@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "repository": "saf1102/opentake-standard",
+  "firstCollectedAt": "2026-10-27T15:14:09.061Z",
+  "clones": {
+    "status": "unavailable",
+    "lastSuccessAt": null,
+    "history": null,
+    "attemptedAt": "2026-10-27T15:14:09.061Z"
+  },
+  "sourceZip": {
+    "status": "ok",
+    "lastSuccessAt": "2026-10-27T15:14:09.061Z",
+    "assets": [],
+    "intervals": [
+      {
+        "from": null,
+        "to": "2026-10-27T15:14:09.061Z",
+        "increase": 0,
+        "firstSeenBaseline": 0,
+        "correction": 0,
+        "kind": "first-baseline",
+        "utcDate": null,
+        "changes": []
+      }
+    ],
+    "attemptedAt": "2026-10-27T15:14:09.061Z",
+    "lastSnapshot": "[]"
+  },
+  "lastCollectedAt": "2026-10-27T15:14:09.061Z",
+  "automaticSourceArchiveDownloads": null
+}
