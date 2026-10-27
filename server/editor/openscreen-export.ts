@@ -240,6 +240,26 @@ export function stageEditorSettings(document: unknown, snapshot: unknown, root =
   return staged;
 }
 
+/** The installed renderer discovers telemetry beside the video, not in Standard's media database. */
+export function stageCursorSidecars(document: unknown, project: EditProject, projectDir: string, stagingDir: string) {
+  const staged = structuredClone(document) as JsonObject;
+  for (const asset of (Array.isArray(staged.assets) ? staged.assets : []) as JsonObject[]) {
+    const media = project.media.find(m => m.id === asset.id);
+    const relative = media?.capture?.cursorDataFile;
+    if (!relative) continue;
+    const cursor = path.resolve(projectDir, relative);
+    if (!cursor.startsWith(path.resolve(projectDir) + path.sep) || !fs.existsSync(cursor))
+      throw new Error('录屏鼠标数据缺失，不能导出不一致的成片');
+    const source = String(asset.originalPath || '');
+    if (!path.isAbsolute(source) || !fs.existsSync(source)) throw new Error('录屏源视频缺失');
+    const video = path.join(stagingDir, `${safeId(asset.id, '素材 ID')}${path.extname(source) || '.mp4'}`);
+    fs.copyFileSync(source, video, fs.constants.COPYFILE_FICLONE);
+    fs.copyFileSync(cursor, `${video}.cursor.json`);
+    asset.originalPath = video;
+  }
+  return staged;
+}
+
 function qualityOf(value: unknown): OpenScreenExportJob["quality"] {
   return value === "medium" || value === "source" ? value : "good";
 }
@@ -294,12 +314,13 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
 
   const stagingDir = path.join(exportJobsDir(found.dir, documentId), `.staging-${id}`);
   fs.mkdirSync(stagingDir, { recursive: true });
-  const stagedDocument = localizeDocument(
+  const localizedDocument = localizeDocument(
     stageEditorSettings(current.document, input.exportEditor),
     found.dir,
     found.project,
     path.dirname(path.join(found.dir, current.ref.relativePath)),
   );
+  const stagedDocument = stageCursorSidecars(localizedDocument, found.project, found.dir, stagingDir);
   const stagedProject = path.join(stagingDir, "project.openscreen");
   fs.writeFileSync(stagedProject, JSON.stringify(stagedDocument, null, 2));
 

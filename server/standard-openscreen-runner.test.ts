@@ -65,3 +65,18 @@ test('isolated OpenScreen profile requires an absolute path and passes it to nat
  assert.throws(()=>openScreenProfile({OPENSCREEN_USER_DATA_DIR:'relative'}),/绝对路径/);
  assert.deepEqual(openScreenProfileArgs({OPENSCREEN_USER_DATA_DIR:'/tmp/isolated screen'}),['--user-data-dir=/tmp/isolated screen']);
 });
+
+test('cursor sidecar accompanies staged video without mutating original media',async()=>{
+ const {stageCursorSidecars}=await import('./editor/openscreen-export.ts');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'screen-cursor-'));
+ try {
+  const video=path.join(root,'original.mp4'),cursor=path.join(root,'cursor.json'),stage=path.join(root,'stage');fs.mkdirSync(stage);fs.writeFileSync(video,'video');fs.writeFileSync(cursor,'{"samples":[]}');
+  const project={media:[{id:'a',capture:{cursorDataFile:'cursor.json'}}]} as any;
+  const doc={assets:[{id:'a',originalPath:video}]};
+  const staged=stageCursorSidecars(doc,project,root,stage) as any;
+  assert.equal(doc.assets[0].originalPath,video);assert.equal(fs.existsSync(video+'.cursor.json'),false);
+  assert.equal(fs.readFileSync(staged.assets[0].originalPath+'.cursor.json','utf8'),fs.readFileSync(cursor,'utf8'));
+  assert.equal(fs.readFileSync(staged.assets[0].originalPath,'utf8'),'video');
+  fs.unlinkSync(cursor);assert.throws(()=>stageCursorSidecars(doc,project,root,stage),/鼠标数据缺失/);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});

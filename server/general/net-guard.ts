@@ -1,3 +1,5 @@
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 /**
  * 联网 lets the agent find material online (pictures, sound, music, data), never software (S先生 2026-10-26: 下载软件、
  * 插件、代码这些在后台关闭). Three layers, whether the switch is on or off:
@@ -46,6 +48,20 @@ function binary(file: string) {
  * Move the software found in `work` to `dest`. Code is allowed where the agent writes its own (the pages and their
  * folders); a code library in assets/ or vendor/ must be one we allow (`allowed`: sha256 of the copies that are fine).
  */
+function savedVersionArchive(work: string, rel: string) {
+  const match = /^versions\/v([1-9]\d*)\.zip$/.exec(rel);
+  if (!match) return false;
+  const project = path.dirname(work), n = match[1];
+  // This host-owned snapshot is outside the agent's writable work directory.
+  // An archive name alone never grants an exception: every byte must match.
+  const snapshot = path.join(project, 'versions', `v${n}`, 'work');
+  const result = spawnSync(process.env.LINKREADER_PYTHON || 'python3', [
+    fileURLToPath(new URL('./version-archive.py', import.meta.url)), path.join(work, rel), snapshot,
+    path.join(project, 'versions', `v${n}.mp4`),
+  ], {timeout: 30000, stdio: 'ignore'});
+  return result.status === 0;
+}
+
 export function quarantineSoftware(work: string, dest: string, allowed: string[] = KEPT_LIBRARIES) {
   const ok = new Set(allowed);
   const moved: string[] = [];
@@ -65,7 +81,7 @@ export function quarantineSoftware(work: string, dest: string, allowed: string[]
         walk(rel); continue;
       }
       const top = rel.split('/')[0];
-      if (PACKAGE_FILES.test(entry.name) || binary(path.join(work, rel))) { move(rel); continue; }
+      if (PACKAGE_FILES.test(entry.name) || binary(path.join(work, rel))) { if (!savedVersionArchive(work, rel)) move(rel); continue; }
       if (CODE.test(entry.name) && (top === 'assets' || top === 'vendor') && !ok.has(hash(path.join(work, rel)))) move(rel);
     }
   };
