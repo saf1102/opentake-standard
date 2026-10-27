@@ -157,6 +157,8 @@ interface VirtualPreviewProps {
 	/** LinkReader's browser host has no native compositor, so it needs the DOM
 	 * cursor layer that Electron deliberately omits to avoid drawing twice. */
 	renderBrowserCursor?: boolean;
+	cursorFrameShortSide?: number;
+	cursorPreviousFrame?: {x:number;y:number;width:number;height:number};
 }
 
 export function VirtualPreview({
@@ -177,6 +179,8 @@ export function VirtualPreview({
 	cropRegion,
 	clockRef,
 	renderBrowserCursor = false,
+	cursorFrameShortSide = 720,
+	cursorPreviousFrame,
 }: VirtualPreviewProps) {
 	const { settings } = useEditorSettings();
 	// ponytail: an oversized, offset video inside .videoFrame's overflow:hidden
@@ -704,6 +708,7 @@ export function VirtualPreview({
 			disableZoomTransform || zoomRegions.length === 0
 				? IDENTITY_ZOOM_TRANSFORM
 				: computeZoomPreviewTransform(zoomRegions, virtualTimeSec * 1000, undefined, playbackRate);
+		frame.style.setProperty("--cursor-camera-scale", String(transform.scale));
 		frame.style.transform = `translate(${transform.translateXPercent}%, ${transform.translateYPercent}%) scale(${transform.scale})`;
 	}, [zoomRegions, virtualTimeSec, disableZoomTransform]);
 
@@ -963,7 +968,8 @@ export function VirtualPreview({
 		<div className={styles.container} data-load-state={loadState}>
 			{activeSource ? (
 				<>
-					<div ref={videoFrameRef} className={styles.videoFrame}>
+					<div ref={videoFrameRef} className={styles.videoFrame} style={renderBrowserCursor ? {overflow: "visible"} : undefined}>
+						<div style={{position: "absolute", inset: 0, overflow: "hidden", borderRadius: videoStyle?.borderRadius, display: "flex", alignItems: "center", justifyContent: "center"}}>
 						<video
 							// Key on the asset id, not the URL: distinct assets that resolve
 							// to the same file URL must still remount the <video> on switch so
@@ -1135,6 +1141,7 @@ export function VirtualPreview({
 							// handles clip-end advancement, so dropping the event
 							// handler here is safe.
 						/>
+						</div>
 						<audio
 							key={`${activeSource.id}:primary-audio`}
 							ref={setPrimaryAudioElement}
@@ -1163,6 +1170,9 @@ export function VirtualPreview({
 						    Réessayer, rendue au-dessus de la dernière image composée. */}
 						{renderBrowserCursor ? (
 							<BrowserCursorPreview
+								frameShortSide={cursorFrameShortSide}
+								previousFrame={cursorPreviousFrame}
+								padding={settings.padding}
 								videoPath={activeSource.filePath ?? activeSource.src}
 								sourceTimeSec={sourceTimeSec}
 								show={settings.cursorShow}

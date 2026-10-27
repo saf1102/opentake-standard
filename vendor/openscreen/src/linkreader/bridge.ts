@@ -293,11 +293,22 @@ function gifSizeFromParams(params: Record<string, unknown> | undefined) {
 	return "original" as const;
 }
 
+let browserExportCancelRequested = false;
+let activeBrowserExport: {documentId: string; started: Promise<OpenScreenExportJob>} | null = null;
+export async function cancelBrowserExport() {
+ browserExportCancelRequested = true;
+ const active = activeBrowserExport;
+ if (!active) return;
+ const job = await active.started;
+ return api<OpenScreenExportJob>(`${exportBase(active.documentId)}/exports/${encodeURIComponent(job.id)}/cancel`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({clientId})});
+}
+
 async function runNativeExport(request: {
 	action: "exportMulti" | "exportGif";
 	payload?: Record<string, unknown>;
 	requestId?: string;
 }) {
+	browserExportCancelRequested = false;
 	if (!activeDocumentId) throw new Error("请先打开一个 OpenScreen 工程");
 	if (!writable) throw new Error("当前工程为只读，不能导出");
 	const payload = request.payload || {};
@@ -323,7 +334,7 @@ async function runNativeExport(request: {
 		label: `OpenScreen 正在导出 ${format.toUpperCase()}…`,
 		documentId: activeDocumentId,
 	});
-	const started = await api<OpenScreenExportJob>(`${exportBase(activeDocumentId)}/exports`, {
+	const startedPromise = api<OpenScreenExportJob>(`${exportBase(activeDocumentId)}/exports`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
@@ -339,7 +350,11 @@ async function runNativeExport(request: {
 			totalFrames,
 		}),
 	});
-	let job = started;
+	const active = {documentId: activeDocumentId, started: startedPromise};
+	activeBrowserExport = active;
+	try {
+	let job = await startedPromise;
+	if (browserExportCancelRequested) job = await cancelBrowserExport() ?? job;
 	let lastFrame = -1;
 	while (job.status === "queued" || job.status === "running") {
 		const frame = Math.min(
@@ -352,9 +367,10 @@ async function runNativeExport(request: {
 		}
 		await sleep(450);
 		job = await api<OpenScreenExportJob>(
-			`${exportBase(activeDocumentId)}/exports/${encodeURIComponent(job.id)}`,
+			`${exportBase(active.documentId)}/exports/${encodeURIComponent(job.id)}`,
 		);
 	}
+	if (job.status === "cancelled") throw new Error("OPENSCREEN_EXPORT_CANCELLED");
 	if (job.status !== "completed") throw new Error(job.error || `OpenScreen 导出${job.status}`);
 	for (const listener of nativeExportProgressListeners) listener(totalFrames);
 	bridgeMessage("export-state", {
@@ -370,6 +386,7 @@ async function runNativeExport(request: {
 		wallS: job.wallS ?? 0,
 		...(format === "gif" ? { fileBytes: 0 } : {}),
 	};
+	} finally { if (activeBrowserExport === active) activeBrowserExport = null; }
 }
 
 
@@ -582,7 +599,7 @@ async function createDocument(document: AxcutDocument): Promise<DocumentEnvelope
 	return { ...result, document: normalizeDocument(result.document) };
 }
 
-async function saveDocument(document: AxcutDocument): Promise<DocumentEnvelope> {
+async function persistHostDocument(document: AxcutDocument): Promise<DocumentEnvelope> {
 	if (!writable) throw new Error("当前工程为只读，修改不会保存");
 	const normalized = normalizeDocument(document);
 	const id = normalized.project.id;
@@ -784,7 +801,7 @@ export async function installLinkReaderBridge() {
 		try {
 			return {
 				success: true,
-				document: (await saveDocument(documentSchema.parse(value))).document,
+				document: (await persistHostDocument(documentSchema.parse(value))).document,
 			};
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -826,7 +843,7 @@ export async function installLinkReaderBridge() {
 				},
 			],
 		});
-		const saved = await saveDocument(next);
+		const saved = await persistHostDocument(next);
 		return { assetId, document: saved.document };
 	};
 	ai.removeAsset = async (id: string, assetId: string) => {
@@ -839,7 +856,7 @@ export async function installLinkReaderBridge() {
 				clips: current.document.timeline.clips.filter((clip) => clip.assetId !== assetId),
 			},
 		});
-		const saved = await saveDocument(next);
+		const saved = await persistHostDocument(next);
 		return { assetId, document: saved.document };
 	};
 
@@ -1099,8 +1116,8 @@ export async function installLinkReaderBridge() {
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				bridgeMessage("export-state", {
-					status: "failed",
-					label: message,
+					status: message === "OPENSCREEN_EXPORT_CANCELLED" ? "cancelled" : "failed",
+					label: message === "OPENSCREEN_EXPORT_CANCELLED" ? "已取消导出" : message,
 					documentId: activeDocumentId,
 				});
 				return {

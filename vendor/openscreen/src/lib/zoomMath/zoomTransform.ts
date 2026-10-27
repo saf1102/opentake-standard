@@ -40,15 +40,13 @@ export function computeZoomTransform({
 	// Focus coords are stage-normalized (0-1 of full canvas), so map directly to stage pixels, not via baseMask.
 	const focusStagePxX = focusX * stageSize.width;
 	const focusStagePxY = focusY * stageSize.height;
-	const stageCenterX = stageSize.width / 2;
-	const stageCenterY = stageSize.height / 2;
-	const scale = 1 + (zoomScale - 1) * progress;
-	const finalX = stageCenterX - focusStagePxX * zoomScale;
-	const finalY = stageCenterY - focusStagePxY * zoomScale;
-
+	const centerX = baseMask.x + baseMask.width / 2;
+	const centerY = baseMask.y + baseMask.height / 2;
+	// Match OpenScreen 2.1.2's exponential zoom interpolation.
+	const scale = Math.max(zoomScale, 0.001) ** progress;
 	return {
 		scale,
-		x: finalX * progress,
-		y: finalY * progress,
+		x: focusStagePxX + (centerX - focusStagePxX) * progress - focusStagePxX * scale,
+		y: focusStagePxY + (centerY - focusStagePxY) * progress - focusStagePxY * scale,
 	};
 }

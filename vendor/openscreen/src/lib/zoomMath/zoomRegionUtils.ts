@@ -11,14 +11,12 @@ import {
 	lerpRotation3D,
 } from "@/components/video-editor/types";
 import { clamp01 } from "@/utils/math";
-import { TRANSITION_WINDOW_MS, ZOOM_IN_TRANSITION_WINDOW_MS } from "./constants";
 import { interpolateCursorAt } from "./cursorFollowUtils";
 import { clampFocusToScale } from "./focusUtils";
-import { cubicBezier, easeOutScreenStudio } from "./mathUtils";
+import { cubicBezier } from "./mathUtils";
 
 const CHAINED_ZOOM_PAN_GAP_MS = 1500;
 const CONNECTED_ZOOM_PAN_DURATION_MS = 1000;
-const ZOOM_IN_OVERLAP_MS = 500;
 
 type DominantRegionOptions = {
 	connectZooms?: boolean;
@@ -50,39 +48,24 @@ function easeConnectedPan(value: number) {
 	return cubicBezier(0.1, 0.0, 0.2, 1.0, value);
 }
 
-// ponytail: `playbackRate` lets the caller scale the lead-in / lead-out
-// windows in source-time so the zoom transition stays wall-clock constant
-// inside speed regions (2× speed → window is 2× source-ms → takes 1×
-// wall-clock-ms to traverse). Hold span between `zoomInEnd` and
-// `region.endMs` stays in source-time, so the zoomed state still flies
-// through under speed regions — that's the duration the user expects
-// to scale.
+// OpenScreen 2.1.2 uses scale-dependent transition duration and a normalized
+// critically damped ease. Keep browser preview in sync with the installed
+// compositor: the earlier fixed window/500ms overlap moved both video and
+// cursor ahead of the exported frame during zoom transitions.
 export function computeRegionStrength(
-	region: ZoomRegion,
-	timeMs: number,
-	playbackRate = 1,
+ region: ZoomRegion,
+ timeMs: number,
+ playbackRate = 1,
 ): number {
-	const zoomInWindow = ZOOM_IN_TRANSITION_WINDOW_MS * playbackRate;
-	const zoomOutWindow = TRANSITION_WINDOW_MS * playbackRate;
-	const zoomInEnd = region.startMs + ZOOM_IN_OVERLAP_MS;
-	const leadInStart = zoomInEnd - zoomInWindow;
-	const leadOutEnd = region.endMs + zoomOutWindow;
-
-	if (timeMs < leadInStart || timeMs > leadOutEnd) {
-		return 0;
-	}
-
-	if (timeMs < zoomInEnd) {
-		const progress = (timeMs - leadInStart) / zoomInWindow;
-		return easeOutScreenStudio(progress);
-	}
-
-	if (timeMs <= region.endMs) {
-		return 1;
-	}
-
-	const progress = clamp01((timeMs - region.endMs) / zoomOutWindow);
-	return 1 - easeOutScreenStudio(progress);
+ const window = (600 + 550 * Math.log(Math.max(1, getZoomScale(region)))) * Math.max(0.001, playbackRate);
+ const ease = (value: number) => {
+  const t = 7 * clamp01(value);
+  return (1 - (1 + t) * Math.exp(-t)) / (1 - 8 * Math.exp(-7));
+ };
+ if (timeMs < region.startMs - window || timeMs > region.endMs + window) return 0;
+ if (timeMs < region.startMs) return ease((timeMs - region.startMs + window) / window);
+ if (timeMs <= region.endMs) return 1;
+ return 1 - ease((timeMs - region.endMs) / window);
 }
 
 function getLinearFocus(start: ZoomFocus, end: ZoomFocus, amount: number): ZoomFocus {

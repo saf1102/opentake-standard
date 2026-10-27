@@ -8,6 +8,7 @@
 // used by the legacy VideoEditor; this one is a compact surface tuned for
 // the new shell's modal style.
 
+import { cancelBrowserExport } from "@/linkreader/bridge";
 import { Download, FileVideo, FolderOpen, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -139,7 +140,8 @@ export function ExportDialog({ open, onClose, document }: ExportDialogProps) {
 	const [progress, setProgress] = useState<ExportProgress | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [savedPath, setSavedPath] = useState<string | null>(null);
-	const cancelRef = useRef<{ cancel: () => void } | null>(null);
+	const cancelRequested = useRef(false);
+	const [cancelling, setCancelling] = useState(false);
 
 	// (Old behavior: the native compositor overlay used to be a top-level OS window outside the
 	//  Chromium surface, so we'd hide it here to put this modal in front. The compositor now
@@ -231,9 +233,16 @@ export function ExportDialog({ open, onClose, document }: ExportDialogProps) {
 			setProgress(null);
 			setError(null);
 			setSavedPath(null);
-			cancelRef.current = null;
+			setCancelling(false);
 		}
 	}, [open]);
+
+	const handleCancel = async () => {
+		cancelRequested.current = true;
+		setCancelling(true);
+		try { await cancelBrowserExport(); } catch (err) { setError(String(err)); }
+		finally { setCancelling(false); }
+	};
 
 	const handleClose = () => {
 		if (phase === "rendering" || phase === "writing") return;
@@ -241,6 +250,7 @@ export function ExportDialog({ open, onClose, document }: ExportDialogProps) {
 	};
 
 	const handleStart = async () => {
+		cancelRequested.current = false;
 		if (!document) return;
 		const asset = primaryAsset;
 		if (!asset) {
@@ -269,7 +279,7 @@ export function ExportDialog({ open, onClose, document }: ExportDialogProps) {
 			setPhase("error");
 			return;
 		}
-		if (!pickedPath) {
+		if (!pickedPath || cancelRequested.current) {
 			setPhase("idle");
 			return;
 		}
@@ -342,6 +352,7 @@ export function ExportDialog({ open, onClose, document }: ExportDialogProps) {
 					},
 				});
 			} catch (err) {
+				if (String(err).includes("OPENSCREEN_EXPORT_CANCELLED")) { setPhase("idle"); setProgress(null); setError(null); return; }
 				setError(err instanceof Error ? err.message : String(err));
 				setPhase("error");
 				toast.error(t("exportDialog.exportFailed"), {
@@ -648,10 +659,10 @@ export function ExportDialog({ open, onClose, document }: ExportDialogProps) {
 					<button
 						type="button"
 						className={`${styles.btn} ${styles.btnSecondary}`}
-						onClick={handleClose}
-						disabled={isBusy}
+						onClick={isBusy ? handleCancel : handleClose}
+						disabled={cancelling}
 					>
-						{phase === "done" ? t("exportDialog.close") : t("exportDialog.cancel")}
+						{cancelling ? "Cancelling…" : phase === "done" ? t("exportDialog.close") : t("exportDialog.cancel")}
 					</button>
 					<button
 						type="button"

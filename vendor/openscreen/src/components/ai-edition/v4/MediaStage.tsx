@@ -1,4 +1,4 @@
-import { CheckCircle2, Film, FolderOpen, RefreshCw, Search, Send, X } from "lucide-react";
+import { CheckCircle2, Film, FolderOpen, RefreshCw, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AxcutAsset } from "@/lib/ai-edition/schema";

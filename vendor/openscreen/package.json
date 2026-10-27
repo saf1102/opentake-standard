@@ -34,7 +34,8 @@
   "scripts": {
     "build:linkreader": "vite build --config vite.linkreader.config.ts",
     "build:host": "vite build --config vite.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:standard": "vitest run --config vitest.standard.config.ts"
   },
   "dependencies": {
     "@fix-webm-duration/fix": "^1.0.1",

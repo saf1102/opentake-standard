@@ -10,12 +10,13 @@
   "scripts": {
     "start": "electron .",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --experimental-strip-types --test --test-concurrency=4 server/*.test.ts && npm run test:desktop",
+    "test": "node --experimental-strip-types --test --test-concurrency=4 server/*.test.ts && npm run test:desktop && npm run test:openscreen",
     "build": "npm run build:openscreen && vite build",
     "dev": "vite",
     "build:app": "npm run build && node desktop/build-app.mjs",
     "test:desktop": "node --test desktop/*.test.cjs",
-    "build:openscreen": "npm --prefix vendor/openscreen run build:linkreader"
+    "build:openscreen": "npm --prefix vendor/openscreen run build:linkreader",
+    "test:openscreen": "npm --prefix vendor/openscreen run test:standard"
   },
   "dependencies": {
     "@hyperframes/core": "0.8.198",

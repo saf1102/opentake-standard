@@ -22,6 +22,8 @@ Electron: MIT, copyright Electron contributors, https://github.com/electron/elec
 
 OpenScreen: MIT, Siddharth Vaddem and contributors. Complete upstream notices: vendor/openscreen/LICENSE and vendor/openscreen/THIRD-PARTY-NOTICES.md. OpenTake modifications are AGPL-3.0.
 
+Default cursor PNG artwork and normalized hotspots are synchronized from the locally installed official OpenScreen 2.1.2 distribution (MIT), copyright 2025 Siddharth Vaddem and 2025–2026 OpenScreen contributors. The browser zoom transition adapter follows that version's compositor behavior. Full license: vendor/openscreen/LICENSE. No OpenScreen executable is included.
+
 
 ## OpenScreen upstream notices
 

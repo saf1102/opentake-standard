@@ -329,6 +329,19 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 		style.borderRadius=`${previewRadius(layout.screenBorderRadius ?? settings.borderRadius,frameSize,output)}px`;
 		return style;
 	}, [layout, settings, frameSize, isLinkReaderBrowser, isPlaying, props.speedRegions, props.zoomRegions, props.currentTimeSec, document]);
+	// Motion-blur history must use the previous camera rectangle too; using
+	// today's zoom for every tap makes the pointer smear along a different path.
+	const cursorPreviousFrame = useMemo(() => {
+		if (!isLinkReaderBrowser || !layout?.screenRect) return undefined;
+		const now = props.currentTimeSec * 1000;
+		const previous = now - Math.min(1, Math.max(0, settings.cursor.motionBlur)) / 60 * 1000;
+		const rectAt = (time: number) => screenPreviewRect(layout.screenRect!, frameSize,
+			computeZoomPreviewTransform(props.zoomRegions ?? [], time, undefined,
+				findActiveSpeedRegion(props.speedRegions ?? [], Math.round(time))?.speed ?? 1));
+		const current = rectAt(now), prior = rectAt(previous);
+		return {x:(prior.x-current.x)/current.width,y:(prior.y-current.y)/current.height,
+			width:prior.width/current.width,height:prior.height/current.height};
+	}, [isLinkReaderBrowser, layout, frameSize, props.currentTimeSec, props.zoomRegions, props.speedRegions, settings.cursor.motionBlur]);
 	const webcamStyle = useMemo(
 		() => buildWebcamStyle(effectiveLayout, settings, frameSize),
 		[effectiveLayout, settings, frameSize],
@@ -427,7 +440,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 			    dual preview path. */}
 			{isLinkReaderBrowser ? null : <NativeCompositorOverlay />}
 			{layout?.screenRect ? (
-				<div className={styles.screenStage} style={screenStyle}>
+				<div className={styles.screenStage} style={{...screenStyle, ...(isLinkReaderBrowser ? {overflow: "visible"} : {})}}>
 					{(() => {
 						// ponytail: PreviewCompositor (Pixi v8) regressed the screen
 						// preview — the `<video>` is `visibility: hidden` while it's
@@ -447,10 +460,12 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 							<VirtualPreview
 								{...relayProps}
 								renderBrowserCursor={isLinkReaderBrowser}
+								cursorFrameShortSide={Math.min(frameSize.width, frameSize.height)}
+								cursorPreviousFrame={cursorPreviousFrame}
 								disableZoomTransform={isLinkReaderBrowser}
 								videoStyle={{
 									...videoBorderRadiusStyle(layout, settings),
-									...(isLinkReaderBrowser ? { visibility: "visible" as const, borderRadius: 0 } : {}),
+									...(isLinkReaderBrowser ? { visibility: "visible" as const, borderRadius: screenStyle.borderRadius } : {}),
 								}}
 							/>
 						);

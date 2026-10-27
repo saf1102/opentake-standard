@@ -9,7 +9,7 @@ import { readOpenScreenDocument } from "./openscreen-documents.ts";
 import { atomicJson, findProject } from "./store.ts";
 
 type JsonObject = Record<string, unknown>;
-type LiveExport = { child: ChildProcess; startedAt: number };
+type LiveExport = { child: ChildProcess; startedAt: number; job: OpenScreenExportJob };
 
 const live = new Map<string, LiveExport>();
 export const activeOpenScreenExports = () => live.size;
@@ -349,7 +349,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     env: runner.env,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  live.set(id, { child, startedAt: Date.now() });
+  live.set(id, { child, startedAt: Date.now(), job });
   job.status = "running";
   job.startedAt = Date.now();
   job.progress = 1;
@@ -359,6 +359,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   const diagnostics: string[] = [];
   const stderr: string[] = [];
   child.stdout.on("data", (chunk) => readJsonLines(String(chunk), stdout, (event) => {
+    if (job.status === "cancelled") return;
     inferProgress(event, job);
     if (event.error || event.message || event.type === "error") {
       diagnostics.push(JSON.stringify(event));
@@ -372,6 +373,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   });
   child.once("error", (error) => {
     live.delete(id);
+    if (job.status === "cancelled") return;
     job.status = "failed";
     job.error = error.message;
     persist(job);
@@ -379,6 +381,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   child.once("close", (code, signal) => {
     live.delete(id);
     if (job.status === "cancelled") {
+      fs.rmSync(stagingDir, {recursive: true, force: true});
       persist(job);
       return;
     }
@@ -419,7 +422,8 @@ export function readOpenScreenExport(projectId: string, documentId: string, jobI
 }
 
 export function cancelOpenScreenExport(projectId: string, documentId: string, jobId: string) {
-  const job = readOpenScreenExport(projectId, documentId, jobId);
+  const persisted = readOpenScreenExport(projectId, documentId, jobId);
+  const job = live.get(jobId)?.job ?? persisted;
   if (job.status !== "running" && job.status !== "queued") return job;
   job.status = "cancelled";
   job.completedAt = Date.now();
