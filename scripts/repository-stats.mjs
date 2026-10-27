@@ -184,6 +184,7 @@ export function report(history) {
     `| ZIP 最近成功采集（UTC） | ${zip.lastSuccessAt??'尚未成功'} |\n`+
     `| Clone 本次状态 | ${clones.status==='ok'?'成功':'未知（无权限或 API 不可用），不按 0 次处理'} |\n`+
     `| GitHub 自动 Download ZIP / 自动 Source code archive | 未知，API 无对应计数 |\n\n`;
+  text+='计数由 GitHub 提供，可能尚未反映已发生的下载；采集成功只表示 API 返回成功。0 是平台当前返回值，不能据此断言无人下载。\n\n';
   text+='**这些是请求次数，不是独立下载人数、安装成功数或活跃用户数。** ZIP 与 clone 分开，不相加成“用户数”。下载依赖工具、重复下载和自动化也可能计入。\n\n';
   text+='## 每日 ZIP 已确认增量（最近 30 天）\n\n每小时采集；只能把起止均在同一 UTC 日的差值归到当天。跨日和漏采区间保留在下面，不分摊。当天表内数字是已确认部分，不是完整自然日总量。\n\n| UTC 日期 | 同日区间新增 | 同日计数修正 | 跨日/漏采待归属区间数 | 覆盖状态 |\n|---|---:|---:|---:|---|\n';
   text+=dailyZipRows(zip).map(r=>`| ${r.date} | ${r.increase??'未知'} | ${r.correction??'未知'} | ${r.unallocated} | ${r.baseline?'含首次基线；':''}${r.unallocated?'部分覆盖，跨日量未分配':'仅已观测区间'} |`).join('\n')+'\n\n';

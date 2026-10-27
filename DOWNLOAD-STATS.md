@@ -16,7 +16,7 @@ OpenTake Standard 不向我们上传安装、启动或使用遥测。维护工�
 
 ## 每日查看与长期留存
 
-`Repository download statistics` 工作流在官方仓库每小时 UTC 的 17 分采集，也可手动运行。fork 默认不执行。聚合结果保存到独立 `repository-stats` 分支，只包含 `history.json` 和中文 `README.md`，不修改 main 源码。GitHub 调度可能延迟，应检查报告的最近成功采集时间。
+`Repository download statistics` 工作流在官方仓库每小时 UTC 的 17 分采集，也可手动运行。fork 默认不执行。聚合结果保存到独立 `repository-stats` 分支，只包含 `history.json` 和中文 `README.md`，不修改 main 源码。GitHub 调度可能延迟，应检查报告的最近成功采集时间。API 计数也可能尚未反映已发生的下载；采集成功只表示读取成功，0 不能直接证明无人下载。2026-10-27 上线验收中源码 ZIP 已完整下载且 SHA-256 正确，但随后平台仍返回 0，因此正向计数增量尚未确认，没有手工改数。
 
 - README 展示最近 30 天的“同一 UTC 日内已确认 ZIP 新增”及计数修正、跨日/漏采覆盖状态；它不是精确的完整自然日下载总量。
 - 上次采集和本次采集跨午夜时，增量保留为“跨 UTC 日区间”，不硬塞给任意一天；相隔超过 36 小时标为漏采。最近 72 个区间可直接查看，完整历史保存在 JSON。
