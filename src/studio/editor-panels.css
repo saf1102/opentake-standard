@@ -1,0 +1,147 @@
+/* Left media library and right inspector: one row height (28–32px), one label size (12px), left-aligned labels,
+   equal-width segmented tabs and category tiles, and one quiet red style for every delete action.
+   Every theme; colours from editor-tokens.css. Layout only — no control changes what it does. */
+
+/* ---------- media library ---------- */
+html[data-ui-theme] .media-library-toolbar { gap: 6px; align-items: center; }
+html[data-ui-theme] .media-library-toolbar > :is(.upload-button, .media-paste-button) { height: 32px; min-height: 32px; border-radius: 8px; }
+html[data-ui-theme] .media-library-toolbar > .upload-button { flex: 1; justify-content: center; font-size: 13px; font-weight: 600; }
+html[data-ui-theme] .media-library-toolbar > .media-paste-button { width: 32px; padding: 0; display: inline-grid; place-items: center; }
+html[data-ui-theme] .media-search { height: 32px; min-height: 32px; border-radius: 8px; }
+/* categories: row one is the media types (4 tiles), row two the B-roll families (3 tiles) — equal widths per row */
+html[data-ui-theme] .media-category-overlap .media-type-filters {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0;
+}
+html[data-ui-theme] .media-category-overlap .media-type-filters > button {
+  grid-column: span 3;
+  height: 28px;
+  min-height: 28px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 7px;
+  font-size: var(--ed-text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+}
+html[data-ui-theme] .media-category-overlap .media-type-filters > button span { margin: 0; font-size: var(--ed-text-xs); opacity: .7; font-variant-numeric: tabular-nums; }
+html[data-ui-theme] .media-type-filters > [data-media-category=all] { order: 1; }
+html[data-ui-theme] .media-type-filters > [data-media-category=video] { order: 2; }
+html[data-ui-theme] .media-type-filters > [data-media-category=audio] { order: 3; }
+html[data-ui-theme] .media-type-filters > [data-media-category=recording] { order: 4; }
+html[data-ui-theme] .media-type-filters > [data-media-category=b-roll] { order: 5; }
+html[data-ui-theme] .media-type-filters > [data-media-category=image] { order: 6; }
+html[data-ui-theme] .media-type-filters > [data-media-category=general] { order: 7; }
+html[data-ui-theme] .media-category-overlap .media-type-filters > :is([data-media-category=b-roll], [data-media-category=image], [data-media-category=general]) { grid-column: span 4; }
+html[data-ui-theme] .media-library-summary { min-height: 24px; align-items: center; font-size: var(--ed-text-sm); color: var(--ed-muted); }
+html[data-ui-theme] .media-library-summary summary { font-size: var(--ed-text-sm); cursor: pointer; }
+html[data-ui-theme] .media-panel .media-reveal-button {
+  height: 30px;
+  min-height: 30px;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  font-size: var(--ed-text);
+  color: var(--ed-ink-2);
+}
+
+/* ---------- inspector: equal tabs ---------- */
+html[data-ui-theme] .inspector-panel .inspector-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin: 10px 12px 10px;
+  padding: 3px;
+  min-height: 0;
+  border: 1px solid var(--ed-line) !important;
+  border-radius: 9px;
+  background: var(--ed-input) !important;
+  box-shadow: none !important;
+}
+/* every tab has its own icon; icon above label keeps four tabs equal width without squeezing the words */
+html[data-ui-theme] .inspector-panel .inspector-tabs button {
+  height: 46px;
+  min-height: 46px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 4px;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ed-ink-2) !important;
+  font-size: var(--ed-text-sm) !important;
+  font-weight: 500;
+  white-space: nowrap;
+}
+html[data-ui-theme] .inspector-panel .inspector-tabs button svg { width: 17px; height: 17px; flex: none; stroke-width: 1.75; color: var(--ed-icon); }
+html[data-ui-theme] .inspector-panel .inspector-tabs button:hover:not(.active):not([aria-pressed=true]) { background: var(--ed-raise) !important; color: var(--ed-ink) !important; }
+html[data-ui-theme] .inspector-panel .inspector-tabs button:is(.active, [aria-pressed=true]) {
+  background: var(--ed-raise-hi) !important;
+  color: var(--ed-accent-text) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ed-accent) 40%, transparent), var(--ed-shadow-sm) !important;
+  font-weight: 600;
+}
+
+/* ---------- inspector: headings, labels, rows ---------- */
+html[data-ui-theme] .inspector-panel :is(.position-editor > div > b, .card-layout-editor > b, .card-layout-editor__title b, .card-inspector__heading b) {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ed-ink);
+}
+html[data-ui-theme] .inspector-panel :is(.card-layout-editor__title span, .card-layout-editor small, .card-inspector__heading small) { font-size: var(--ed-text-sm); color: var(--ed-muted); }
+html[data-ui-theme] .inspector-panel .position-editor label > span { margin-bottom: 2px; font-size: var(--ed-text); color: var(--ed-ink-2); }
+html[data-ui-theme] .inspector-panel .position-editor label > span output { font-size: var(--ed-text); color: var(--ed-ink); font-variant-numeric: tabular-nums; }
+html[data-ui-theme] .inspector-panel .position-editor > div:first-child { min-height: 28px; align-items: center; }
+html[data-ui-theme] .inspector-panel .position-editor > div:first-child button { height: 24px; padding: 0 8px; border-radius: 6px; font-size: var(--ed-text-sm); }
+html[data-ui-theme] .inspector-panel .card-inspector__heading { min-height: 32px; padding-bottom: 10px; border-bottom-color: var(--ed-line-2); }
+html[data-ui-theme] .inspector-panel :is(.subtitle-text-field > span, .card-layout-editor__background > span) { font-size: var(--ed-text); color: var(--ed-ink-2); }
+html[data-ui-theme] .inspector-panel :is(input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=color]), select) { min-height: 30px; border-radius: 7px; }
+html[data-ui-theme] .inspector-panel textarea { border-radius: 8px; font-size: 13px; line-height: 1.6; }
+
+/* one quiet red button for every delete in the inspector, icon and text on one line */
+html[data-ui-theme] .inspector-panel :is(.media-inspector__actions, .card-inspector__actions, .card-inspector__heading) > button.danger {
+  height: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--ed-danger) 40%, transparent) !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ed-danger) !important;
+  font-size: var(--ed-text) !important;
+  white-space: nowrap;
+}
+html[data-ui-theme] .inspector-panel :is(.media-inspector__actions, .card-inspector__actions, .card-inspector__heading) > button.danger svg { width: 14px; height: 14px; color: currentColor; }
+html[data-ui-theme] .inspector-panel :is(.media-inspector__actions, .card-inspector__actions, .card-inspector__heading) > button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--ed-danger) 12%, transparent) !important; }
+html[data-ui-theme] .inspector-panel .media-inspector__actions { margin: 0 0 8px; }
+
+/* motion-card slot: duration row, then a status pill */
+html[data-ui-theme] .inspector-panel form.inspector-card-status { display: flex; align-items: center; gap: 8px; margin: 0 12px 8px; color: var(--ed-ink-2); }
+html[data-ui-theme] .inspector-panel form.inspector-card-status label { display: flex; align-items: center; gap: 8px; flex: 1; font-size: var(--ed-text); }
+html[data-ui-theme] .inspector-panel form.inspector-card-status input { width: 72px; margin: 0; padding: 0 8px; border: 1px solid var(--ed-line-2); background: var(--ed-input); color: var(--ed-ink); }
+html[data-ui-theme] .inspector-panel form.inspector-card-status button { height: 30px; padding: 0 10px; border: 1px solid var(--ed-line-2); border-radius: 7px; background: var(--ed-raise); color: var(--ed-ink-2); font-size: var(--ed-text); white-space: nowrap; }
+html[data-ui-theme] .inspector-panel p.inspector-card-status { display: inline-flex; align-items: center; height: 22px; margin: 0 12px 10px; padding: 0 9px; border-radius: 999px; background: var(--ed-raise); color: var(--ed-ink-2); font-size: var(--ed-text-sm); }
+
+/* card layout blocks */
+html[data-ui-theme] .inspector-panel .card-layout-editor { gap: 10px; padding: 12px; border: 1px solid var(--ed-line-2); border-radius: 10px; background: var(--ed-slot); }
+html[data-ui-theme] .inspector-panel .card-layout-editor__segments { gap: 4px; }
+html[data-ui-theme] .inspector-panel .card-layout-editor__segments button { height: 30px; min-height: 30px; border-radius: 7px; font-size: var(--ed-text); }
+html[data-ui-theme] .inspector-panel .full-card-pip-picker legend { margin-bottom: 6px; font-size: var(--ed-text-sm); color: var(--ed-muted); }
+html[data-ui-theme] .inspector-panel .full-card-pip-picker > .full-card-pip-picker__positions.placement-tile-grid > button { min-height: 0; height: 34px; aspect-ratio: auto; }
+html[data-ui-theme] .inspector-panel .full-card-pip-picker :is(.full-card-pip-picker__shapes, [role=group]) > button { min-height: 30px; border-radius: 7px; }

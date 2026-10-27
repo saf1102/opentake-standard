@@ -1,0 +1,57 @@
+{
+  "presets": {
+    "路牌标题": {
+      "font": "Overpass",
+      "fontFile": "Overpass-var.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "weight": 700,
+      "size": 0.078,
+      "color": "#F6F4E9",
+      "accent": "#F6F4E9",
+      "lineHeight": 1.3,
+      "roles": [
+        "title"
+      ],
+      "box": true,
+      "boxColor": "#244838"
+    },
+    "站牌字幕": {
+      "font": "Overpass",
+      "fontFile": "Overpass-var.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "weight": 600,
+      "size": 0.042,
+      "color": "#F6F4E9",
+      "accent": "#F6F4E9",
+      "lineHeight": 1.3,
+      "roles": [
+        "caption"
+      ],
+      "box": true,
+      "boxColor": "#244838"
+    },
+    "倍速时钟": {
+      "font": "IBM Plex Mono",
+      "fontFile": "IBMPlexMono-Medium.ttf",
+      "fallback": "Menlo",
+      "layout": "content",
+      "weight": 500,
+      "size": 0.03,
+      "color": "#FFFFFF",
+      "accent": "#FFFFFF",
+      "lineHeight": 1.3,
+      "roles": [
+        "label"
+      ],
+      "box": true,
+      "boxColor": "#27333C",
+      "uppercase": true
+    }
+  },
+  "finishes": [
+    "none",
+    "vignette"
+  ]
+}

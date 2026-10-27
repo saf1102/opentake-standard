@@ -1,0 +1,203 @@
+/* Home (首页): two entrances, then 我的工程, then 全部模块.
+   Neutral surfaces; the brand colours (amber = 口播, teal = 通用) appear only on dots and the two main buttons.
+   Parallax and entrances move transform and opacity only: no blur, no filter. The base rules below are the flat
+   layout (reduced motion or a small window); the motion block further down layers the parallax on top. */
+:is(.home, .home-soon) {
+  --home-gutter:10px; /* the top bar's own side margin: the least room the cards keep from the window edge */
+  --home-width:1180px; /* the two entrances sit in a centred column; 我的工程 and 全部模块 use the full width */
+  --home-ease:cubic-bezier(.2,.8,.2,1);
+  --home-koubo:#ffb020; --home-koubo-ink:#16171a;
+  --home-general:#2fc6a4; --home-general-ink:#06201a;
+  --home-ink:var(--ui-ink); --home-ink-2:var(--ui-ink); --home-muted:var(--ui-muted);
+  --home-faint:color-mix(in srgb,var(--ui-muted) 70%,transparent);
+  --home-card:var(--ui-glass); --home-card-hover:var(--ui-glass);
+  --home-line:var(--ui-line); --home-line-2:var(--ui-line);
+  --home-bg:#191d20; --home-dim:#0a0b0c8c; --home-backdrop:#0a0b0cb3;
+  --home-sheet-edge:0 -1px 0 #ffffff12,0 -40px 90px #000000b8;
+  --home-media:#0b0c0d; --home-card-shadow:none;
+  /* the two entrance cards let the studio shot behind them show through (no backdrop blur: it would run every frame) */
+  --home-entry-bg:linear-gradient(160deg,#1c1d21a6,#111214b3); --home-entry-line:#ffffff1f;
+  color:var(--home-ink);
+}
+html[data-ui-theme=original] :is(.home, .home-soon) {
+  --home-ink:var(--pro-ink); --home-ink-2:var(--pro-ink-2); --home-muted:var(--pro-muted); --home-faint:var(--pro-faint);
+  --home-card:#17181b; --home-card-hover:#1c1d21; --home-line:#ffffff0d; --home-line-2:#ffffff17;
+  --home-bg:var(--pro-bg);
+}
+html[data-ui-theme=warm] :is(.home, .home-soon) {
+  --home-ink-2:#4a4037; --home-faint:#7a6f62;
+  --home-card:linear-gradient(145deg,#fff9ec4a,#f7eed51a),#a49a8b62; --home-card-hover:linear-gradient(145deg,#fff9ec66,#f7eed526),#a49a8b70;
+  --home-line:#fff8e766; --home-line-2:#5a4c3b29;
+  --home-bg:#b8afa2; --home-dim:#3b322a5c; --home-backdrop:#3b322a80;
+  --home-sheet-edge:0 -1px 0 #fff8e7a6,0 -30px 70px #4a3c2a33;
+  --home-card-shadow:inset 0 1px 0 #fff9ee59,0 5px 16px #57442d0f;
+  --home-entry-bg:linear-gradient(145deg,#fff9ec5c,#f7eed529),#a49a8b4d; --home-entry-line:#fff8e780;
+}
+html[data-ui-theme=frost] :is(.home, .home-soon) {
+  --home-entry-bg:linear-gradient(125deg,#ffffffb3,#faf8f28c 42%,#f4f5f066); --home-entry-line:#ffffffd9;
+  --home-ink-2:#3a524d; --home-faint:#6f837e;
+  --home-card:linear-gradient(125deg,#fffffff0,#faf8f2b8 42%,#f4f5f080); --home-card-hover:linear-gradient(125deg,#fffffff7,#faf8f2d9 42%,#f4f5f0a6);
+  --home-line:#ffffffc9; --home-line-2:#9eb9b159;
+  --home-bg:#f6f4ef; --home-dim:#2f403c4d; --home-backdrop:#2f403c66;
+  --home-sheet-edge:0 -1px 0 #fff,0 -30px 70px #5b746b2e;
+  --home-card-shadow:inset 0 1px 0 #fff,0 1px 2px #5b746b1f,0 8px 22px #5b746b1a;
+}
+
+.home-dot { flex:none;display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--home-koubo); }
+.home-dot[data-kind=general] { background:var(--home-general); }
+
+/* ---------- layer 0: the studio shot behind the entrances (the sign-in page's backdrop, developing under the pointer) ---------- */
+.home { position:relative; }
+.home > .login-backdrop-video { position:absolute;left:0;right:0;top:0;bottom:auto;height:100vh;z-index:0; }
+
+/* ---------- layer 1: the two entrances ---------- */
+.home-shield,.home-spacer,.home-hero__dim,.home-hero__hint { display:none; }
+/* The two cards keep their content height and sit together in the middle of the first screen (S先生: they need not fill it). */
+.home-hero { position:relative;z-index:1;display:flex;flex-direction:column;justify-content:center;min-height:calc(100vh - var(--workspace-nav-height));padding:8px var(--home-gutter) 24px; }
+.home-entries { flex:0 0 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:12px;width:min(var(--home-width),100%);margin:0 auto;min-height:0; }
+/* the entrances lean away from the pointer, like the sign-in page's text (--mx, --my come from the backdrop) */
+.home-entries { translate:calc(var(--mx,0) * -10px) calc(var(--my,0) * -7px);transition:translate .6s var(--home-ease); }
+.home-entry { display:flex;flex-direction:column;justify-content:flex-start;gap:28px;min-height:0;padding:clamp(28px,3vw,44px);border:1px solid var(--home-entry-line);border-radius:22px;background:var(--home-entry-bg);box-shadow:var(--home-card-shadow),inset 0 1px 0 #ffffff0f; }
+.home-entry__eyebrow { display:flex;align-items:center;gap:8px;margin:0;font-size:12px;line-height:1.5;letter-spacing:.02em;color:var(--home-muted); }
+.home-entry h2 { margin:16px 0 10px;font-size:clamp(40px,3.9vw,56px);line-height:1.05;font-weight:650;letter-spacing:-.02em;color:var(--home-ink); }
+.home-entry__line { max-width:440px;margin:0;font-size:15px;line-height:1.6;color:var(--home-muted); }
+.home-entry__actions { display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin-top:28px; }
+.home-entry__button { display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 18px 0 20px;border:0;border-radius:12px;font:inherit;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;transition:background-color .18s; }
+.home-entry[data-kind=koubo] .home-entry__button { background:var(--home-koubo);color:var(--home-koubo-ink); }
+.home-entry[data-kind=general] .home-entry__button { background:var(--home-general);color:var(--home-general-ink); }
+.home-entry[data-kind=koubo] .home-entry__button:hover { background:color-mix(in srgb,var(--home-koubo) 86%,#fff); }
+.home-entry[data-kind=general] .home-entry__button:hover { background:color-mix(in srgb,var(--home-general) 86%,#fff); }
+.home-entry__button:focus-visible { outline:2px solid var(--home-ink);outline-offset:3px; }
+.home-entry__status { display:inline-flex;align-items:center;gap:8px;font-size:12px;line-height:1.5;color:var(--home-muted); }
+
+/* Images: one ratio, one radius, one shade. The slot is a neutral dark frame until a clip plays in it. */
+/* The clip sits right under the button, as wide as the card's text column; on a short window it narrows so the card
+   still fits the first screen (470px ≈ top bar, paddings and the text above it). */
+.home-media { position:relative;flex:0 1 auto;align-self:flex-start;width:min(100%,calc((100vh - 470px) * 16 / 9));min-height:120px;aspect-ratio:16/9;overflow:hidden;border-radius:14px;background:var(--home-media); }
+.home-media__drift { position:absolute;inset:0; }
+.home-media video { display:block;width:100%;max-width:none;height:100%;object-fit:cover; }
+:is(.home-media,.home-thumb)::after { content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,#00000000 50%,#00000047),#0000003d;box-shadow:inset 0 0 0 1px #ffffff12;pointer-events:none;transition:opacity .2s; }
+
+.home-hero__dim { position:absolute;inset:0;background:var(--home-dim);opacity:0;pointer-events:none; }
+.home-hero__hint { position:absolute;left:0;right:0;bottom:18px;justify-content:center;pointer-events:none; }
+.home-hero__hint span { display:flex;flex-direction:column;align-items:center;font-size:12px;line-height:1.5;color:var(--home-faint);animation:home-bob 2.6s ease-in-out infinite; }
+@keyframes home-bob { 0%,100% { transform:translate3d(0,0,0); } 50% { transform:translate3d(0,5px,0); } }
+
+/* ---------- layer 2: the sheet ---------- */
+/* The sheet runs edge to edge; its content keeps the mock's 40px so 我的工程 and 全部模块 do not hug the window. */
+.home-sheet { position:relative;z-index:2;padding:56px 40px 80px; }
+.home-section + .home-section { margin-top:80px; }
+.home-section__head { display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:24px; }
+.home-section__head h2 { margin:0;font-size:32px;line-height:1.2;font-weight:650;letter-spacing:-.01em;color:var(--home-ink); }
+.home-tools { display:flex;align-items:center;gap:24px;font-size:12px;line-height:1.5;color:var(--home-muted); }
+.home-filter { display:flex;gap:4px; }
+.home-filter button { display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 8px;border:0;border-radius:8px;background:none;color:inherit;font:inherit;cursor:pointer;transition:color .18s; }
+.home-filter button:hover,.home-all:hover { color:var(--home-ink-2); }
+.home-filter button[aria-pressed=true] { color:var(--home-ink); }
+.home-all { display:inline-flex;align-items:center;gap:2px;height:28px;color:var(--home-ink-2);text-decoration:none;border-radius:8px; }
+.home-empty { margin:0;padding:28px 0;font-size:13px;line-height:1.6;color:var(--home-muted); }
+
+/* One row of recent projects that grows with the window: 4, then 5 and 6 on wide screens. */
+.home-project-row { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:0;padding:0;list-style:none; }
+.home-project:nth-child(n+5) { display:none; }
+@media (min-width:1680px) { .home-project-row { grid-template-columns:repeat(5,minmax(0,1fr)); } .home-project:nth-child(5) { display:list-item; } }
+@media (min-width:2080px) { .home-project-row { grid-template-columns:repeat(6,minmax(0,1fr)); } .home-project:nth-child(6) { display:list-item; } }
+.home-project > a { display:block;min-width:0;color:inherit;text-decoration:none;border-radius:14px; }
+.home-thumb { position:relative;display:grid;place-items:center;aspect-ratio:16/9;overflow:hidden;border-radius:14px;background:var(--home-media); }
+.home-thumb img { position:absolute;inset:0;width:100%;max-width:none;height:100%;object-fit:cover; }
+.home-thumb > span { font-size:12px;color:#ffffff59; }
+.home-project > a:hover .home-thumb::after { opacity:.5; }
+.home-project h3 { margin:12px 0 2px;overflow:hidden;font-size:15px;line-height:1.5;font-weight:600;white-space:nowrap;text-overflow:ellipsis;color:var(--home-ink); }
+.home-meta { display:flex;align-items:center;gap:8px;margin:0;font-size:12px;line-height:1.5;color:var(--home-muted);font-variant-numeric:tabular-nums; }
+
+/* Equal module columns; narrow tracks separate the groups (12 + 8 + 12 = 32px between groups). The columns and each group's
+   span come from the group sizes (--home-module-cols, --home-group-cols, set in WorkspaceHome). */
+.home-module-groups { display:grid;grid-template-columns:var(--home-module-cols);column-gap:12px;row-gap:32px; }
+.home-module-group { display:grid;grid-template-columns:subgrid;align-content:start;grid-column:var(--home-group-cols); }
+.home-module-group__head { grid-column:1 / -1;margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid var(--home-line-2);font-size:12px;line-height:1.5;font-weight:600;letter-spacing:.06em;color:var(--home-ink-2); }
+.home-module-list { grid-column:1 / -1;display:grid;grid-template-columns:subgrid;margin:0;padding:0;list-style:none; }
+.home-module { display:flex;flex-direction:column;padding:10px 10px 16px;border:1px solid var(--home-line);border-radius:18px;background:var(--home-card);box-shadow:var(--home-card-shadow);color:inherit;text-decoration:none;transition:background .18s,border-color .18s; }
+.home-module:hover { background:var(--home-card-hover);border-color:var(--home-line-2); }
+.home-module__top { display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 8px 0;color:var(--home-ink-2); }
+/* the concept loop: 16:9, darkened, sitting low; modules without one keep a dark frame with their icon */
+.home-module__media { position:relative;display:grid;place-items:center;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:var(--home-media);color:#ffffff38; }
+.home-module__media video { display:block;width:100%;height:100%;object-fit:cover; }
+.home-module__media::after { content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,#00000000 55%,#00000040),#00000024;box-shadow:inset 0 0 0 1px #ffffff12;pointer-events:none;transition:opacity .2s; }
+.home-module:is(:hover,:focus-visible) .home-module__media::after { opacity:.4; }
+.home-only { display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:1.5;white-space:nowrap;color:var(--home-faint); }
+.home-only .home-dot { width:6px;height:6px; }
+.home-module__name { margin:8px 8px 2px;font-size:15px;line-height:1.5;font-weight:600;color:var(--home-ink); }
+.home-module__brief { margin:0 8px;display:-webkit-box;overflow:hidden;min-height:3em;font-size:12px;line-height:1.5;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--home-muted); }
+
+/* ---------- 一键剪辑 sheet (the existing intake, opened from 新建口播工程) ---------- */
+html.home-intake-open { overflow:hidden; }
+.home-intake { position:fixed;inset:0;z-index:36;display:flex;flex-direction:column;padding:var(--workspace-nav-height) var(--home-gutter) var(--home-gutter); }
+.home-intake[hidden] { display:none; }
+.home-intake__backdrop { position:absolute;inset:0;background:var(--home-backdrop);animation:home-fade-in .2s ease both; }
+.home .home-intake__panel[role=dialog] { position:relative;display:flex;flex-direction:column;gap:8px;max-height:100%;overflow:auto;padding:0;border:0;border-radius:0;background:none;box-shadow:none;backdrop-filter:none;outline:none;overscroll-behavior:contain;animation:home-intake-in .26s var(--home-ease) both; }
+.home-intake__bar { display:flex;justify-content:flex-end; }
+/* Outranks the themes' generic button rules for this sheet (暖雾 lists .home-intake there for the intake's own controls). */
+html[data-ui-theme] .home .home-intake .home-intake__close { display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--home-line-2);border-radius:10px;background:var(--home-bg);color:var(--home-ink-2);font:inherit;font-size:12px;cursor:pointer; }
+html[data-ui-theme] .home .home-intake .home-intake__close:hover { color:var(--home-ink); }
+.home-intake__body { display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:stretch; }
+.home-intake .quick-edit { margin:0; }
+.home-intake__live { position:relative;display:flex;justify-content:flex-end;min-width:0; }
+.home-intake__live:empty { display:none; }
+.home-intake__live > .qe-live { flex:1 1 auto;inset:0; }
+.home-intake__live > .qe-live-reopen { position:relative; }
+@media(min-width:1201px) {
+  .home-intake__body:has(> .home-intake__live > .qe-live) { grid-template-columns:minmax(560px,1.1fr) minmax(0,1fr); }
+  .home-intake__live:has(> .qe-live) { min-height:560px; }
+}
+@keyframes home-fade-in { from { opacity:0; } to { opacity:1; } }
+@keyframes home-intake-in { from { opacity:0;transform:translate3d(0,16px,0); } to { opacity:1;transform:translate3d(0,0,0); } }
+
+/* ---------- motion: fixed entrance layer + parallax, and entrances from the sides ---------- */
+@media (prefers-reduced-motion: no-preference) and (min-width: 760px) and (min-height: 560px) {
+  .home-shield { display:block;position:fixed;z-index:30;left:0;right:0;top:0;height:calc(var(--workspace-nav-height) + 6px);background:var(--home-bg);opacity:0;pointer-events:none;-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent); }
+  .home > .login-backdrop-video { position:fixed;will-change:transform,opacity; }
+  .home-hero { position:fixed;left:0;right:0;top:0;height:100vh;min-height:0;padding:calc(var(--workspace-nav-height) + 8px) var(--home-gutter) 64px;transform-origin:50% 38%;will-change:transform,opacity; }
+  .home-hero__dim { display:block; }
+  .home-hero__hint { display:flex; }
+  .home-spacer { display:block;height:calc(100vh - var(--workspace-nav-height)); }
+  /* Content height only; the minimum lets the sheet reach the top bar, the heading sits 56px under its edge. */
+  .home-sheet { min-height:calc(100vh - var(--workspace-nav-height));border-radius:28px 28px 0 0;background:var(--home-bg);box-shadow:var(--home-sheet-edge); }
+  .home-projects__body[data-reveal=pending] .home-project,
+  .home-module-groups[data-reveal=pending] :is(.home-module-group__head,.home-module) { opacity:0; }
+  /* The parallax itself is written per frame by WorkspaceHome (0.45× speed, shrink to 0.94, dim; pictures one step slower):
+     CSS scroll timelines did not run in the desktop app, so the script drives it everywhere. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero__hint span,.home-intake__backdrop,.home .home-intake__panel[role=dialog] { animation:none; }
+  .home-entry__button,.home-filter button,.home-module,:is(.home-media,.home-thumb)::after { transition:none; }
+}
+@media (max-width:1100px) {
+  .home-project-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .home-project:nth-child(n+3) { display:none; }
+  .home-module-groups { grid-template-columns:repeat(var(--home-module-max),minmax(0,1fr)); }
+  .home-module-group { grid-column:1 / -1; }
+}
+@media (max-width:759px) {
+  .home-entries { grid-template-columns:1fr; }
+  .home-entry { min-height:520px; }
+  .home-section__head { flex-direction:column;align-items:flex-start; }
+  .home-project-row { grid-template-columns:1fr; }
+  .home-module-groups { display:flex;flex-direction:column;gap:28px; }
+  .home-module-group { display:block; }
+  .home-module-list { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }
+  .home-module { padding-bottom:12px; }
+}
+
+/* ---------- in-development page (风格库, 通用剪辑) ---------- */
+.home-soon { display:grid;place-items:center;min-height:calc(100vh - var(--workspace-nav-height));padding:24px var(--home-gutter) 12vh; }
+.home-soon__body { display:flex;flex-direction:column;align-items:center;text-align:center; }
+.home-soon h1 { display:flex;align-items:center;gap:12px;margin:0;font-size:32px;line-height:1.2;font-weight:650;letter-spacing:-.01em;color:var(--home-ink); }
+.home-soon h1 .home-dot { width:8px;height:8px; }
+.home-soon p { margin:12px 0 0;font-size:15px;line-height:1.6;color:var(--home-muted); }
+.home-soon p.home-soon__picked { display:flex;align-items:center;gap:12px;margin-top:20px;font-size:14px;color:var(--home-ink-2); }
+.home-soon__picked a { color:var(--home-muted);font-size:13px;text-decoration:underline;text-underline-offset:3px; }
+.home-soon__picked a:hover { color:var(--home-ink); }
+.home-soon__back { display:inline-flex;align-items:center;gap:4px;height:40px;margin-top:28px;padding:0 16px 0 12px;border:1px solid var(--home-line-2);border-radius:12px;color:var(--home-ink-2);font-size:13px;text-decoration:none;transition:color .18s,border-color .18s; }
+.home-soon__back:hover { color:var(--home-ink);border-color:var(--home-faint); }
+@media (prefers-reduced-motion: reduce) { .home-soon__back { transition:none; } }

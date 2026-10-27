@@ -1,0 +1,42 @@
+/* Same-origin OpenScreen document uses hex tokens, separate from host HSL tokens. */
+:root:root:root {
+ --bg:#1c2323; --bg-grad:radial-gradient(ellipse at 75% 25%,#38584744,transparent 60%),#1c2323;
+ --surface:#28312feb; --surface-1:#303a37; --surface-2:#3b4741; --surface-3:#49594f;
+ --surface-hi:#34443c; --surface-warm:#303832;
+ --border:#b8d6c630; --border-soft:#b8d6c61c; --border-hi:#b8d6c655;
+ --fg:#e9eeeb; --fg-2:#c3cfc8; --fg-emphasis:#f4f7f5; --muted:#a3b0ab; --muted-soft:#8e9d95; --meta:#a3b0ab; --dim:#788c80;
+ --brand:#a0d4bc; --brand-lo:#81b69e; --accent:#a0d4bc; --accent-on:#152b20;
+ --accent-soft:#a0d4bc22; --accent-wash:#a0d4bc12; --accent-border:#a0d4bc66;
+ --font-display:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;
+ color-scheme:dark;
+}
+body {font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;}
+:root:root:root[data-ui-theme=frost] {
+ --bg:#f8f5ef;--bg-grad:linear-gradient(130deg,#f8f5ef,#dcece3);
+ --surface:#f2f7eef0;--surface-1:#e7efe6;--surface-2:#dcebe1;--surface-3:#cce3d7;
+ --surface-hi:#eef7ed;--surface-warm:#f4ede5;
+ --border:#b5cbc0;--border-soft:#b5cbc066;--border-hi:#ffffff;
+ --fg:#293e3b;--fg-2:#425f56;--fg-emphasis:#1e362e;--muted:#536863;--muted-soft:#60766c;--meta:#536863;--dim:#60766c;
+ --brand:#376f65;--brand-lo:#2d6055;--accent:#376f65;--accent-on:#ffffff;
+ --accent-soft:#b5dcd266;--accent-wash:#b5dcd233;--accent-border:#85b8a8;color-scheme:light;
+}
+:root:root:root[data-ui-theme=warm] {
+ --bg:#b3aa9d;--bg-grad:linear-gradient(130deg,#d7cebf,#a79a88);
+ --surface:#c1b6a3dc;--surface-1:#cec3b1;--surface-2:#e1d6c2;--surface-3:#efe3ce;
+ --surface-hi:#e9dec9;--surface-warm:#d7c9b4;
+ --border:#fff3dc80;--border-soft:#fff3dc40;--border-hi:#fffae6;
+ --fg:#393026;--fg-2:#514638;--fg-emphasis:#251f19;--muted:#665947;--muted-soft:#786b59;--meta:#665947;--dim:#786b59;
+ --brand:#79644c;--brand-lo:#6b5842;--accent:#79644c;--accent-on:#fff8e9;
+ --accent-soft:#79644c22;--accent-wash:#79644c12;--accent-border:#79644c66;color-scheme:light;
+}
+
+/* 原色 · Graphite Pro (same palette as src/workspace/pro-theme.css): brand amber for active state, white / light grey text */
+:root:root:root[data-ui-theme=original] {
+ --bg:#121315; --bg-grad:#121315;
+ --surface:#1a1b1e; --surface-1:#1f2023; --surface-2:#28292e; --surface-3:#313339;
+ --surface-hi:#28292e; --surface-warm:#222327;
+ --border:#ffffff1c; --border-soft:#ffffff0f; --border-hi:#ffffff2e;
+ --fg:#f2f2f4; --fg-2:#c9cbd1; --fg-emphasis:#ffffff; --muted:#8b8e96; --muted-soft:#7a7d85; --meta:#8b8e96; --dim:#5e6169;
+ --brand:#ffb020; --brand-lo:#d98e00; --accent:#ffb020; --accent-on:#1b1c1f;
+ --accent-soft:#ffb02024; --accent-wash:#ffb02012; --accent-border:#ffb02066; color-scheme:dark;
+}

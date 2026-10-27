@@ -1,0 +1,1281 @@
+{
+ "generated_by": "scripts/build-style-library.ts",
+ "styles": [
+  {
+   "id": "crayon-book",
+   "name_zh": "蜡笔儿童绘本",
+   "description_zh": "月亮失眠了，小女孩爬上屋顶给它唱摇篮曲。",
+   "category_zh": "手绘与绘画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个温暖的小故事或绘本式旁白稿；可选自录旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "绘本",
+    "睡前故事",
+    "儿童启蒙"
+   ],
+   "attribution": "Preview/poster from “The Moon Can't Sleep”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (28.5–34.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 32.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/crayon-book.mp4",
+   "poster": "/styles/crayon-book.jpg"
+  },
+  {
+   "id": "watercolor",
+   "name_zh": "水彩笔刷",
+   "description_zh": "跟着降雨从澳洲红色腹地一路画到绿色海岸，一镜到底。",
+   "category_zh": "手绘与绘画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个可以“边画边讲”的自然/旅行/知识主题和旁白稿",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "自然纪录片",
+    "旅行",
+    "科普讲解"
+   ],
+   "attribution": "Preview/poster from “Follow the Rain”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (64.5–70.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 68.16 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/watercolor.mp4",
+   "poster": "/styles/watercolor.jpg"
+  },
+  {
+   "id": "ink-wash",
+   "name_zh": "中国水墨",
+   "description_zh": "侠客踏水过江，一剑断流。",
+   "category_zh": "手绘与绘画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个寓言、诗意或东方题材的故事；可选诗句（需公有领域）",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "武侠",
+    "文化品牌",
+    "诗词"
+   ],
+   "attribution": "Preview/poster from “The Swordsman and the River”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (26–32 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 31 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/ink-wash.mp4",
+   "poster": "/styles/ink-wash.jpg"
+  },
+  {
+   "id": "impasto",
+   "name_zh": "油画厚涂",
+   "description_zh": "灰色雨中广场，第一把红伞撑开，圆舞曲把整个广场刷上颜色。",
+   "category_zh": "手绘与绘画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个以色彩/情绪转变为核心的故事；演示无旁白，音乐与音效驱动",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "样片无旁白，可不配"
+   },
+   "uses": [
+    "音乐 MV",
+    "艺术文化",
+    "情感广告"
+   ],
+   "attribution": "Preview/poster from “The Colour of Rain”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (19.5–25.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 24.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/impasto.mp4",
+   "poster": "/styles/impasto.jpg"
+  },
+  {
+   "id": "one-line",
+   "name_zh": "一笔画",
+   "description_zh": "一根不离纸的线画完一个人的一生，再把笔交给孩子。",
+   "category_zh": "手绘与绘画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个能用“一笔不断的线”串起来的人生/关系/成长主题与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "品牌故事",
+    "人生节点",
+    "极简广告"
+   ],
+   "attribution": "Preview/poster from “The Line That Never Lifted”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (16–22 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 19.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/one-line.mp4",
+   "poster": "/styles/one-line.jpg"
+  },
+  {
+   "id": "whiteboard",
+   "name_zh": "白板讲解",
+   "description_zh": "手机怎么知道你在哪：GPS、原子钟，和相对论每天多出的 38 微秒。",
+   "category_zh": "手绘与绘画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个要讲清楚的概念和讲稿（科普、原理、流程）",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "讲解",
+    "网课",
+    "科学"
+   ],
+   "attribution": "Preview/poster from “Einstein in Your Pocket”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (52–58 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 55.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/whiteboard.mp4",
+   "poster": "/styles/whiteboard.jpg"
+  },
+  {
+   "id": "urban-sketch",
+   "name_zh": "钢笔淡彩",
+   "description_zh": "公园只是一张钢笔速写，风把草帽吹到哪里，哪里才有颜色。",
+   "category_zh": "手绘与绘画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个地方、一段散步或旅行经历；演示无旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "样片无旁白，可不配"
+   },
+   "uses": [
+    "城市与旅行",
+    "建筑",
+    "生活方式品牌"
+   ],
+   "attribution": "Preview/poster from “Where the Wind Went”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (8–14 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 11 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/urban-sketch.mp4",
+   "poster": "/styles/urban-sketch.jpg"
+  },
+  {
+   "id": "shadow-puppet",
+   "name_zh": "皮影戏",
+   "description_zh": "十日炙烤大地，后羿张弓射日。",
+   "category_zh": "东方传统",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个民间故事或神话类叙事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "神话传说",
+    "文化遗产",
+    "节日"
+   ],
+   "attribution": "Preview/poster from “Hou Yi Shoots the Suns”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (20–26 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 23 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/shadow-puppet.mp4",
+   "poster": "/styles/shadow-puppet.jpg"
+  },
+  {
+   "id": "ukiyoe",
+   "name_zh": "浮世绘",
+   "description_zh": "旅人走向远山，每个镜头都是一幅版画；巨浪是高潮，结尾是远山与整幅画轴拉远。",
+   "category_zh": "东方传统",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一段旅程或“几景”结构的故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "旅行",
+    "日本文化",
+    "诗词"
+   ],
+   "attribution": "Preview/poster from “Toward the Mountain”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (24.5–30.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 29 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/ukiyoe.mp4",
+   "poster": "/styles/ukiyoe.jpg"
+  },
+  {
+   "id": "papercut-red",
+   "name_zh": "红色窗花剪纸",
+   "description_zh": "除夕年兽进村，小女孩剪出的大窗花照亮全村，把它吓跑。",
+   "category_zh": "东方传统",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个节日/民俗故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "春节",
+    "节日祝福",
+    "民间故事"
+   ],
+   "attribution": "Preview/poster from “Nian Comes to Town”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (26–32 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 30.6 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/papercut-red.mp4",
+   "poster": "/styles/papercut-red.jpg"
+  },
+  {
+   "id": "paper-lantern",
+   "name_zh": "纸雕灯影",
+   "description_zh": "一枚月饼讲中秋的团圆与思念，纸雕灯箱层层透光。",
+   "category_zh": "东方传统",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个抒情的思念/节日故事与中文旁白（需 TTS 或自录；演示用的 Edge TTS 旁白不可复用）",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "节日",
+    "礼品品牌",
+    "文化故事"
+   ],
+   "attribution": "Preview/poster from “A Mooncake's Longing”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (57–63 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 60.9 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/paper-lantern.mp4",
+   "poster": "/styles/paper-lantern.jpg"
+  },
+  {
+   "id": "risograph",
+   "name_zh": "Risograph 孔版印刷",
+   "description_zh": "周日早晨骑车穿过城市：面包店、公园、河边，每到一处加一版油墨，最后三版套印。",
+   "category_zh": "印刷与版画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个轻松的日常/城市小故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "独立品牌",
+    "独立杂志",
+    "生活方式"
+   ],
+   "attribution": "Preview/poster from “Sunday Ride”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (23–29 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 26 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/risograph.mp4",
+   "poster": "/styles/risograph.jpg"
+  },
+  {
+   "id": "halftone-dossier",
+   "name_zh": "复古半调案卷",
+   "description_zh": "橘猫胖橘被立案审查：测试重力、凌晨跑酷，最后无罪释放。",
+   "category_zh": "印刷与版画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个“立案调查”式的轻松题材（如宠物）与中文字卡文案；演示无旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "样片无旁白，可不配"
+   },
+   "uses": [
+    "幽默",
+    "宠物",
+    "社交短视频"
+   ],
+   "attribution": "Preview/poster from “Case File: Chubby”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (7.5–13.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 9.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/halftone-dossier.mp4",
+   "poster": "/styles/halftone-dossier.jpg"
+  },
+  {
+   "id": "woodcut",
+   "name_zh": "木刻版画",
+   "description_zh": "村子用一整个冬天铸一口钟，钟声第一次响起，雪停了。",
+   "category_zh": "印刷与版画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个寓言或匠人故事与旁白；可选：照片/画面经“刀刻滤镜”转成版画（原生招式）",
+    "own_video": "optional",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "民间故事",
+    "手作品牌",
+    "图书宣传"
+   ],
+   "attribution": "Preview/poster from “The Bell Founder”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (36–42 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 39 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/woodcut.mp4",
+   "poster": "/styles/woodcut.jpg"
+  },
+  {
+   "id": "engraving",
+   "name_zh": "铜版画",
+   "description_zh": "一张博物志图版自己刻出来：雕刀推开铜版，蜜蜂一线线成形，最后手工水彩上色。",
+   "category_zh": "印刷与版画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个适合做成图版的对象（物种、器物、机械）及其事实与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "展品说明",
+    "科普讲解",
+    "品牌传承"
+   ],
+   "attribution": "Preview/poster from “The Honeybee, Plate VII”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (28–34 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 31.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/engraving.mp4",
+   "poster": "/styles/engraving.jpg"
+  },
+  {
+   "id": "silkscreen-poster",
+   "name_zh": "丝印旅行海报",
+   "description_zh": "三条步道各一张丝印海报，一色一刮印出来，再沿山脊一镜到底从正午爬到黄昏。",
+   "category_zh": "印刷与版画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一组目的地/路线/选项及其关键数字；演示无旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "样片无旁白，可不配"
+   },
+   "uses": [
+    "目的地指南",
+    "旅游",
+    "活动海报"
+   ],
+   "attribution": "Preview/poster from “Three Trails”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (19.5–25.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 24 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/silkscreen-poster.mp4",
+   "poster": "/styles/silkscreen-poster.jpg"
+  },
+  {
+   "id": "swiss-motion",
+   "name_zh": "瑞士动态排版",
+   "description_zh": "一张音乐会海报按瑞士设计的五条规则自己排版，第五条是只打破一条。",
+   "category_zh": "图形与排版",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一组规则、要点或清单式内容与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "品牌形象",
+    "活动",
+    "设计教学"
+   ],
+   "attribution": "Preview/poster from “Five Rules for a Poster”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (27–33 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 31.68 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/swiss-motion.mp4",
+   "poster": "/styles/swiss-motion.jpg"
+  },
+  {
+   "id": "spy-titles",
+   "name_zh": "60s 间谍片头",
+   "description_zh": "虚构 1964 年间谍片的片头：追一把被偷的钥匙，几何碎片最后拼成片名。",
+   "category_zh": "图形与排版",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "片头/人物介绍式的题材与短句旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "片头",
+    "活动开场",
+    "预告片"
+   ],
+   "attribution": "Preview/poster from “The Velvet Cipher”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (24.5–30.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 27.6 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/spy-titles.mp4",
+   "poster": "/styles/spy-titles.jpg"
+  },
+  {
+   "id": "art-deco",
+   "name_zh": "装饰艺术",
+   "description_zh": "1930 年的大饭店，门童赶在午夜前把一封信送上顶楼。",
+   "category_zh": "图形与排版",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个华丽、仪式感的故事（开幕、庆典、倒计时）与旁白/对白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "奢侈品与酒店",
+    "晚会盛典",
+    "邀请函"
+   ],
+   "attribution": "Preview/poster from “Midnight at the Starlight Hotel”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (42–48 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 45.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/art-deco.mp4",
+   "poster": "/styles/art-deco.jpg"
+  },
+  {
+   "id": "blueprint",
+   "name_zh": "蓝图 / 工程制图",
+   "description_zh": "发明家的蓝图自己画出一台接云机器，修订云线变成了真的雨云。",
+   "category_zh": "图形与排版",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个发明/机械/原理题材与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "工程",
+    "硬件发布",
+    "科技讲解"
+   ],
+   "attribution": "Preview/poster from “Patent Pending: The Cloud Catcher”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (28.5–34.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 32.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/blueprint.mp4",
+   "poster": "/styles/blueprint.jpg"
+  },
+  {
+   "id": "stained-glass",
+   "name_zh": "彩色玻璃窗",
+   "description_zh": "阳光从清晨移到黄昏，照到哪一格花窗，哪一格的故事就动起来。",
+   "category_zh": "图形与排版",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个传说或寓言式故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "传说",
+    "文化遗产",
+    "节日故事"
+   ],
+   "attribution": "Preview/poster from “The Dragon of the East Window”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (35–41 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 38.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/stained-glass.mp4",
+   "poster": "/styles/stained-glass.jpg"
+  },
+  {
+   "id": "ascii-crt",
+   "name_zh": "ASCII / CRT 终端",
+   "description_zh": "月球基地的 AI 沉睡 40 年后被唤醒，用字符画出“家”来回复。",
+   "category_zh": "图形与排版",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个终端/日志/科幻独白式故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "开发者工具",
+    "科幻",
+    "科技品牌"
+   ],
+   "attribution": "Preview/poster from “Tranquility.log”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (35.5–41.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 40 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/ascii-crt.mp4",
+   "poster": "/styles/ascii-crt.jpg"
+  },
+  {
+   "id": "dataviz",
+   "name_zh": "数据叙事",
+   "description_zh": "一百年的夏季气温，图表本身就是故事。",
+   "category_zh": "信息与发布",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "一组真实时间序列数据（附出处）+ 一句能把数据讲成故事的主线；旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "数据新闻",
+    "报告",
+    "气候与科学"
+   ],
+   "attribution": "Preview/poster from “A Hundred Summers”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (36.5–42.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 41.5 s, downscaled. Third-party material in this excerpt: NASA GISS Surface Temperature Analysis (GISTEMP v4), public domain; ColorBrewer RdBu colour ramp (Apache-2.0).",
+   "third_party_in_preview": [
+    "NASA GISS Surface Temperature Analysis (GISTEMP v4), public domain; ColorBrewer RdBu colour ramp (Apache-2.0)"
+   ],
+   "preview": "/styles/dataviz.mp4",
+   "poster": "/styles/dataviz.jpg"
+  },
+  {
+   "id": "iso-infographic",
+   "name_zh": "等距信息图",
+   "description_zh": "一杯咖啡从种植园到你手里的旅程。",
+   "category_zh": "信息与发布",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个流程/旅程/系统（如“从咖啡豆到杯子”）及关键数字与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "流程讲解",
+    "供应链",
+    "年报"
+   ],
+   "attribution": "Preview/poster from “From Bean to Cup”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (13–19 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 16.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/iso-infographic.mp4",
+   "poster": "/styles/iso-infographic.jpg"
+  },
+  {
+   "id": "dark-keynote",
+   "name_zh": "暗色科技发布",
+   "description_zh": "虚构 app Tidy 的发布片：被埋掉的光标一键把几百个窗口归位。",
+   "category_zh": "信息与发布",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个产品/App 的卖点、数字与界面要素（演示 app 虚构、全部代码画）；可选品牌色与 logo",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "产品发布",
+    "SaaS 软件",
+    "发布会"
+   ],
+   "attribution": "Preview/poster from “Room to Think”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (7–13 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 8.4 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/dark-keynote.mp4",
+   "poster": "/styles/dark-keynote.jpg"
+  },
+  {
+   "id": "hologram-hud",
+   "name_zh": "科幻全息界面",
+   "description_zh": "电助力车被扫描成全息线框，目标框依次锁定电池、电机、刹车。",
+   "category_zh": "信息与发布",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个产品的规格参数与卖点（演示产品虚构，由代码几何体构成）",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "参数讲解",
+    "发布视频",
+    "展会"
+   ],
+   "attribution": "Preview/poster from “Volt · Spec Scan”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (19.5–25.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 22.4 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/hologram-hud.mp4",
+   "poster": "/styles/hologram-hud.jpg"
+  },
+  {
+   "id": "rubber-hose",
+   "name_zh": "1930s 橡皮管卡通",
+   "description_zh": "一只咖啡杯满厨房追一块逃跑的方糖。",
+   "category_zh": "卡通与动画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个追逐/闹剧式小故事（拟人角色）与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "餐饮",
+    "复古广告",
+    "儿童"
+   ],
+   "attribution": "Preview/poster from “Coffee Cup Chase”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (16–22 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 19 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/rubber-hose.mp4",
+   "poster": "/styles/rubber-hose.jpg"
+  },
+  {
+   "id": "cel-anime-80s",
+   "name_zh": "80 年代赛璐璐动画",
+   "description_zh": "快递少女骑车穿过雨后霓虹都市，赶在黎明发射前送到一盘磁带。",
+   "category_zh": "卡通与动画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个有角色、有动作场面的故事与对白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "音乐 MV",
+    "游戏预告片",
+    "怀旧"
+   ],
+   "attribution": "Preview/poster from “City Lights, 1987”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (15.5–21.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 17.7 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/cel-anime-80s.mp4",
+   "poster": "/styles/cel-anime-80s.jpg"
+  },
+  {
+   "id": "scifi-toon",
+   "name_zh": "科幻情景喜剧卡通",
+   "description_zh": "厌世天才开传送门只想买杯咖啡，却穿过越来越离谱的平行宇宙。",
+   "category_zh": "卡通与动画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个情景喜剧式小故事与多角色对白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "喜剧",
+    "科技品牌",
+    "社交短视频"
+   ],
+   "attribution": "Preview/poster from “Coffee Run”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (10.5–16.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 15.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/scifi-toon.mp4",
+   "poster": "/styles/scifi-toon.jpg"
+  },
+  {
+   "id": "midcentury-toon",
+   "name_zh": "50s 扁平卡通",
+   "description_zh": "用 50 年代教育片的口吻，三步教你装好一台扫地机。",
+   "category_zh": "卡通与动画",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个产品或操作指南（三五步）与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "安装指南",
+    "帮助中心",
+    "教程"
+   ],
+   "attribution": "Preview/poster from “Meet Pip”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (15–21 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 17 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/midcentury-toon.mp4",
+   "poster": "/styles/midcentury-toon.jpg"
+  },
+  {
+   "id": "pixel-rpg",
+   "name_zh": "16-bit 像素 RPG",
+   "description_zh": "勇士在最终 Boss 门前存档，存档画面闪回一路冒险。",
+   "category_zh": "游戏",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个冒险/回忆式故事与对白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "游戏预告片",
+    "回顾",
+    "怀旧"
+   ],
+   "attribution": "Preview/poster from “The Last Save Point”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (24.5–30.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 28.6 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/pixel-rpg.mp4",
+   "poster": "/styles/pixel-rpg.jpg"
+  },
+  {
+   "id": "hd-2d",
+   "name_zh": "HD-2D",
+   "description_zh": "灯塔熄灭，孙女提着最后一簇火穿过夜林、爬上风暴悬崖。",
+   "category_zh": "游戏",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个奇幻冒险故事与旁白/对白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "游戏预告片",
+    "奇幻",
+    "故事短片"
+   ],
+   "attribution": "Preview/poster from “The Lampbearer”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (55–61 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 57.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/hd-2d.mp4",
+   "poster": "/styles/hd-2d.jpg"
+  },
+  {
+   "id": "microgame",
+   "name_zh": "微游戏快闪",
+   "description_zh": "见习宇航员闯五秒训练营，越来越快，Boss 关亲手降落回地球。",
+   "category_zh": "游戏",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个能拆成若干 5 秒小挑战的主题与短句台词",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "游戏预告片",
+    "新手引导",
+    "社交短视频"
+   ],
+   "attribution": "Preview/poster from “Five-Second Astronaut”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (27–33 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 28.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/microgame.mp4",
+   "poster": "/styles/microgame.jpg"
+  },
+  {
+   "id": "game-show",
+   "name_zh": "综艺节奏扁平",
+   "description_zh": "把 AI 发展史做成一局节奏游戏，模型踩着拍登场，最后发成绩单。",
+   "category_zh": "游戏",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一条时间线或一组问答题目（综艺分关结构）；喊声需自配（演示用的 macOS say 语音不可复用）",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "科技时间线",
+    "年度回顾",
+    "综艺"
+   ],
+   "attribution": "Preview/poster from “Rhythm of AI, 1997 → 2026”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (10.5–16.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 13 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/game-show.mp4",
+   "poster": "/styles/game-show.jpg"
+  },
+  {
+   "id": "silent-film",
+   "name_zh": "1920s 默片",
+   "description_zh": "面包店学徒追一个滚走的面包，最后掰成两半分给饿肚子的小女孩。",
+   "category_zh": "电影与时代",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个默片式喜剧小故事（字幕卡、无旁白）；可选：用户视频经“墨线重绘”变成默片插画（原生招式）",
+    "own_video": "optional",
+    "script_or_topic": "required",
+    "voice_over": "样片无旁白，可不配"
+   },
+   "uses": [
+    "喜剧",
+    "复古品牌",
+    "无声叙事"
+   ],
+   "attribution": "Preview/poster from “The Runaway Loaf”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (15.5–21.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 17.6 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/silent-film.mp4",
+   "poster": "/styles/silent-film.jpg"
+  },
+  {
+   "id": "backrooms",
+   "name_zh": "后室 / 新怪谈",
+   "description_zh": "新夜班员工拍下入职第一晚：无尽的黄色办公空间，和墙上的员工守则。",
+   "category_zh": "电影与时代",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个规则怪谈/伪纪录片式剧本与广播/对白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "恐怖",
+    "悬疑解谜",
+    "游戏预告"
+   ],
+   "attribution": "Preview/poster from “Night Shift Orientation”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (6.5–12.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 10 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/backrooms.mp4",
+   "poster": "/styles/backrooms.jpg"
+  },
+  {
+   "id": "brick-toy",
+   "name_zh": "积木玩具",
+   "description_zh": "积木宇航员用零件拼出火箭，飞向积木月亮。",
+   "category_zh": "材质与 3D",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个玩具世界里的小故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "玩具与儿童",
+    "产品组装",
+    "太空"
+   ],
+   "attribution": "Preview/poster from “Rocket from Spare Parts”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (36–42 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 38.88 s, downscaled. Third-party material in this excerpt: Poly Haven “tea_set_01”, “photo_studio_loft_hall” HDRI and “American Walnut Veneer”, CC0.",
+   "third_party_in_preview": [
+    "Poly Haven “tea_set_01”, “photo_studio_loft_hall” HDRI and “American Walnut Veneer”, CC0"
+   ],
+   "preview": "/styles/brick-toy.mp4",
+   "poster": "/styles/brick-toy.jpg"
+  },
+  {
+   "id": "paper-popup",
+   "name_zh": "纸片立体书",
+   "description_zh": "立体书在书桌上打开，小精灵 Pip 在纸片世界冒险，最后跳出书外。",
+   "category_zh": "材质与 3D",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个童话/冒险故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "童书",
+    "游戏预告片",
+    "故事短片"
+   ],
+   "attribution": "Preview/poster from “Pip's Paper Adventure”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (22–28 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 26.6 s, downscaled. Third-party material in this excerpt: Poly Haven HDRI, models and textures on the desk set, CC0.",
+   "third_party_in_preview": [
+    "Poly Haven HDRI, models and textures on the desk set, CC0"
+   ],
+   "preview": "/styles/paper-popup.mp4",
+   "poster": "/styles/paper-popup.jpg"
+  },
+  {
+   "id": "tilt-shift",
+   "name_zh": "移轴微缩",
+   "description_zh": "玩具城的早高峰，一切都像模型。",
+   "category_zh": "材质与 3D",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个城市/小镇一天的节奏故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "城市宣传",
+    "房地产",
+    "交通"
+   ],
+   "attribution": "Preview/poster from “Toy Town Rush Hour”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (14–20 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 16.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/tilt-shift.mp4",
+   "poster": "/styles/tilt-shift.jpg"
+  },
+  {
+   "id": "lowpoly-island",
+   "name_zh": "低多边形等距",
+   "description_zh": "空海里一格格长出小岛和村庄，每放一块响一个音符，直到星空。",
+   "category_zh": "材质与 3D",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个“生长/建设”过程的故事与旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "游戏预告片",
+    "世界观搭建",
+    "治愈系"
+   ],
+   "attribution": "Preview/poster from “The Island That Grew”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (15–21 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 18.5 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/lowpoly-island.mp4",
+   "poster": "/styles/lowpoly-island.jpg"
+  },
+  {
+   "id": "glass-product",
+   "name_zh": "玻璃质感产品",
+   "description_zh": "虚构玻璃耳机 Aura 的开箱与特写。",
+   "category_zh": "材质与 3D",
+   "input_type": "topic",
+   "user_provides": {
+    "summary_zh": "一个产品的卖点（演示是虚构耳机，three.js 代码建模）；做真实产品需外形资料或 CAD",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "产品发布",
+    "消费电子",
+    "美妆"
+   ],
+   "attribution": "Preview/poster from “Aura — Hear the Light”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (16.5–22.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 19.2 s, downscaled.",
+   "third_party_in_preview": [],
+   "preview": "/styles/glass-product.mp4",
+   "poster": "/styles/glass-product.jpg"
+  },
+  {
+   "id": "satellite-briefing",
+   "name_zh": "卫星简报",
+   "description_zh": "卫星照着地图去找咸海，找到的是沙漠；只有筑了坝的那一块回来了。",
+   "category_zh": "实证影像",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "一个真实地点和它随时间的变化；卫星影像（默认 agent 联网从 Planetary Computer 取 Landsat、从 NASA GIBS 取 Blue Marble，或用户自有影像）；旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "气候",
+    "新闻解读",
+    "地理"
+   ],
+   "attribution": "Preview/poster from “The Map Still Says Sea”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (8–14 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 13.6 s, downscaled. Third-party material in this excerpt: Landsat imagery courtesy of the U.S. Geological Survey / NASA (public domain); NASA Blue Marble via GIBS.",
+   "third_party_in_preview": [
+    "Landsat imagery courtesy of the U.S. Geological Survey / NASA (public domain); NASA Blue Marble via GIBS"
+   ],
+   "preview": "/styles/satellite-briefing.mp4",
+   "poster": "/styles/satellite-briefing.jpg"
+  },
+  {
+   "id": "briefing-board",
+   "name_zh": "工程简报板",
+   "description_zh": "一条河要架桥，四种桥型在一面简报墙上逐个受检，拍板的是桥下要过的船。",
+   "category_zh": "实证影像",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "一个工程/决策题材；真实物体的照片（用户自有，或 Commons/国家图书馆的 CC0/CC BY/公有领域照片）；每个数字的出处",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "工程",
+    "方案对比",
+    "简报"
+   ],
+   "attribution": "Preview/poster from “The Ship Decides”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (20–26 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 25 s, downscaled. Third-party material in this excerpt: “Kiiminkiriver Bridge 20100705” by Estormiz (public domain); “Fort Henry Bridge” and “East Huntington bridge” by Carol M. Highsmith, Library of Congress (public domain) — cut out, graded, modified.",
+   "third_party_in_preview": [
+    "“Kiiminkiriver Bridge 20100705” by Estormiz (public domain); “Fort Henry Bridge” and “East Huntington bridge” by Carol M. Highsmith, Library of Congress (public domain) — cut out, graded, modified"
+   ],
+   "preview": "/styles/briefing-board.mp4",
+   "poster": "/styles/briefing-board.jpg"
+  },
+  {
+   "id": "lidar-survey",
+   "name_zh": "点云测绘",
+   "description_zh": "激光点云剥掉一片森林的树冠，露出当年农田的石墙：3.4 公里。",
+   "category_zh": "实证影像",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "一个地点的机载激光点云（LAZ/EPT；默认 agent 联网取 USGS 3DEP 美国公有数据，或用户自有扫描）+ 可选航拍照片；旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "文化遗产",
+    "环境",
+    "场地勘测"
+   ],
+   "attribution": "Preview/poster from “The Fields Under the Forest”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (9–15 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 13 s, downscaled. Third-party material in this excerpt: USGS 3D Elevation Program lidar (USGS_LPC_CT_Statewide_B8_2016), U.S. Geological Survey, public domain.",
+   "third_party_in_preview": [
+    "USGS 3D Elevation Program lidar (USGS_LPC_CT_Statewide_B8_2016), U.S. Geological Survey, public domain"
+   ],
+   "preview": "/styles/lidar-survey.mp4",
+   "poster": "/styles/lidar-survey.jpg"
+  },
+  {
+   "id": "white-model",
+   "name_zh": "白模投影",
+   "description_zh": "投影机把数据一层层刷上鹿特丹白模：从 1940 年的空洞到今天的塔楼。",
+   "category_zh": "实证影像",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "一个城市片区的建筑轮廓与高度数据 + 要投影的数据层（年代、人口等）。演示工具只认荷兰 3DBAG/BGT，其他地区需写数据适配器（如 OpenStreetMap）",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "城市规划",
+    "展览",
+    "城市数据"
+   ],
+   "attribution": "Preview/poster from “How a Flattened City Grew Back”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (12–18 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 17 s, downscaled. Third-party material in this excerpt: 3DBAG (https://3dbag.nl) by 3DGI and the 3D geoinformation group, TU Delft, CC BY 4.0; BAG (Kadaster) and BGT (PDOK), CC0 — cropped, extruded.",
+   "third_party_in_preview": [
+    "3DBAG (https://3dbag.nl) by 3DGI and the 3D geoinformation group, TU Delft, CC BY 4.0; BAG (Kadaster) and BGT (PDOK), CC0 — cropped, extruded"
+   ],
+   "preview": "/styles/white-model.mp4",
+   "poster": "/styles/white-model.jpg"
+  },
+  {
+   "id": "data-physical",
+   "name_zh": "数据实物化",
+   "description_zh": "十二年风电和太阳能装机叠成实物，绕表盘升成两条螺旋，2021 年太阳能反超。",
+   "category_zh": "实证影像",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "一到两组真实统计数据（CSV）及出处；旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "年报",
+    "投资人路演",
+    "能源数据"
+   ],
+   "attribution": "Preview/poster from “Two Spirals”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (19–25 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 21.5 s, downscaled. Third-party material in this excerpt: Solar and wind capacity data: IRENA (2026), processed by Our World in Data, CC BY 4.0 — https://ourworldindata.org/grapher/installed-solar-pv-capacity , https://ourworldindata.org/grapher/cumulative-installed-wind-energy-capacity-gigawatts; Poly Haven “photo_studio_loft_hall” HDRI and “American Walnut Veneer” texture, CC0.",
+   "third_party_in_preview": [
+    "Solar and wind capacity data: IRENA (2026), processed by Our World in Data, CC BY 4.0 — https://ourworldindata.org/grapher/installed-solar-pv-capacity , https://ourworldindata.org/grapher/cumulative-installed-wind-energy-capacity-gigawatts",
+    "Poly Haven “photo_studio_loft_hall” HDRI and “American Walnut Veneer” texture, CC0"
+   ],
+   "preview": "/styles/data-physical.mp4",
+   "poster": "/styles/data-physical.jpg"
+  },
+  {
+   "id": "teardown",
+   "name_zh": "产品拆解",
+   "description_zh": "开源键盘的一半在一次环绕中逐层拆开，看到主控再合拢，标上真实尺寸。",
+   "category_zh": "实证影像",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "一件真实产品的工程文件：CAD（STEP）、PCB 布局（KiCad）、BOM；没有工程文件就做不了真实拆解",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "硬件发布",
+    "产品页",
+    "规格讲解"
+   ],
+   "attribution": "Preview/poster from “21 Keys, Opened”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (5–11 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 9.75 s, downscaled. Third-party material in this excerpt: Corne keyboard (crkbd) by foostan, CC BY 4.0, https://github.com/foostan/crkbd — geometry from its KiCad/STEP files, left half only, modified; Poly Haven “photo_studio_loft_hall” HDRI, CC0.",
+   "third_party_in_preview": [
+    "Corne keyboard (crkbd) by foostan, CC BY 4.0, https://github.com/foostan/crkbd — geometry from its KiCad/STEP files, left half only, modified",
+    "Poly Haven “photo_studio_loft_hall” HDRI, CC0"
+   ],
+   "preview": "/styles/teardown.mp4",
+   "poster": "/styles/teardown.jpg"
+  },
+  {
+   "id": "microscope",
+   "name_zh": "显微叙事",
+   "description_zh": "一镜从肝组织玻片推到单个细胞核，两个圆逐像素数出 2.4 倍的蓝。",
+   "category_zh": "实证影像",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "一张真实的全玻片扫描（BIF/SVS/NDPI/金字塔 TIFF）或带比例元数据的显微图像；旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "生物医学",
+    "材料科学",
+    "护肤科学"
+   ],
+   "attribution": "Preview/poster from “Measured Blue”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (24–30 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 28.5 s, downscaled. Third-party material in this excerpt: Ventana-1.bif whole-slide scan (human liver, trichrome), credit PathAI, CC0, via the OpenSlide test-data index — cropped, graded.",
+   "third_party_in_preview": [
+    "Ventana-1.bif whole-slide scan (human liver, trichrome), credit PathAI, CC0, via the OpenSlide test-data index — cropped, graded"
+   ],
+   "preview": "/styles/microscope.mp4",
+   "poster": "/styles/microscope.jpg"
+  },
+  {
+   "id": "archive-lighttable",
+   "name_zh": "档案灯台",
+   "description_zh": "电报说最长飞了 57 秒；放大镜下，莱特兄弟的底片和档案说是 59 秒。",
+   "category_zh": "实证影像",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "档案实物的高清扫描（玻璃底片、信件、电报、剪报、老照片），用户自有或公有领域；每个日期和读数的出处；旁白",
+    "own_video": "no",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "品牌历史",
+    "档案故事",
+    "博物馆"
+   ],
+   "attribution": "Preview/poster from “Two Seconds Short”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (16–22 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 17.5 s, downscaled. Third-party material in this excerpt: Wright brothers glass negatives (LC-DIG-ppprs-00626 and related), Library of Congress, public domain — inverted, masked, layered.",
+   "third_party_in_preview": [
+    "Wright brothers glass negatives (LC-DIG-ppprs-00626 and related), Library of Congress, public domain — inverted, masked, layered"
+   ],
+   "preview": "/styles/archive-lighttable.mp4",
+   "poster": "/styles/archive-lighttable.jpg"
+  },
+  {
+   "id": "caption-news",
+   "name_zh": "字幕新闻",
+   "description_zh": "美国一年死掉 130 万箱蜜蜂，总数却涨了 6%：静音也能看懂的新闻。",
+   "category_zh": "剪辑与纪实",
+   "input_type": "footage",
+   "user_provides": {
+    "summary_zh": "一个新闻/数据话题；能用的真实视频和照片（用户自有，或由 agent 联网到 Wikimedia Commons 等找 CC BY/公有领域素材）；一份原始报告或数据作为数字出处；旁白可选（默认 TTS）",
+    "own_video": "core",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "社交媒体新闻",
+    "报告解读",
+    "数据短片"
+   ],
+   "attribution": "Preview/poster from “The Bee Ledger”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (19.5–25.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 22.3 s, downscaled. Third-party material in this excerpt: “Te veel bijen in de Biesbosch…” by Altena TV (A-TV), CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/), https://commons.wikimedia.org/wiki/File:Te_veel_bijen_in_de_Biesbosch_door_bijenkasten_in_de_Noordwaard_-_Altena_TV.webm — cropped, logo cropped out, desaturated; “Three bee packages for Park” by vastateparksstaff (Virginia State Parks), CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/), https://commons.wikimedia.org/wiki/File:Three_bee_packages_for_Park_(16272512611).jpg — cropped, graded; “People's Garden Apiary and Pollinator Garden” (USDA) and “Queen Bee” (USGS Bee Inventory and Monitoring Lab), public domain.",
+   "third_party_in_preview": [
+    "“Te veel bijen in de Biesbosch…” by Altena TV (A-TV), CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/), https://commons.wikimedia.org/wiki/File:Te_veel_bijen_in_de_Biesbosch_door_bijenkasten_in_de_Noordwaard_-_Altena_TV.webm — cropped, logo cropped out, desaturated",
+    "“Three bee packages for Park” by vastateparksstaff (Virginia State Parks), CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/), https://commons.wikimedia.org/wiki/File:Three_bee_packages_for_Park_(16272512611).jpg — cropped, graded",
+    "“People's Garden Apiary and Pollinator Garden” (USDA) and “Queen Bee” (USGS Bee Inventory and Monitoring Lab), public domain"
+   ],
+   "preview": "/styles/caption-news.mp4",
+   "poster": "/styles/caption-news.jpg"
+  },
+  {
+   "id": "newsreel",
+   "name_zh": "1920s 新闻影片",
+   "description_zh": "1926 年报纸说查尔斯顿会跳坏膝盖，福特工人野餐会上的孩子照跳不误。",
+   "category_zh": "剪辑与纪实",
+   "input_type": "footage",
+   "user_provides": {
+    "summary_zh": "一个可以“播报”的题材；老影像/老照片/旧报刊扫描（用户自有的家庭老片，或 agent 联网到 Internet Archive 等找 1931 年前公有领域素材）；快节奏播报旁白（TTS 或自录）",
+    "own_video": "core",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "历史故事",
+    "时代风潮",
+    "周年纪念"
+   ],
+   "attribution": "Preview/poster from “Knock-Knee Alert”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (29.5–35.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 32.5 s, downscaled. Third-party material in this excerpt: Ford Motor Company Film Collection, U.S. National Archives (FC-4158 and related reels, 1924–27) — copyright-free (rights transferred to NARA 1962).",
+   "third_party_in_preview": [
+    "Ford Motor Company Film Collection, U.S. National Archives (FC-4158 and related reels, 1924–27) — copyright-free (rights transferred to NARA 1962)"
+   ],
+   "preview": "/styles/newsreel.mp4",
+   "poster": "/styles/newsreel.jpg"
+  },
+  {
+   "id": "countdown",
+   "name_zh": "实时倒计时分屏",
+   "description_zh": "阿尔忒弥斯二号发射的最后一分钟，一秒不剪：格子从 1 开到 9，点火合成 1。",
+   "category_zh": "剪辑与纪实",
+   "input_type": "footage",
+   "user_provides": {
+    "summary_zh": "一个有明确“零点”的真实事件（发射、宣判、终场哨、投票截止）的多机位真实视频，最好带原声和时间码；相关文件/时间表。没有多机位素材就做不成",
+    "own_video": "core",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "发射与发布",
+    "倒计时",
+    "直播活动"
+   ],
+   "attribution": "Preview/poster from “Counting Itself Down”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (26.5–32.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 28.5 s, downscaled. Third-party material in this excerpt: NASA footage and photographs of the Artemis II launch (images.nasa.gov), U.S. federal government works, public domain — NASA did not make or endorse this.",
+   "third_party_in_preview": [
+    "NASA footage and photographs of the Artemis II launch (images.nasa.gov), U.S. federal government works, public domain — NASA did not make or endorse this"
+   ],
+   "preview": "/styles/countdown.mp4",
+   "poster": "/styles/countdown.jpg"
+  },
+  {
+   "id": "city-symphony",
+   "name_zh": "延时交响",
+   "description_zh": "纽约的一天：延时光河、踩着十六分音符的网格，1899 年和今天并排。",
+   "category_zh": "剪辑与纪实",
+   "input_type": "footage",
+   "user_provides": {
+    "summary_zh": "某个地方的延时、航拍、慢动作视频和照片（用户自有，或 agent 找 CC BY/公有领域素材）；不需要旁白，音乐驱动；可选一段公有领域文字引语",
+    "own_video": "core",
+    "script_or_topic": "required",
+    "voice_over": "样片无旁白，可不配"
+   },
+   "uses": [
+    "城市影片",
+    "音乐混剪",
+    "开场"
+   ],
+   "attribution": "Preview/poster from “One Day in New York”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (26.5–32.5 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 29.5 s, downscaled. Third-party material in this excerpt: “New York in Motion” by Scott Herder (2018), CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/), https://commons.wikimedia.org/wiki/File:New_York_in_Motion.webm — scaled, cropped, split-screen, graded; “New Brooklyn to New York via Brooklyn Bridge, no. 2” (Edison, 1899), Library of Congress, public domain; “Interior, Grand Central Station” by Carol M. Highsmith, Library of Congress, public domain.",
+   "third_party_in_preview": [
+    "“New York in Motion” by Scott Herder (2018), CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/), https://commons.wikimedia.org/wiki/File:New_York_in_Motion.webm — scaled, cropped, split-screen, graded",
+    "“New Brooklyn to New York via Brooklyn Bridge, no. 2” (Edison, 1899), Library of Congress, public domain",
+    "“Interior, Grand Central Station” by Carol M. Highsmith, Library of Congress, public domain"
+   ],
+   "preview": "/styles/city-symphony.mp4",
+   "poster": "/styles/city-symphony.jpg"
+  },
+  {
+   "id": "visual-investigation",
+   "name_zh": "视觉调查",
+   "description_zh": "新闻片、照片、证词和调查报告排上同一条时间轴，五路来源指向一处。",
+   "category_zh": "剪辑与纪实",
+   "input_type": "footage",
+   "user_provides": {
+    "summary_zh": "一个真实事件的视频、照片、文件、录音或数据（行车记录仪、报告 PDF、读数表格），能放到同一条时钟上互相印证；旁白（TTS）",
+    "own_video": "core",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "事件还原",
+    "事实核查",
+    "事故报告"
+   ],
+   "attribution": "Preview/poster from “The Hindenburg: Four Minutes, 32 Seconds”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (28–34 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 31.5 s, downscaled. Third-party material in this excerpt: “Special Release – Zeppelin Explodes Scores Dead”, Universal Newsreel 1937, U.S. National Archives, public domain; FBI file “Hindenburg” (1937) and U.S. Navy photographs (Gus Pasquarella; NH 57973), public domain.",
+   "third_party_in_preview": [
+    "“Special Release – Zeppelin Explodes Scores Dead”, Universal Newsreel 1937, U.S. National Archives, public domain",
+    "FBI file “Hindenburg” (1937) and U.S. Navy photographs (Gus Pasquarella; NH 57973), public domain"
+   ],
+   "preview": "/styles/visual-investigation.mp4",
+   "poster": "/styles/visual-investigation.jpg"
+  },
+  {
+   "id": "kino-montage",
+   "name_zh": "构成主义蒙太奇",
+   "description_zh": "帝国大厦的小册子写着建造者，工地实拍和老照片给出答案：每天 2,500 人。",
+   "category_zh": "剪辑与纪实",
+   "input_type": "footage",
+   "user_provides": {
+    "summary_zh": "档案影像、照片、文件（公有领域或用户自有）+ 每个数字的原始出处；旁白可选",
+    "own_video": "core",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "行业史",
+    "里程碑",
+    "众人合力"
+   ],
+   "attribution": "Preview/poster from “410 Days”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (7–13 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 10.5 s, downscaled. Third-party material in this excerpt: “Empires of Steel” (American Bridge Company, 1930–31), Internet Archive, public domain; “What Everybody Wants to Know About Empire State” (1931 brochure), Columbia University Libraries, public domain.",
+   "third_party_in_preview": [
+    "“Empires of Steel” (American Bridge Company, 1930–31), Internet Archive, public domain",
+    "“What Everybody Wants to Know About Empire State” (1931 brochure), Columbia University Libraries, public domain"
+   ],
+   "preview": "/styles/kino-montage.mp4",
+   "poster": "/styles/kino-montage.jpg"
+  },
+  {
+   "id": "news-package",
+   "name_zh": "电视新闻包装",
+   "description_zh": "一周四条 AI 新闻，一整套电视台包装：串联单、标题条、翻牌价格表、规格卡。",
+   "category_zh": "剪辑与纪实",
+   "input_type": "material",
+   "user_provides": {
+    "summary_zh": "当期新闻事实与数据（每条要有官方出处）；可选：用户自己的图片、logo、品牌色。画面全部代码画，不需要视频；中文旁白需 TTS（演示用的豆包配音不可复用）",
+    "own_video": "optional",
+    "script_or_topic": "required",
+    "voice_over": "可选：用户自录或默认 TTS"
+   },
+   "uses": [
+    "新闻汇总",
+    "快讯",
+    "行情播报"
+   ],
+   "attribution": "Preview/poster from “The Week in AI”, a Lemo-Opuscar demo film by LemoLab (https://github.com/lemomo-ai/lemo-opuscar), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: trimmed to 6 s (15–21 s), downscaled to 640 px, 15 fps, re-encoded H.264 without audio; poster = one frame at 17.4 s, downscaled. Third-party material in this excerpt: KOSPI daily closes (Korea Exchange via Naver Finance) — facts; background plate AI-generated with the Codex image tool for the demo (labelled as illustration).",
+   "third_party_in_preview": [
+    "KOSPI daily closes (Korea Exchange via Naver Finance) — facts; background plate AI-generated with the Codex image tool for the demo (labelled as illustration)"
+   ],
+   "preview": "/styles/news-package.mp4",
+   "poster": "/styles/news-package.jpg"
+  }
+ ]
+}

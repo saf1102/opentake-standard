@@ -1,0 +1,177 @@
+{
+  "presets": {
+    "水墨题字": {
+      "font": "Ma Shan Zheng",
+      "fontFile": "MaShanZheng-Regular.ttf",
+      "fallback": "Kaiti SC",
+      "layout": "content",
+      "weight": 400,
+      "size": 0.078,
+      "color": "#292A27",
+      "accent": "#292A27",
+      "lineHeight": 1.3,
+      "roles": [
+        "title"
+      ]
+    },
+    "宣纸旁白": {
+      "font": "Cormorant Garamond",
+      "fontFile": "CormorantGaramond-Italic-VF.ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "weight": 500,
+      "size": 0.042,
+      "color": "#373A36",
+      "accent": "#373A36",
+      "lineHeight": 1.3,
+      "roles": [
+        "caption"
+      ],
+      "italic": true
+    },
+    "卷轴题签": {
+      "font": "Noto Serif SC",
+      "fontFile": "NotoSerifSC[wght].ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "weight": 500,
+      "size": 0.03,
+      "color": "#454640",
+      "accent": "#454640",
+      "lineHeight": 1.3,
+      "roles": [
+        "label"
+      ],
+      "tracking": 0.1
+    },
+    "竖排题字": {
+      "font": "Ma Shan Zheng",
+      "fontFile": "MaShanZheng-Regular.ttf",
+      "fallback": "Kaiti SC",
+      "layout": "content",
+      "weight": 400,
+      "lineHeight": 1.3,
+      "size": 0.078,
+      "color": "#1F1D1A",
+      "accent": "#1F1D1A",
+      "vertical": true,
+      "roles": [
+        "title"
+      ]
+    },
+    "淡墨远题": {
+      "font": "Ma Shan Zheng",
+      "fontFile": "MaShanZheng-Regular.ttf",
+      "fallback": "Kaiti SC",
+      "layout": "content",
+      "weight": 400,
+      "lineHeight": 1.3,
+      "size": 0.078,
+      "color": "rgba(41,42,39,.5)",
+      "accent": "#292A27",
+      "roles": [
+        "title"
+      ]
+    },
+    "宋体题名": {
+      "font": "Noto Serif SC",
+      "fontFile": "NotoSerifSC[wght].ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "weight": 700,
+      "size": 0.07,
+      "color": "#292A27",
+      "accent": "#292A27",
+      "tracking": 0.2,
+      "roles": [
+        "title"
+      ]
+    },
+    "朱印题跋": {
+      "font": "Cormorant Garamond",
+      "fontFile": "CormorantGaramond-Italic-VF.ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "weight": 500,
+      "size": 0.042,
+      "color": "#373A36",
+      "accent": "#373A36",
+      "italic": true,
+      "marker": "square",
+      "markerColor": "#B02E22",
+      "roles": [
+        "caption"
+      ]
+    },
+    "宋体旁白": {
+      "font": "Noto Serif SC",
+      "fontFile": "NotoSerifSC[wght].ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "weight": 400,
+      "size": 0.04,
+      "color": "#373A36",
+      "accent": "#1F1D1A",
+      "tracking": 0.06,
+      "roles": [
+        "caption"
+      ]
+    },
+    "行书旁白": {
+      "font": "Ma Shan Zheng",
+      "fontFile": "MaShanZheng-Regular.ttf",
+      "fallback": "Kaiti SC",
+      "layout": "content",
+      "weight": 400,
+      "lineHeight": 1.3,
+      "size": 0.046,
+      "color": "#292A27",
+      "accent": "#292A27",
+      "roles": [
+        "caption"
+      ]
+    },
+    "朱文印签": {
+      "font": "Noto Serif SC",
+      "fontFile": "NotoSerifSC[wght].ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "weight": 600,
+      "size": 0.03,
+      "color": "#F2ECDE",
+      "accent": "#F2ECDE",
+      "box": true,
+      "boxColor": "#B02E22",
+      "radius": 0.06,
+      "tracking": 0.1,
+      "roles": [
+        "label"
+      ]
+    },
+    "竖排落款": {
+      "font": "Noto Serif SC",
+      "fontFile": "NotoSerifSC[wght].ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "weight": 500,
+      "size": 0.03,
+      "color": "#454640",
+      "accent": "#454640",
+      "vertical": true,
+      "tracking": 0.1,
+      "roles": [
+        "label"
+      ]
+    }
+  },
+  "finishes": [
+    "none",
+    "paper",
+    "vignette"
+  ]
+}

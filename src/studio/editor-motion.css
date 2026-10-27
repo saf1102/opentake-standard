@@ -1,0 +1,167 @@
+/* Editor refinement · step 3 — interaction motion.
+   Three speeds: 120ms for hover feedback, 180ms for state changes, 200–220ms for things that appear.
+   Entrances use the individual `scale` / `translate` properties so they compose with any `transform`
+   a dialog already uses for its position. Timeline clips never scale: they are drag targets.
+   Applies to every theme; timings and colours come from editor-tokens.css. */
+
+/* ---------- controls: colour eases, a press settles in ---------- */
+html[data-ui-theme] :is(.editor-header, .timeline-toolbar, .preview-controls, .media-panel, .inspector-panel) :is(button, [role=tab]):not(.timeline-clip) {
+  transition:
+    background-color var(--ed-fast) ease,
+    border-color var(--ed-fast) ease,
+    color var(--ed-fast) ease,
+    box-shadow var(--ed-state) ease,
+    opacity var(--ed-fast) ease,
+    scale var(--ed-fast) var(--ed-ease);
+}
+html[data-ui-theme] :is(.editor-header, .timeline-toolbar, .preview-controls, .media-panel, .inspector-panel) :is(button, [role=tab]):not(.timeline-clip):active:not(:disabled) {
+  scale: .96;
+  transition-duration: 60ms;
+}
+html[data-ui-theme] :is(.editor-header, .timeline-toolbar, .preview-controls) button svg { transition: color var(--ed-fast) ease, opacity var(--ed-fast) ease; }
+html[data-ui-theme] :where(button, a, input, textarea, select):focus-visible { transition: outline-offset var(--ed-fast) var(--ed-ease); }
+
+/* ---------- media library: cards lift toward the pointer ---------- */
+html[data-ui-theme] .media-item {
+  transition: border-color var(--ed-fast) ease, box-shadow var(--ed-state) ease, opacity var(--ed-fast) ease, translate var(--ed-state) var(--ed-ease);
+}
+html[data-ui-theme] .media-item:hover { translate: 0 -2px; box-shadow: var(--ed-shadow-md); border-color: var(--ed-line-2); }
+html[data-ui-theme] .media-item__preview :is(img, video) { transition: scale .3s var(--ed-ease); }
+html[data-ui-theme] .media-item:hover .media-item__preview :is(img, video) { scale: 1.03; }
+
+/* ---------- timeline ---------- */
+html[data-ui-theme] .track-lane::before { transition: background-color var(--ed-state) ease, box-shadow var(--ed-state) ease; }
+html[data-ui-theme] .timeline-clip { transition: filter var(--ed-fast) ease, box-shadow var(--ed-state) ease, transform var(--ed-state) var(--ed-ease), outline-color var(--ed-fast) ease, opacity var(--ed-fast) ease; }
+/* picked up: the clip floats above the lane instead of blinking */
+html[data-ui-theme] .timeline-clip.dragging {
+  opacity: .94;
+  outline: 2px solid var(--ed-accent);
+  outline-offset: 1px;
+  box-shadow: inset 0 0 0 1px var(--ed-clip-rim), var(--ed-shadow-lg);
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  animation: none;
+  z-index: 8;
+}
+/* the slot a dragged layout clip will land in: a calm pulse in the accent, not a green flash */
+html[data-ui-theme] .timeline-clip.slot-drop-target {
+  outline: 2px dashed var(--ed-accent-hi);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ed-accent) 12%, transparent);
+  animation: ed-slot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ed-slot-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ed-accent) 10%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ed-accent) 35%, transparent); }
+}
+/* trim handles: pointing at one turns it into a solid accent tab (FCP's yellow trim edge), so you know a drag will trim, not move */
+html[data-ui-theme] .timeline-clip.resizing { box-shadow: inset 0 0 0 1px var(--ed-clip-rim), var(--ed-shadow-md); }
+html[data-ui-theme] .timeline-clip-duration-handle { border-radius: 0 6px 6px 0; transition: opacity var(--ed-fast) ease, background-color var(--ed-fast) ease, width var(--ed-fast) var(--ed-ease); }
+html[data-ui-theme] .timeline-clip-duration-handle--left { border-radius: 6px 0 0 6px; }
+html[data-ui-theme] .timeline-clip-duration-handle::after { transition: background-color var(--ed-fast) ease, top var(--ed-fast) var(--ed-ease), bottom var(--ed-fast) var(--ed-ease); }
+html[data-ui-theme] :is(.timeline-clip-duration-handle:hover, .timeline-clip.resizing .timeline-clip-duration-handle) {
+  opacity: 1;
+  width: 10px;
+  background: var(--ed-accent);
+}
+html[data-ui-theme] :is(.timeline-clip-duration-handle:hover, .timeline-clip.resizing .timeline-clip-duration-handle)::after { top: 22%; bottom: 22%; left: 4px; background: var(--ed-accent-ink); }
+/* the divider between preview and timeline: a grip you can find, and an accent rule across the editor while you hold it */
+html[data-ui-theme] .editor-resizer { transition: box-shadow var(--ed-state) ease; }
+html[data-ui-theme] .editor-resizer i { width: 40px; height: 4px; border-radius: 2px; background: var(--ed-grip); transition: background-color var(--ed-fast) ease, width var(--ed-state) var(--ed-ease); }
+html[data-ui-theme] .editor-resizer:is(:hover, :active) { box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--ed-accent) 60%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ed-accent) 60%, transparent); }
+html[data-ui-theme] .editor-resizer:is(:hover, :active) i { width: 88px; background: var(--ed-accent); }
+
+/* ---------- dragging from the media library ---------- */
+/* the label that follows the pointer: a small card with an accent edge */
+html[data-ui-theme] .media-pointer-ghost {
+  padding: 7px 12px 7px 11px;
+  border: 1px solid var(--ed-line-2);
+  border-radius: 8px;
+  background: var(--ed-menu-bg);
+  box-shadow: inset 3px 0 0 var(--ed-accent), var(--ed-shadow-lg);
+  color: var(--ed-ink);
+  font-weight: 600;
+  animation: ed-ghost-in 160ms var(--ed-ease);
+}
+@keyframes ed-ghost-in { from { opacity: 0; scale: .88; } }
+/* category tabs: the one under the pointer fills with the accent and rises, so re-filing an asset is unmistakable */
+html[data-ui-theme] .media-type-filters button { transition: background-color var(--ed-fast) ease, color var(--ed-fast) ease, box-shadow var(--ed-state) ease, scale var(--ed-state) var(--ed-ease); }
+html[data-ui-theme] .media-type-filters button.is-classification-target {
+  scale: 1.06;
+  background: var(--ed-accent) !important;
+  border-color: var(--ed-accent) !important;
+  color: var(--ed-accent-ink) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ed-accent) 25%, transparent), var(--ed-shadow-md);
+}
+html[data-ui-theme] .media-type-filters button.is-classification-target span { color: color-mix(in srgb, var(--ed-accent-ink) 70%, transparent); }
+/* drop line and slot preview on the timeline: steady (no blinking) and gliding with the pointer */
+html[data-ui-theme] .track-drop-indicator {
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ed-accent);
+  box-shadow: 0 0 0 1px var(--ed-playhead-halo), 0 0 12px color-mix(in srgb, var(--ed-accent) 65%, transparent);
+  transition: left 90ms var(--ed-ease);
+}
+html[data-ui-theme] .track-drop-indicator b {
+  top: 50%;
+  translate: 0 -50%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ed-accent);
+  color: var(--ed-accent-ink);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+html[data-ui-theme] .timeline-slot-drop-preview {
+  border: 1.5px dashed var(--ed-accent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--ed-accent) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ed-accent) 14%, transparent);
+  color: var(--ed-ink);
+  animation: none;
+  transition: left 120ms var(--ed-ease), width 120ms var(--ed-ease);
+}
+html[data-ui-theme] .timeline-slot-drop-preview b { padding: 2px 9px; background: var(--ed-accent); color: var(--ed-accent-ink); font-weight: 600; }
+html[data-ui-theme] .timeline-slot-drop-preview.is-swap { border-color: var(--ed-accent-hi); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ed-accent) 20%, transparent); }
+html[data-ui-theme] .timeline-snap-guide { width: 1px; background: var(--ed-accent); box-shadow: 0 0 0 .5px var(--ed-playhead-halo), 0 0 10px color-mix(in srgb, var(--ed-accent) 60%, transparent); }
+html[data-ui-theme] .timeline-snap-guide b { background: var(--ed-accent); color: var(--ed-accent-ink); font-weight: 600; border-radius: 999px; padding: 1px 7px; }
+
+/* ---------- things that appear ---------- */
+@keyframes ed-pop-in { from { opacity: 0; scale: .97; translate: 0 6px; } }
+@keyframes ed-menu-in { from { opacity: 0; scale: .96; } }
+@keyframes ed-fade-in { from { opacity: 0; } }
+@keyframes ed-panel-in { from { opacity: 0; translate: 0 4px; } }
+html[data-ui-theme] .studio-drawer-backdrop { animation: ed-fade-in var(--ed-state) ease-out; }
+html[data-ui-theme] :is(.export-dialog, .roughcut-dialog, .roughcut-progress-dialog, .agent-settings-dialog, .full-card-dialog,
+  .media-preview-dialog, .media-placement-progress-dialog, .project-storage-dialog, .content-dialog, .card-export-modal,
+  .director-segment-dialog, .vox-preview-dialog, .qe-reset-dialog) {
+  animation: ed-pop-in var(--ed-enter) var(--ed-ease);
+}
+html[data-ui-theme] :is(.clip-context-menu, .director-slot-menu, .segment-media-popover) {
+  transform-origin: top left;
+  animation: ed-menu-in 140ms var(--ed-ease);
+}
+/* switching inspector tabs: the new page settles in under the tabs */
+html[data-ui-theme] .inspector-panel > :not(.inspector-tabs) { animation: ed-panel-in var(--ed-state) var(--ed-ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-theme] :is(.studio-drawer-backdrop, .export-dialog, .roughcut-dialog, .roughcut-progress-dialog, .agent-settings-dialog,
+    .full-card-dialog, .media-preview-dialog, .media-placement-progress-dialog, .project-storage-dialog, .content-dialog, .card-export-modal,
+    .director-segment-dialog, .vox-preview-dialog, .qe-reset-dialog, .clip-context-menu, .director-slot-menu, .segment-media-popover,
+    .timeline-clip.slot-drop-target) { animation: none; }
+  html[data-ui-theme] .inspector-panel > :not(.inspector-tabs) { animation: none; }
+  html[data-ui-theme] :is(.media-item, .media-item__preview img, .media-item__preview video, .timeline-clip) { transition: none; }
+  html[data-ui-theme] :is(.media-item:hover, .media-item:hover .media-item__preview img, .media-item:hover .media-item__preview video) { translate: none; scale: none; }
+  html[data-ui-theme] .timeline-clip.dragging { transform: none; }
+  html[data-ui-theme] :is(.editor-header, .timeline-toolbar, .preview-controls, .media-panel, .inspector-panel) :is(button, [role=tab]):not(.timeline-clip):active:not(:disabled) { scale: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-theme] .media-pointer-ghost { animation: none; }
+  html[data-ui-theme] :is(.track-drop-indicator, .timeline-slot-drop-preview, .media-type-filters button) { transition: none; }
+  html[data-ui-theme] .media-type-filters button.is-classification-target { scale: none; }
+}
+/* a video's still plays on hover (MediaLibrary HoverPlay) */
+.media-hover-play { position: absolute; inset: 0; display: block; }
+.media-hover-play > img { width: 100%; height: 100%; object-fit: cover; }
+.media-hover-play > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

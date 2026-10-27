@@ -1,0 +1,67 @@
+{
+  "presets": {
+    "水彩题名": {
+      "font": "Cormorant Garamond",
+      "fontFile": "CormorantGaramond-VF.ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "weight": 600,
+      "size": 0.078,
+      "color": "#4A3B30",
+      "accent": "#4A3B30",
+      "lineHeight": 1.3,
+      "roles": [
+        "title"
+      ]
+    },
+    "纸上旁白": {
+      "font": "Cormorant Garamond",
+      "fontFile": "CormorantGaramond-Italic-VF.ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "weight": 500,
+      "size": 0.042,
+      "color": "#4A3B30",
+      "accent": "#4A3B30",
+      "lineHeight": 1.3,
+      "roles": [
+        "caption"
+      ],
+      "italic": true
+    },
+    "标本手记": {
+      "font": "Caveat",
+      "fontFile": "Caveat-VF.ttf",
+      "fallback": "Kaiti SC",
+      "layout": "content",
+      "weight": 600,
+      "size": 0.03,
+      "color": "#4A3B30",
+      "accent": "#4A3B30",
+      "lineHeight": 1.3,
+      "roles": [
+        "label"
+      ]
+    },
+    "测量单位": {
+      "font": "IBM Plex Mono",
+      "fontFile": "IBMPlexMono-Medium.ttf",
+      "fallback": "Menlo",
+      "layout": "content",
+      "weight": 500,
+      "size": 0.03,
+      "color": "#4A3B30",
+      "accent": "#4A3B30",
+      "lineHeight": 1.3,
+      "roles": [
+        "label"
+      ],
+      "tracking": 0.08
+    }
+  },
+  "finishes": [
+    "none",
+    "paper",
+    "vignette"
+  ]
+}

@@ -1,0 +1,23 @@
+OpenTake Standard — Third-party notices
+
+OpenTake original code: AGPL-3.0-only, see LICENSE. OpenTake name and T mark are excluded; see TRADEMARK.md.
+
+lemo-opuscar, copyright 2026 LemoLab, MIT; upstream https://github.com/lemomo-ai/lemo-opuscar (3961ddb3d24d8876e0e2754f7790d66908acee51). Standard includes ten style guides and common authoring helpers. Full MIT text: server/general/kit/LICENSE.lemo-opuscar. Attribution: server/general/kit/ATTRIBUTION.md.
+Style preview images and videos: copyright LemoLab, CC BY 4.0, excerpts cropped for preview; individual credits and other included material are listed in src/workspace/style-library/style-library.json and displayed in the style detail.
+
+HyperFrames, copyright HeyGen contributors, Apache-2.0. Source: https://github.com/heygen-com/hyperframes. The package license texts are retained under licenses/npm, and the authoring skill NOTICE follows:
+# 来源与授权
+
+本目录的技能文档来自 HyperFrames（https://github.com/heygen-com/hyperframes），授权为 Apache License 2.0。原样随 OpenTake 分发，供出片智能体查阅，未作修改。HyperFrames 是 HeyGen 的项目，OpenTake 与其没有隶属关系。
+
+OpenScreen, MIT, copyright OpenScreen contributors including Etienne Lescot and Siddharth Vaddem, https://github.com/getopenscreen/openscreen. The embedded editor and its native host source are retained; Standard supplies screen-only storage and API adapters. Original LICENSE and THIRD-PARTY-NOTICES.md are preserved in vendor/openscreen. The upstream notices describe upstream installers; this source export includes none of their native executables, models, DLLs or installers.
+
+FFmpeg: LGPLv3 shared build (with OpenSSL 3); no FFmpeg executable is distributed in this source export. Users provide their compatible LGPL build. FFmpeg licensing: https://ffmpeg.org/legal.html; source: https://ffmpeg.org/download.html. Installation and corresponding modified-build source distribution are task 11 responsibilities. Do not redistribute a modified binary without its exact corresponding source, patches, configure command and LGPL dependency sources.
+
+Headless browser: Playwright Core Apache-2.0; Chromium/BSD and third-party licenses, https://chromium.googlesource.com/chromium/src/+/main/LICENSE. No browser binary is distributed. Any separately installed browser retains its own LICENSE and credits.
+
+Semantic icons: Lucide ISC and Simple Icons CC0; attribution and upstream brands retain their trademarks. Three.js MIT, d3 ISC, React MIT, React Router MIT, Lucide ISC, Radix MIT, Vite MIT, Tailwind MIT, TypeScript Apache-2.0. Exact installed dependency versions and all top-level license/NOTICE files follow and are preserved under licenses/npm.
+
+Electron: MIT, copyright Electron contributors, https://github.com/electron/electron. Electron includes Chromium, Node.js and third-party components; the local App retains Electron's LICENSE and LICENSES.chromium.html. electron-builder: MIT, copyright electron-builder contributors, https://github.com/electron-userland/electron-builder. Full installed package licenses are included in licenses/npm.
+
+OpenScreen: MIT, Siddharth Vaddem and contributors. Complete upstream notices: vendor/openscreen/LICENSE and vendor/openscreen/THIRD-PARTY-NOTICES.md. OpenTake modifications are AGPL-3.0.

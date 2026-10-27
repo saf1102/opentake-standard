@@ -1,0 +1,91 @@
+/* Right-click menu on timeline and preview clips — one look in every theme (colours from editor-tokens.css):
+   a titled card, 32px rows with a fixed column of brand-orange icons, shortcuts in a right-hand column, groups split by hairlines,
+   destructive rows last and red. The card status row reuses the timeline's state chip. */
+
+html[data-ui-theme] .clip-context-menu {
+  width: 248px;
+  padding: 6px;
+  border: 1px solid var(--ed-line-2);
+  border-radius: 12px;
+  background: var(--ed-menu-bg);
+  backdrop-filter: none;
+  box-shadow: var(--ed-shadow-lg), 0 0 0 1px color-mix(in srgb, var(--ed-ink) 6%, transparent);
+  color: var(--ed-ink);
+  font-size: var(--ed-text);
+}
+html[data-ui-theme] .clip-context-menu header {
+  gap: 2px;
+  padding: 6px 10px 9px;
+  margin: 0 0 4px;
+  border-bottom: 1px solid var(--ed-line-2);
+}
+html[data-ui-theme] .clip-context-menu header b { font-size: 13px; font-weight: 600; color: var(--ed-ink); }
+html[data-ui-theme] .clip-context-menu header span { font-size: var(--ed-text-sm); color: var(--ed-muted); }
+
+/* rows */
+html[data-ui-theme] .clip-context-menu > button {
+  height: 32px;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 7px;
+  color: var(--ed-ink-2);
+  font-size: 13px;
+  font-weight: 400;
+  transition: background-color var(--ed-fast) ease, color var(--ed-fast) ease;
+}
+html[data-ui-theme] .clip-context-menu > button svg { width: 16px; height: 16px; flex: none; stroke-width: 1.75; color: var(--ed-icon); transition: color var(--ed-fast) ease; }
+html[data-ui-theme] .clip-context-menu > button:hover:not(:disabled) { background: var(--ed-raise-hi); color: var(--ed-ink); }
+html[data-ui-theme] .clip-context-menu > button:hover:not(:disabled) svg { color: var(--ed-icon); }
+html[data-ui-theme] .clip-context-menu > button:disabled { opacity: .4; }
+html[data-ui-theme] .clip-context-menu > button kbd {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ed-ink) 8%, transparent);
+  color: var(--ed-muted);
+  font: 500 11px/18px system-ui, sans-serif;
+}
+/* a row without an icon still starts its text on the icon rows' text column */
+html[data-ui-theme] .clip-context-menu > button:not(:has(> svg)) { padding-left: 36px; }
+/* hairlines between groups; a hairline never opens or closes the menu, and two never touch */
+html[data-ui-theme] .clip-context-menu > i { height: 1px; margin: 5px 6px; background: var(--ed-line-2); }
+html[data-ui-theme] .clip-context-menu > header + i,
+html[data-ui-theme] .clip-context-menu > i + i,
+html[data-ui-theme] .clip-context-menu > i:last-child { display: none; }
+/* destructive rows */
+html[data-ui-theme] .clip-context-menu > button.danger,
+html[data-ui-theme] .clip-context-menu > button.danger svg { color: var(--ed-danger); }
+html[data-ui-theme] .clip-context-menu > button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--ed-danger) 12%, transparent); color: var(--ed-danger); }
+html[data-ui-theme] .clip-context-menu > button.danger:hover:not(:disabled) svg { color: var(--ed-danger); }
+
+/* 增强卡 status: the same chip as on the timeline, then its label */
+html[data-ui-theme] .clip-context-menu__status {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  color: var(--ed-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+html[data-ui-theme] .clip-context-menu__status .timeline-card-state-icon { width: 16px; height: 16px; display: inline-grid; place-items: center; }
+html[data-ui-theme] .clip-context-menu__status[data-card-state=ready] .timeline-card-state-icon,
+html[data-ui-theme] .clip-context-menu__status[data-card-state=rework] .timeline-card-state-icon { background: var(--card-tone, var(--ed-card-m)); color: var(--ed-card-ink); }
+
+/* inline controls inside a row */
+html[data-ui-theme] .clip-context-menu__gap-duration { padding: 6px 10px; font-size: var(--ed-text); color: var(--ed-ink-2); }
+html[data-ui-theme] .clip-context-menu__gap-duration input { height: 26px; border: 1px solid var(--ed-line-2); border-radius: 6px; background: var(--ed-input); color: var(--ed-ink); }
+html[data-ui-theme] .clip-context-menu button .source-audio-switch {
+  padding: 0 9px;
+  height: 20px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ed-ink) 12%, transparent);
+  color: var(--ed-muted) !important;
+  font-size: var(--ed-text-xs);
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+html[data-ui-theme] .clip-context-menu button .source-audio-switch.is-on { background: var(--ed-accent); color: var(--ed-accent-ink) !important; }

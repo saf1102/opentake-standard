@@ -1,0 +1,143 @@
+/* Editor refinement · steps 1–2 — one control scale, one type scale, timeline lanes as rounded slots,
+   clips with name pills, hover-only trim handles, a knob playhead.
+   Applies to every theme (`html[data-ui-theme]` ties the themes' own specificity and wins by import order);
+   colours come from editor-tokens.css. Rules marked 原色 change a theme's material (button boxes, radii)
+   and stay with 原色 only. Nothing here moves a clip horizontally: lanes keep their left edge, so time ↔ pixel
+   mapping is unchanged. */
+
+/* ---------- one control scale: header, timeline toolbar, preview transport, media toolbar ---------- */
+html[data-ui-theme] :is(.editor-header .editor-actions, .timeline-toolbar, .preview-controls, .media-library-toolbar) > button,
+html[data-ui-theme] .editor-header .editor-actions > :is(.editor-task-button, .editor-primary) {
+  height: var(--ed-control);
+  min-height: var(--ed-control);
+  font-size: var(--ed-text);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+/* the timeline toolbar is the densest row: keep its 11px labels and 7px padding */
+html[data-ui-theme] .timeline-toolbar > button { padding: 0 7px; font-size: var(--ed-text-sm); }
+html[data-ui-theme] .timeline-toolbar > .timeline-zoom-button { width: var(--ed-control); min-width: var(--ed-control); padding: 0; }
+html[data-ui-theme] :is(.timeline-toolbar, .preview-controls, .editor-header) svg { width: 15px; height: 15px; stroke-width: 1.75; }
+html[data-ui-theme] .timeline-toolbar > span:empty { height: 18px; width: 1px; margin: 0 6px; background: var(--ed-line-2); }
+/* 原色 · quiet chrome: idle tool buttons have no box, the box appears on hover (FCP / Resolve) */
+html[data-ui-theme=original] :is(.editor-header .editor-actions, .timeline-toolbar, .preview-controls, .media-library-toolbar) > button,
+html[data-ui-theme=original] .editor-header .editor-actions > :is(.editor-task-button, .editor-primary) { border-radius: 7px; }
+html[data-ui-theme=original] .timeline-toolbar > button:not(.is-active):not([aria-pressed=true]),
+html[data-ui-theme=original] .editor-header .editor-actions > button:not(.editor-primary) {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+html[data-ui-theme=original] .timeline-toolbar > button:not(.is-active):not([aria-pressed=true]):hover:not(:disabled),
+html[data-ui-theme=original] .editor-header .editor-actions > button:not(.editor-primary):hover:not(:disabled) {
+  background: var(--ed-raise) !important;
+  border-color: var(--ed-line-2) !important;
+}
+/* segmented groups: one track height, one thumb height */
+html[data-ui-theme] :is(.ui-theme-switch, .preview-style-switch, .preview-quality-switch, .timeline-display-mode, .media-view-toggle, .inspector-tabs) {
+  min-height: var(--ed-control);
+  padding: 3px;
+  gap: 2px;
+  align-items: center;
+}
+html[data-ui-theme] :is(.ui-theme-switch, .preview-style-switch, .preview-quality-switch, .timeline-display-mode, .media-view-toggle) button {
+  height: var(--ed-control-sm);
+  min-height: var(--ed-control-sm);
+  font-size: var(--ed-text-sm);
+  padding: 0 9px;
+}
+/* 原色 · squarer segments; 暖雾 / 磨砂 keep their pills */
+html[data-ui-theme=original] :is(.ui-theme-switch, .preview-style-switch, .preview-quality-switch, .timeline-display-mode, .media-view-toggle, .inspector-tabs) { border-radius: 7px; }
+html[data-ui-theme=original] :is(.ui-theme-switch, .preview-style-switch, .preview-quality-switch, .timeline-display-mode, .media-view-toggle) button { border-radius: 5px !important; }
+
+/* ---------- one type scale; numbers that tick are tabular ---------- */
+html[data-ui-theme] .editor-project-title { font-size: 13px; font-weight: 600; letter-spacing: 0; }
+html[data-ui-theme] :is(.preview-controls, .timeline-ruler, .track-volume-control, .timeline-toolbar) :is(span, time, output, b) { font-variant-numeric: tabular-nums; }
+html[data-ui-theme] .preview-controls :is(time, span, output) { font-size: var(--ed-text-sm); }
+
+/* ---------- timeline: lanes as rounded slots, separated by air instead of lines ---------- */
+html[data-ui-theme] .track-lane,
+html[data-ui-theme] .track-lane:nth-child(even) { background: transparent; border-bottom: 0; }
+html[data-ui-theme] .track-lane::before {
+  content: "";
+  position: absolute;
+  inset: 3px 0;
+  border-radius: 8px;
+  background: var(--ed-slot);
+  box-shadow: inset 0 0 0 1px var(--ed-slot-rim);
+  pointer-events: none;
+}
+html[data-ui-theme] .track-lane:hover::before { background: var(--ed-slot-hover); }
+html[data-ui-theme] .track-lane:is(.is-drop-target, .is-pointer-drop-target) { background: transparent; box-shadow: none; }
+html[data-ui-theme] .track-lane:is(.is-drop-target, .is-pointer-drop-target)::before {
+  background: color-mix(in srgb, var(--ed-accent) 8%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ed-accent) 70%, transparent);
+}
+/* track heads: the same rows, a label you can read, controls that recede until you need them.
+   The head column is a sibling of the scroll area, so widening it shifts the whole lane box — clip x stays relative to the lane. */
+html[data-ui-theme] .studio-editor .timeline-body { grid-template-columns: 184px minmax(0, 1fr); }
+html[data-ui-theme] .track-heads { border-right: 1px solid var(--ed-line); }
+html[data-ui-theme] .track-head { border-bottom: 0; padding: 0 6px 0 10px; font-size: var(--ed-text); gap: 2px; grid-template-columns: 20px 1fr 20px 20px 20px; }
+html[data-ui-theme] .track-head b { font-weight: 500; color: var(--ed-ink-2); }
+html[data-ui-theme] .track-head svg { width: 14px; height: 14px; stroke-width: 1.75; }
+html[data-ui-theme] .track-head > span:first-child { color: var(--ed-muted); }
+html[data-ui-theme] .track-head button { width: 20px; height: 20px; border-radius: 5px; opacity: .5; transition: opacity .12s ease, background-color .12s ease, color .12s ease; }
+html[data-ui-theme] .track-head:hover button,
+html[data-ui-theme] .track-head button:is(.active, [aria-pressed=true]) { opacity: 1; }
+html[data-ui-theme] .track-head:hover { background: var(--ed-head-hover); }
+/* audio faders: a hairline track and a small knob instead of a full web slider */
+html[data-ui-theme] .track-volume-control { left: 30px; right: 8px; bottom: 4px; font-size: var(--ed-text-xs); }
+html[data-ui-theme] .track-volume-control input[type=range] { -webkit-appearance: none; appearance: none; height: 12px; background: transparent; }
+html[data-ui-theme] .track-volume-control input[type=range]::-webkit-slider-runnable-track { height: 3px; border-radius: 3px; background: var(--ed-fader); }
+html[data-ui-theme] .track-volume-control input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; margin-top: -3.5px; border-radius: 50%; background: var(--ed-ink-2); box-shadow: var(--ed-shadow-sm); }
+html[data-ui-theme] .track-head:hover .track-volume-control input[type=range]::-webkit-slider-thumb { background: var(--ed-ink); }
+
+/* ---------- clips: rounded, a name pill, trim handles only on hover / selection ---------- */
+html[data-ui-theme] .timeline-clip {
+  top: 5px;
+  bottom: 5px;
+  border-radius: 6px;
+  border-width: 0;
+  box-shadow: inset 0 0 0 1px var(--ed-clip-rim), var(--ed-shadow-sm);
+  transition: filter .12s ease, box-shadow .14s ease, transform .14s ease;
+}
+html[data-ui-theme] .timeline-clip:hover { filter: brightness(1.08); }
+html[data-ui-theme] :is(.timeline-media-strip, .voice-waveform) { border-radius: inherit; overflow: hidden; }
+html[data-ui-theme] .timeline-clip.selected {
+  outline: 2px solid var(--ed-accent);
+  outline-offset: 1px;
+  box-shadow: inset 0 0 0 1px var(--ed-clip-rim), var(--ed-shadow-md);
+  transform: translateY(-1px);
+  z-index: 5;
+}
+/* the file name sits on the thumbnails, so its pill stays dark in every theme */
+html[data-ui-theme] .timeline-media-strip > b {
+  top: 4px;
+  left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #000000a6;
+  color: #f2f2f4;
+  text-shadow: none;
+  font-size: var(--ed-text-xs);
+  font-weight: 600;
+  line-height: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-ui-theme] .track-lane--subtitle .timeline-clip { padding: 0 8px; display: flex; align-items: center; }
+html[data-ui-theme] .track-lane--subtitle .timeline-clip b { font-size: var(--ed-text-sm); font-weight: 500; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-ui-theme] .timeline-clip-duration-handle { opacity: 0; width: 8px; border: 0; background: linear-gradient(90deg, #0000, #00000073); transition: opacity .12s ease; }
+html[data-ui-theme] .timeline-clip-duration-handle::after { top: 30%; bottom: 30%; left: 3px; width: 2px; border: 0; border-radius: 1px; background: currentColor; opacity: .9; }
+html[data-ui-theme] :is(.timeline-clip:hover, .timeline-clip.selected, .timeline-clip.resizing) .timeline-clip-duration-handle { opacity: 1; }
+
+/* ---------- playhead: a hairline with a rounded knob ---------- */
+html[data-ui-theme] .playhead { width: 1.5px; margin-left: -.25px; box-shadow: 0 0 0 .5px var(--ed-playhead-halo); }
+html[data-ui-theme] .playhead i { top: 2px; left: -5.25px; width: 12px; height: 16px; border-radius: 4px; clip-path: none; box-shadow: var(--ed-shadow-sm); }
+html[data-ui-theme] .timeline-ruler span { font-size: var(--ed-text-xs); color: var(--ed-faint); }
+html[data-ui-theme] .timeline-ruler span::before { border-left-color: var(--ed-tick); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-theme] :is(.timeline-clip, .track-head button, .timeline-clip-duration-handle) { transition: none; }
+  html[data-ui-theme] .timeline-clip.selected { transform: none; }
+}

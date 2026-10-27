@@ -1,0 +1,92 @@
+/* Preview transport bar: time | transport | progress with chapter ticks | format and quality.
+   The current time is the brightest text, play is the one filled button, the progress line is thin until hovered,
+   chapters are thin ticks rather than boxes. Every theme; colours from editor-tokens.css. */
+
+html[data-ui-theme] .preview-controls { gap: 8px; padding: 6px 12px; }
+
+/* time: current position bright and tabular, total muted */
+html[data-ui-theme] .preview-controls > span:first-child {
+  min-width: 118px;
+  font-size: var(--ed-text-sm);
+  color: var(--ed-muted) !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+html[data-ui-theme] .preview-controls > span:first-child > span {
+  margin-right: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ed-ink) !important;
+}
+/* format readout next to the quality switch */
+html[data-ui-theme] .preview-controls > span:not(:first-child) { font-size: var(--ed-text-sm); color: var(--ed-muted) !important; font-variant-numeric: tabular-nums; }
+
+/* transport: one height; play is the only filled control */
+html[data-ui-theme] .preview-controls > button:not(.preview-fullscreen) { width: 30px !important; height: 30px !important; min-width: 30px; }
+html[data-ui-theme] .preview-controls > button:not(.preview-fullscreen) svg { width: 16px; height: 16px; stroke-width: 1.75; }
+html[data-ui-theme] .preview-controls > button.preview-play {
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 2px;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: var(--ed-accent) !important;
+  color: var(--ed-accent-ink) !important;
+  box-shadow: var(--ed-shadow-sm) !important;
+}
+html[data-ui-theme] .preview-controls > button.preview-play:hover:not(:disabled) { background: var(--ed-accent-hi) !important; }
+html[data-ui-theme] .preview-controls > button.preview-play svg { width: 17px; height: 17px; fill: currentColor; }
+/* 原色: the other transport buttons are unboxed until hovered (暖雾 / 磨砂 keep their glass buttons) */
+html[data-ui-theme=original] .preview-controls > button:not(.preview-fullscreen):not(.preview-play) { border-color: transparent !important; background: transparent !important; color: var(--ed-ink-2) !important; }
+html[data-ui-theme=original] .preview-controls > button:not(.preview-fullscreen):not(.preview-play):hover:not(:disabled) { background: var(--ed-raise) !important; color: var(--ed-ink) !important; }
+
+/* progress: a 4px line inside a 9px hit area, thicker while hovered */
+html[data-ui-theme] .preview-controls .preview-progress {
+  background:
+    linear-gradient(90deg, var(--ed-accent) 0 var(--preview-progress), color-mix(in srgb, var(--ed-ink) 20%, transparent) var(--preview-progress) 100%)
+    center / 100% 4px no-repeat !important;
+  border-radius: 999px;
+  transition: background-size var(--ed-fast) var(--ed-ease);
+}
+html[data-ui-theme] .preview-controls .preview-progress-wrap:hover .preview-progress { background-size: 100% 6px !important; }
+html[data-ui-theme] .preview-controls .preview-progress::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  border: 2px solid var(--ed-accent);
+  background: #fff;
+  box-shadow: var(--ed-shadow-sm);
+  transition: scale var(--ed-fast) var(--ed-ease);
+}
+html[data-ui-theme] .preview-controls .preview-progress-wrap:hover .preview-progress::-webkit-slider-thumb { scale: 1.15; }
+/* chapters: thin ticks across the line, not boxes */
+html[data-ui-theme] .preview-controls .preview-chapter-markers .preview-chapter-marker {
+  width: 12px;
+  height: 22px;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+html[data-ui-theme] .preview-controls .preview-chapter-marker > span:first-child {
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--ed-ink);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ed-input) 70%, transparent);
+  transition: height var(--ed-fast) var(--ed-ease), background-color var(--ed-fast) ease;
+}
+html[data-ui-theme] .preview-controls .preview-chapter-marker:is(:hover, :focus-visible) > span:first-child { height: 16px; background: var(--ed-accent); }
+html[data-ui-theme] .preview-controls .preview-chapter-tooltip {
+  padding: 5px 9px;
+  border: 1px solid var(--ed-line-2);
+  border-radius: 8px;
+  background: var(--ed-hint-bg);
+  color: var(--ed-ink);
+  font-size: var(--ed-text-sm);
+  box-shadow: var(--ed-shadow-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-theme] .preview-controls :is(.preview-progress, .preview-chapter-marker > span:first-child) { transition: none; }
+}

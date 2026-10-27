@@ -1,0 +1,51 @@
+/* 通用剪辑 · the stage while Codex works (GeneralRunWall.tsx). The stage is a dark room in every theme: the run's
+   newest picture blurred behind, the mark turning on the left, the steps as a wall on the right. Motion is transform
+   and opacity only. */
+.ge-rw { position:relative;flex:1;min-height:0;margin:0 0 var(--ge-inset,0);border-radius:var(--ge-panel-radius,0);overflow:hidden;background:#08090a;color:#f2f2f4;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif;animation:ge-rw-in .5s var(--ge-ease) both; }
+@keyframes ge-rw-in { from { opacity:0; } }
+.ge-rw-blur { position:absolute;inset:-40px;background:#121315 center/cover no-repeat;filter:blur(28px) saturate(1.1) brightness(.55);transform:scale(1.08);transition:background-image .8s; }
+.ge-rw-scrim { position:absolute;inset:0;background:radial-gradient(70% 80% at 35% 50%,#0000 0,#000a 100%); }
+
+/* the mark, turning */
+.ge-rw-turn { position:absolute;left:0;top:0;bottom:0;width:44%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;perspective:700px; }
+.ge-rw-mark { position:relative;width:96px;height:96px;border-radius:24px;box-shadow:0 18px 50px #f5b31640;animation:ge-rw-flip 2.6s cubic-bezier(.65,0,.35,1) infinite; }
+@keyframes ge-rw-flip { 0% { transform:rotateY(0); } 45%,50% { transform:rotateY(180deg); } 95%,100% { transform:rotateY(360deg); } }
+.ge-rw-glow { position:absolute;width:220px;height:220px;border-radius:50%;background:radial-gradient(#f5b31626,#0000 65%);animation:ge-rw-breathe 2.6s ease-in-out infinite; }
+@keyframes ge-rw-breathe { 50% { transform:scale(1.15);opacity:.6; } }
+.ge-rw-status { position:relative;text-align:center;padding:0 16px; }
+.ge-rw-status b { display:block;font-size:16px;font-weight:600; }
+.ge-rw-status small { color:#c9cbd1aa;font-size:12px;font-variant-numeric:tabular-nums; }
+
+/* the steps: a wall that slides up and down, the chosen one in the middle */
+.ge-rw-wall { position:absolute;right:0;top:0;bottom:0;width:56%;perspective:1400px; }
+.ge-rw-card { position:absolute;left:24px;right:34px;top:50%;height:178px;margin-top:-89px;border-radius:16px;overflow:hidden;cursor:pointer;display:grid;grid-template-columns:44% minmax(0,1fr);
+  background:linear-gradient(180deg,#232429ee,#18191ce6);border:1px solid #ffffff1c;box-shadow:0 24px 50px #000b;
+  transition:transform .65s cubic-bezier(.2,.85,.25,1),opacity .5s,box-shadow .4s; }
+.ge-rw-card[data-front] { box-shadow:0 0 0 1px #f5b316aa,0 30px 60px #000d; }
+.ge-rw-pic { position:relative;min-width:0;background:#0e0f11;overflow:hidden; }
+.ge-rw-pic > img { width:100%;height:100%;object-fit:cover;display:block; }
+.ge-rw-pic[data-text] { display:flex;align-items:center;padding:12px 14px;background:#141518; }
+.ge-rw-pic p { margin:0;font-size:11.5px;line-height:1.65;color:#c9cbd1;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden; }
+.ge-rw-grid { display:grid;grid-template-columns:1fr 1fr;gap:2px;height:100%; }
+.ge-rw-grid img { width:100%;height:100%;object-fit:cover;display:block;min-height:0; }
+.ge-rw-ring { position:absolute;inset:0;display:grid;place-items:center;background:#0008; }
+.ge-rw-ring i { width:34px;height:34px;border-radius:50%;border:2.5px solid #ffffff22;border-top-color:#f5b316;animation:ge-rw-spin .9s linear infinite; }
+@keyframes ge-rw-spin { to { transform:rotate(360deg); } }
+.ge-rw-txt { padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0; }
+.ge-rw-txt header { display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0; }
+.ge-rw-txt header em { flex:none;font-style:normal;font-size:11px;color:#8b8e96;font-variant-numeric:tabular-nums; }
+.ge-rw-txt header b { font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis; }
+.ge-rw-chip { flex:none;margin-left:auto;font-size:11px;padding:1px 8px;border-radius:999px;background:#ffffff10;color:#8b8e96; }
+.ge-rw-chip[data-tone=done] { color:#2fc6a4;background:#2fc6a41a; }
+.ge-rw-chip[data-tone=now],.ge-rw-chip[data-tone=wait] { color:#1d1404;background:#f5b316; }
+.ge-rw-chip[data-tone=failed] { color:#ff6b61;background:#ff6b611a; }
+.ge-rw-txt p { margin:0;color:#b8bbc2;font-size:12px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere; }
+.ge-rw-txt small { margin-top:auto;color:#5e6169;font-size:11px;font-variant-numeric:tabular-nums; }
+.ge-rw-card[data-tone=todo] .ge-rw-pic { filter:grayscale(1) brightness(.5); }
+.ge-rw-card[data-tone=todo] :is(header b,p) { color:#5e6169; }
+.ge-rw-rail { position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px; }
+.ge-rw-rail i { width:5px;height:5px;border-radius:50%;background:#ffffff30;transition:height .3s,background .3s,border-radius .3s; }
+.ge-rw-rail i[data-done] { background:#2fc6a466; }
+.ge-rw-rail i[data-on] { height:16px;border-radius:3px;background:#f5b316; }
+@media (prefers-reduced-motion:reduce) { .ge-rw *,.ge-rw { animation-duration:.01ms !important;transition-duration:.01ms !important; } }

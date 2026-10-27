@@ -1,0 +1,47 @@
+.workspace-nav > .workspace-launcher { position:relative;z-index:5;display:flex;align-items:center;gap:10px;flex-shrink:0;height:100%; }
+.workspace-brand { display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none;white-space:nowrap;font-size:17px;font-weight:650;letter-spacing:-.6px; }
+.workspace-brand-mark { font-size:29px;font-weight:750;letter-spacing:-1.6px;line-height:1; }
+.workspace-brand-mark sup { font-size:15px;vertical-align:super;margin-left:2px; }
+.workspace-nav .workspace-launcher .workspace-launcher-toggle { display:grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid #ffffff45;border-radius:11px;background:#242424b0;color:#fff;cursor:pointer; }
+.workspace-module-dock { position:absolute;left:100%;top:50%;display:flex;align-items:center;padding:12px 14px 12px 18px;transform:translateY(-50%);visibility:hidden;pointer-events:none;transition:visibility 220ms; }
+.workspace-launcher[data-open=true] .workspace-module-dock { visibility:visible;pointer-events:auto; }
+.workspace-module-capsule { position:relative;display:flex;align-items:center;justify-content:center;width:116px;height:44px;margin-left:-10px;color:#fff;text-decoration:none;opacity:0;transform:translateX(-32px);transition:opacity 180ms,transform 220ms cubic-bezier(.2,.8,.2,1); }
+.workspace-launcher[data-open=true] .workspace-module-capsule { opacity:1;transform:translateX(0); }
+.workspace-module-surface { position:relative;display:flex;align-items:center;justify-content:center;gap:7px;width:100%;height:100%;font-size:12px;font-weight:600;white-space:nowrap;isolation:isolate;transition:transform 180ms; }
+.workspace-module-surface::before { content:"";position:absolute;inset:0;z-index:-1;border:1px solid #ffffff70;border-radius:18px;background:linear-gradient(145deg,#555653ef,#292b2bee);box-shadow:inset 0 1px #ffffff25,0 5px 15px #0003;backdrop-filter:blur(22px);transition:transform 180ms,background 180ms; }
+.workspace-module-capsule[aria-current=page] .workspace-module-surface::before { background:linear-gradient(145deg,#827764f5,#504b43f5);border-color:#fff5dc; }
+.workspace-module-capsule[data-proximity=near] { z-index:2; }
+.workspace-module-capsule[data-proximity=near] .workspace-module-surface { transform:translateY(-3px); }
+.workspace-module-capsule[data-proximity=near] .workspace-module-surface::before { transform:scale(1.06); }
+.workspace-module-capsule[data-proximity=active] { z-index:3; }
+.workspace-module-capsule[data-proximity=active] .workspace-module-surface { transform:translateY(-7px); }
+.workspace-module-capsule[data-proximity=active] .workspace-module-surface::before { transform:scale(1.16);background:linear-gradient(145deg,#73736ef5,#383b3bf5); }
+.workspace-brand:focus-visible,.workspace-launcher-toggle:focus-visible,.workspace-module-capsule:focus-visible { outline:2px solid #fff5dc;outline-offset:4px;border-radius:18px; }
+/* Three groups (准备 · 制作 · 复盘): a small, unclickable label leads each group; a hairline separates groups. */
+.workspace-module-group { position:relative;display:flex;align-items:center;flex-shrink:0; }
+.workspace-module-group + .workspace-module-group { margin-left:10px;padding-left:10px; }
+.workspace-module-group + .workspace-module-group::before { content:"";position:absolute;left:0;top:50%;width:1px;height:20px;margin-top:-10px;background:currentColor;opacity:0;transition:opacity 180ms; }
+.workspace-launcher[data-open=true] .workspace-module-group + .workspace-module-group::before { opacity:.16; }
+.workspace-module-group__label { margin:0 8px 0 2px;font-size:11px;font-weight:600;line-height:16px;letter-spacing:.04em;white-space:nowrap;cursor:default;user-select:none;opacity:0;transform:translateX(-32px);transition:opacity 180ms,transform 220ms cubic-bezier(.2,.8,.2,1); }
+.workspace-launcher[data-open=true] .workspace-module-group__label { opacity:.6;transform:translateX(0); }
+.workspace-module-group__label + .workspace-module-capsule { margin-left:0; }
+.workspace-module-name { display:flex;flex-direction:column;align-items:flex-start;line-height:1.25; }
+.workspace-module-only { display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:500;line-height:13px;color:#ffffffa6; }
+.workspace-module-only i { width:5px;height:5px;border-radius:50%;background:#ffb020; }
+.workspace-module-only[data-only=general] i { background:#2fc6a4; }
+/* Eight capsules and three labels reach x≈1260; below 1360 the dock moves under the logo and wraps by group. */
+@media(max-width:1360px) {
+  .workspace-module-dock { left:0;top:100%;transform:none;padding-top:10px;max-width:calc(100vw - 55px);flex-wrap:wrap;row-gap:10px; }
+  .workspace-module-group + .workspace-module-group { margin-left:6px;padding-left:0; }
+  .workspace-module-group + .workspace-module-group::before { display:none; }
+  .workspace-module-group__label { margin-right:6px;padding:4px 8px;border-radius:9px;background:#292b2bee;color:#ffffffb8;box-shadow:inset 0 1px #ffffff1f; }
+  .workspace-launcher[data-open=true] .workspace-module-group__label { opacity:1; }
+}
+@media(max-width:650px) { .workspace-brand { font-size:14px;gap:8px; }.workspace-brand-mark{font-size:25px}.workspace-module-dock{overflow-x:auto;padding-bottom:16px}.workspace-module-capsule{width:100px;flex-shrink:0} }
+@media(prefers-reduced-motion:reduce) { .workspace-module-dock,.workspace-module-capsule,.workspace-module-surface,.workspace-module-surface::before,.workspace-module-group__label,.workspace-module-group::before { transition:none!important; }.workspace-module-capsule,.workspace-module-capsule .workspace-module-surface,.workspace-module-capsule .workspace-module-surface::before,.workspace-module-group__label{transform:none!important} }
+@media(prefers-reduced-transparency:reduce) { .workspace-module-surface::before { backdrop-filter:none;background:#353736!important; }.workspace-module-group__label{background:#353736} }
+
+.workspace-brand-icon { width:32px; height:32px; object-fit:contain; flex-shrink:0; }
+.workspace-brand-wordmark { width:auto; height:22px; flex-shrink:0; overflow:visible; font-family:-apple-system,'SF Pro Display',Inter,sans-serif; }
+.workspace-brand-t { fill:#FFB020; }
+html[data-ui-theme=frost] .workspace-brand-t { fill:#D98E00; }

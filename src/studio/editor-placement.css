@@ -1,0 +1,129 @@
+/* Preview placement: a selected card shows a highlight frame hugging the card as drawn, and a round swap handle on
+   its top edge. Dragging the handle lays the card's preset slots over the picture (nine positions for a small card,
+   the two halves for a half card); the card rides with the pointer and lands in the slot it is over. Every theme. */
+/* the card's own layers take no pointer events; a double-click probes them for text for a moment */
+/* the frame around each card takes no pointer (PreviewLayers); the card does */
+.motion-overlay-shell { pointer-events: auto; }
+.motion-overlay-shell.is-hit-probing * { pointer-events: auto !important; }
+/* SVG words take hits on their whole box, not only on the painted strokes of each glyph */
+.motion-overlay-shell.is-hit-probing svg [data-edit] { pointer-events: bounding-box !important; }
+.motion-overlay-shell.is-hit-probing .motion-selection-box,
+.motion-overlay-shell.is-hit-probing .motion-selection-box * { pointer-events: none !important; }
+
+/* the frame lives in its own box (measured to the card); the shell's old footprint outline is retired */
+html[data-ui-theme] .motion-overlay-shell.selected::after { content: none; }
+.motion-selection-box {
+  position: absolute;
+  z-index: 3;
+  box-sizing: border-box;
+  border: 2px solid var(--studio-selection);
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .85);
+  pointer-events: none;
+}
+.motion-selection-box { inset: -5px; }
+/* a half or full card fills its half: the frame is drawn just inside it so the picture edge does not cut it */
+.motion-selection-box.is-inside { inset: 6px; }
+.motion-selection-box > :is(button, .motion-selection-label) { pointer-events: auto; }
+.motion-selection-box > .motion-selection-label { top: -30px; left: -2px; }
+
+/* swap handle: centred on the top edge of the frame; it is dragged, not clicked */
+.motion-swap-button {
+  position: absolute;
+  z-index: 4;
+  top: -15px;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--studio-selection);
+  color: #1a1a1a;
+  box-shadow: 0 2px 8px #0007;
+  cursor: grab;
+  touch-action: none;
+  translate: -50% 0;
+  transition: scale var(--ed-fast, 120ms) var(--ed-ease, ease);
+}
+.motion-swap-button svg { width: 14px; height: 14px; stroke-width: 2.4; }
+.motion-swap-button:hover { scale: 1.12; }
+.motion-swap-button.is-carrying { cursor: grabbing; scale: 1.15; }
+html[data-ui-theme=warm] .motion-swap-button, html[data-ui-theme=frost] .motion-swap-button { color: #fff; }
+
+/* the card lifts while it is carried */
+.motion-overlay-shell.is-carried { z-index: 30; cursor: grabbing; filter: drop-shadow(0 14px 26px #000a); }
+/* let go, it glides into its slot; a half card carried across has the presenter and subtitle make way for it */
+.motion-overlay-shell.is-landing { z-index: 30; transition: translate .32s var(--ed-ease, ease); }
+.is-swap-sliding, .preview-subtitle.is-swap-sliding { transition: translate .32s var(--ed-ease, ease); }
+@media (prefers-reduced-motion: reduce) {
+  .motion-overlay-shell.is-landing, .is-swap-sliding, .preview-subtitle.is-swap-sliding { transition: none; }
+}
+
+/* the slots: each button is the card's real footprint at a preset position. Neighbouring footprints overlap, so at
+   rest each shows a smaller box inside it; the slot being aimed at opens to the full footprint, showing exactly where
+   the card will land. */
+.motion-slot-layer { position: absolute; inset: 0; z-index: 11; animation: motion-slot-in .22s var(--ed-ease, ease) both; }
+.motion-slot { position: absolute; box-sizing: border-box; padding: 0; border: 0; background: none; pointer-events: none; }
+.motion-slot__box {
+  position: absolute;
+  inset: 13% 10%;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed color-mix(in srgb, #fff 62%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #0b0c10 30%, transparent);
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: inset .22s var(--ed-ease, ease), background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.motion-slot-layer--half .motion-slot__box { inset: 3%; border-radius: 14px; }
+.motion-slot__box > span {
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: #0b0c10b3;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+}
+.motion-slot.is-current .motion-slot__box { border-style: solid; border-color: color-mix(in srgb, #fff 42%, transparent); background: color-mix(in srgb, #0b0c10 14%, transparent); }
+.motion-slot:hover .motion-slot__box, .motion-slot.is-target .motion-slot__box {
+  inset: 0;
+  border-style: solid;
+  border-color: var(--studio-selection);
+  background: color-mix(in srgb, var(--studio-selection) 22%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--studio-selection) 28%, transparent);
+}
+.motion-slot:is(:hover, .is-target) .motion-slot__box > span { background: var(--studio-selection); color: #1a1a1a; }
+html[data-ui-theme=warm] .motion-slot:is(:hover, .is-target) .motion-slot__box > span,
+html[data-ui-theme=frost] .motion-slot:is(:hover, .is-target) .motion-slot__box > span { color: #fff; }
+/* while a card is carried, the other slots step back */
+.motion-slot-layer:has(.is-target) .motion-slot:not(.is-target) .motion-slot__box { opacity: .55; }
+@keyframes motion-slot-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .motion-slot-layer { animation: none; } .motion-slot__box { transition: none; } }
+
+/* picture layers (picture-in-picture, the person over a full card): the handle sits on a frame laid over the layer,
+   the slots and the carried ghost float above every picture */
+.placement-frame { position: absolute; z-index: 46; box-sizing: border-box; pointer-events: none; border-radius: 10px; }
+.placement-frame.is-framed { border: 2px solid var(--studio-selection); box-shadow: 0 0 0 1px rgba(255, 255, 255, .85); }
+.placement-frame.is-round { border-radius: 50%; }
+.placement-frame > .motion-swap-button { pointer-events: auto; }
+.motion-slot-layer--picture { z-index: 44; }
+.motion-slot.is-round .motion-slot__box { inset: 12%; border-radius: 50%; }
+.motion-slot.is-round:is(:hover, .is-target) .motion-slot__box { inset: 0; }
+.placement-ghost {
+  position: absolute;
+  z-index: 45;
+  box-sizing: border-box;
+  border: 2px solid var(--studio-selection);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--studio-selection) 18%, transparent);
+  box-shadow: 0 14px 30px #0009;
+  pointer-events: none;
+}
+.placement-ghost.is-round { border-radius: 50%; }

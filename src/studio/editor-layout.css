@@ -1,0 +1,124 @@
+/* Editor refinement · step 5 — top bar and timeline toolbar regrouped (same commands, same shortcuts).
+   Top bar, left → right: brand · project | card-style capsule | tasks | theme · settings | 导出.
+   Timeline toolbar: undo/redo | cut tools | 智能 group …… display toggles | snapping/linking | focus · zoom.
+   The structure and the grouped surfaces apply to every theme with colours from editor-tokens.css;
+   the last block keeps 原色's quiet (unboxed) buttons, while 暖雾 / 磨砂 keep their own button material. */
+
+/* ---------- top bar ---------- */
+.workspace-nav .workspace-preview-island-slot:not(:empty) { position: static; transform: none; left: auto; top: auto; margin-left: auto; flex: 0 1 auto; min-width: 0; }
+.workspace-nav .workspace-editor-slot { flex: 0 0 auto; }
+.workspace-nav .workspace-preview-island-slot:not(:empty) ~ .workspace-global-actions { margin-left: 0; }
+.workspace-nav :is(.workspace-editor-slot:not(:empty), .workspace-global-actions) { padding-left: 10px; border-left: 1px solid color-mix(in srgb, currentColor 14%, transparent); height: 22px; align-self: center; display: flex; align-items: center; }
+.workspace-nav .workspace-editor-slot .editor-header { height: auto; }
+.workspace-primary-action-slot { display: flex; align-items: center; flex: 0 0 auto; }
+.workspace-primary-action-slot:empty { display: none; }
+.workspace-primary-action-slot svg { width: 16px; height: 16px; }
+.workspace-global-actions .system-settings-entry > span { display: none; }
+.workspace-global-actions :is(.system-settings-entry, .ui-theme-menu-trigger) { width: 32px; height: 32px; padding: 0; display: inline-grid; place-items: center; border-radius: 8px; }
+.ui-theme-menu-trigger { border: 1px solid transparent; background: transparent; color: inherit; cursor: pointer; }
+
+/* the capsule: one rounded field, three parts that each open a short menu */
+.preview-style-capsule.workspace-preview-island { display: inline-flex; align-items: center; gap: 0; padding: 3px; border-radius: 10px; }
+.preview-style-capsule__part {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.preview-style-capsule__part em { font-style: normal; opacity: .55; font-size: 11px; }
+.preview-style-capsule__part > span:not([style]) { opacity: .7; }
+.preview-style-capsule__part svg { width: 12px; height: 12px; opacity: .55; }
+.preview-style-capsule__part:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.preview-style-capsule__part[data-state=open] { background: color-mix(in srgb, currentColor 14%, transparent); }
+.preview-style-capsule > i { width: 1px; height: 14px; margin: 0 2px; background: color-mix(in srgb, currentColor 18%, transparent); }
+.preview-style-capsule__accent > span[style] { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 12%, transparent); }
+.preview-accent-menu__swatch { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; flex: none; box-shadow: inset 0 0 0 1px #0003; }
+
+/* ---------- timeline toolbar ---------- */
+/* studio.css draws every direct `span` child of the toolbar as a divider; the hint wrapper is not one */
+.toolbar-hint-anchor,
+.timeline-toolbar > .toolbar-hint-anchor { display: inline-flex; flex-shrink: 0; width: auto; height: auto; margin: 0; background: none; }
+.toolbar-hint-anchor > button:disabled { pointer-events: none; }
+.timeline-toolbar > .toolbar-hint-anchor > button,
+.timeline-tool-group button { min-width: 30px; justify-content: center; }
+.timeline-tool-group,
+.timeline-ai-group { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.timeline-tool-group button small { margin-left: 3px; font-size: 10px; font-variant-numeric: tabular-nums; }
+.timeline-ai-group {
+  padding: 2px 3px 2px 9px;
+  border-radius: 9px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 14%, transparent);
+}
+.timeline-ai-group > b { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.timeline-ai-group > b svg { width: 13px; height: 13px; }
+.timeline-ai-group button { white-space: nowrap; }
+.timeline-ai-category { display: inline-flex; align-items: center; gap: 1px; margin-left: 4px; padding-left: 7px; border-left: 1px solid color-mix(in srgb, currentColor 16%, transparent); }
+.timeline-ai-category > small { margin-right: 3px; font-size: 10px; opacity: .5; white-space: nowrap; }
+/* hover card that explains a command */
+.toolbar-hint { max-width: 280px; display: grid; gap: 4px; padding: 8px 10px; text-align: left; }
+.toolbar-hint__head { display: flex; align-items: center; gap: 8px; }
+.toolbar-hint__head b { font-size: 12px; font-weight: 600; }
+.toolbar-hint__head kbd { margin-left: auto; padding: 0 5px; border-radius: 4px; font: 500 10px/16px ui-monospace, SFMono-Regular, monospace; background: color-mix(in srgb, currentColor 14%, transparent); }
+.toolbar-hint__detail { font-size: 11.5px; line-height: 1.55; opacity: .78; }
+
+/* ---------- every theme ---------- */
+html[data-ui-theme] .workspace-nav :is(.workspace-editor-slot:not(:empty), .workspace-global-actions) { border-left-color: var(--ed-line-2); }
+html[data-ui-theme] .workspace-primary-action-slot .editor-primary { height: 32px; padding: 0 16px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+html[data-ui-theme] .preview-style-capsule.workspace-preview-island { background: var(--ed-input); border: 1px solid var(--ed-line-2); box-shadow: none; backdrop-filter: none; color: var(--ed-ink-2); }
+html[data-ui-theme] .preview-style-capsule .preview-style-capsule__part { height: 26px; min-height: 26px; padding: 0 8px; border: 0 !important; background: transparent !important; color: var(--ed-ink-2) !important; box-shadow: none !important; }
+html[data-ui-theme] .preview-style-capsule .preview-style-capsule__part:hover { background: var(--ed-raise) !important; color: var(--ed-ink) !important; }
+html[data-ui-theme] .preview-style-capsule .preview-style-capsule__part[data-state=open] { background: var(--ed-raise-hi) !important; color: var(--ed-ink) !important; }
+html[data-ui-theme] .preview-style-capsule > i { background: var(--ed-line-2); }
+/* menus opened from the top bar */
+html[data-ui-theme] :is(.preview-style-menu, .ui-theme-menu) {
+  min-width: 168px;
+  padding: 5px;
+  border: 1px solid var(--ed-line-2) !important;
+  border-radius: 10px;
+  background: var(--ed-menu-bg) !important;
+  backdrop-filter: none !important;
+  box-shadow: var(--ed-shadow-lg) !important;
+  color: var(--ed-ink);
+}
+html[data-ui-theme] :is(.preview-style-menu, .ui-theme-menu) [data-slot=dropdown-menu-label] { padding: 6px 8px 4px; font-size: 11px; font-weight: 500; color: var(--ed-muted); }
+html[data-ui-theme] :is(.preview-style-menu, .ui-theme-menu) [data-slot=dropdown-menu-radio-item] { height: 30px; border-radius: 6px; font-size: 12px; color: var(--ed-ink-2); }
+html[data-ui-theme] :is(.preview-style-menu, .ui-theme-menu) [data-slot=dropdown-menu-radio-item][data-highlighted] { background: var(--ed-raise-hi); color: var(--ed-ink); }
+html[data-ui-theme] :is(.preview-style-menu, .ui-theme-menu) [data-slot=dropdown-menu-radio-item][data-state=checked] { color: var(--ed-ink); }
+html[data-ui-theme] :is(.preview-style-menu, .ui-theme-menu) [data-slot=dropdown-menu-radio-item] svg { fill: var(--ed-accent); color: var(--ed-accent); }
+html[data-ui-theme] :is(.preview-style-menu, .ui-theme-menu) [data-slot=dropdown-menu-separator] { background: var(--ed-line-2); margin: 5px 4px; }
+/* toolbar: every button one height; the 智能 group is one tinted surface with unboxed parts
+   (`.timeline-toolbar` in the selector outranks 磨砂's per-button lens material) */
+html[data-ui-theme] :is(.timeline-tool-group, .timeline-toolbar > .toolbar-hint-anchor) button { height: 30px; min-height: 30px; padding: 0 7px; font-size: 12px; }
+html[data-ui-theme] .timeline-ai-group { background: linear-gradient(90deg, color-mix(in srgb, var(--ed-accent) 8%, transparent), color-mix(in srgb, var(--ed-accent) 2%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ed-accent) 22%, transparent); }
+html[data-ui-theme] .timeline-ai-group > b { color: var(--ed-accent-text); }
+html[data-ui-theme] .timeline-toolbar .timeline-ai-group button { height: 26px; min-height: 26px; padding: 0 9px; border-radius: 7px; font-size: 12px; color: var(--ed-ink-2) !important; background: transparent !important; border-color: transparent !important; box-shadow: none !important; }
+html[data-ui-theme] .timeline-toolbar .timeline-ai-group button:hover:not(:disabled) { color: var(--ed-ink) !important; background: var(--ed-raise) !important; }
+html[data-ui-theme] .timeline-toolbar .timeline-ai-group button.is-active { background: var(--ed-accent-soft) !important; color: var(--ed-accent-text) !important; }
+html[data-ui-theme] .timeline-ai-category { border-left-color: color-mix(in srgb, var(--ed-accent) 20%, transparent); }
+html[data-ui-theme] .timeline-ai-category > small { color: var(--ed-accent-text); opacity: .6; }
+html[data-ui-theme] .toolbar-hint {
+  border: 1px solid var(--ed-line-2);
+  border-radius: 9px;
+  background: var(--ed-hint-bg) !important;
+  color: var(--ed-ink) !important;
+  box-shadow: var(--ed-shadow-lg);
+}
+html[data-ui-theme] .toolbar-hint__head kbd { background: color-mix(in srgb, var(--ed-ink) 10%, transparent); color: var(--ed-ink-2); }
+html[data-ui-theme] .toolbar-hint__detail { color: var(--ed-ink-2); opacity: 1; }
+html[data-ui-theme] .toolbar-hint svg { fill: var(--ed-hint-bg); background: var(--ed-hint-bg); }
+
+/* ---------- 原色 · quiet buttons ---------- */
+html[data-ui-theme=original] .workspace-global-actions :is(.system-settings-entry, .ui-theme-menu-trigger) { background: transparent !important; border-color: transparent !important; color: var(--ed-ink-2) !important; }
+html[data-ui-theme=original] .workspace-global-actions :is(.system-settings-entry, .ui-theme-menu-trigger):is(:hover, [data-state=open]) { background: var(--ed-raise) !important; color: var(--ed-ink) !important; }
+html[data-ui-theme=original] :is(.timeline-tool-group, .timeline-toolbar > .toolbar-hint-anchor) button { border-radius: 7px; color: var(--ed-ink-2); background: transparent !important; border-color: transparent !important; }
+html[data-ui-theme=original] :is(.timeline-tool-group, .timeline-toolbar > .toolbar-hint-anchor) button:hover:not(:disabled) { background: var(--ed-raise) !important; border-color: var(--ed-line-2) !important; }
+html[data-ui-theme=original] .timeline-toolbar > .toolbar-hint-anchor button:is(.is-active, [aria-pressed=true]) { background: var(--ed-accent-soft) !important; border-color: color-mix(in srgb, var(--ed-accent) 45%, transparent) !important; color: var(--ed-accent-text) !important; }

@@ -1,0 +1,118 @@
+{
+  "name": "openscreen",
+  "private": true,
+  "version": "1.10.0",
+  "description": "Record your screen and polish the demo",
+  "homepage": "https://getopenscreen.com/",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "npm@10.9.4",
+  "engines": {
+    "node": "22.22.1",
+    "npm": "10.9.4"
+  },
+  "author": {
+    "name": "Etienne Lescot",
+    "url": "https://github.com/EtienneLescot"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/getopenscreen/openscreen.git"
+  },
+  "contributors": [
+    {
+      "name": "Siddharth Vaddem",
+      "url": "https://github.com/siddharthvaddem"
+    }
+  ],
+  "maintainers": [
+    {
+      "name": "Etienne Lescot",
+      "url": "https://github.com/EtienneLescot"
+    }
+  ],
+  "scripts": {
+    "build:linkreader": "vite build --config vite.linkreader.config.ts",
+    "build:host": "vite build --config vite.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fix-webm-duration/fix": "^1.0.1",
+    "@langchain/anthropic": "^1.3.26",
+    "@langchain/core": "^1.1.44",
+    "@langchain/mistralai": "^1.0.8",
+    "@langchain/openai": "^1.4.2",
+    "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-toggle": "^1.1.10",
+    "@radix-ui/react-toggle-group": "^1.1.11",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@tiptap/extension-text-style": "^3.27.1",
+    "@tiptap/react": "^3.27.1",
+    "@tiptap/starter-kit": "^3.27.1",
+    "@uiw/color-convert": "^2.10.1",
+    "@uiw/react-color-block": "^2.10.1",
+    "@uiw/react-color-colorful": "^2.9.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "electron-updater": "^6.8.9",
+    "i18next": "^23.16.0",
+    "langchain": "^1.2.39",
+    "lucide-react": "^0.545.0",
+    "mediabunny": "^1.40.1",
+    "motion": "^12.38.0",
+    "mp4box": "^2.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.6.0",
+    "react-resizable-panels": "^3.0.6",
+    "react-rnd": "^10.5.3",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss-animate": "^1.0.7",
+    "web-demuxer": "^4.0.0",
+    "zod": "^4.1.12",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "@biomejs/biome": "^2.4.12",
+    "@electron/rebuild": "^4.0.4",
+    "@playwright/test": "^1.59.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.19.17",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^5.2.0",
+    "autoprefixer": "^10.5.0",
+    "electron": "^41.2.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.1",
+    "fast-check": "^4.7.0",
+    "husky": "^9.1.7",
+    "jsdom": "^29.0.2",
+    "lint-staged": "^16.4.0",
+    "postcss": "^8.5.25",
+    "tailwindcss": "^3.4.19",
+    "terser": "^5.46.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.1.10"
+  },
+  "main": "dist-electron/main.js",
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mts,cts,json}": "biome check --no-errors-on-unmatched"
+  }
+}

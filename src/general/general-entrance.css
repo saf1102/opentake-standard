@@ -1,0 +1,155 @@
+/* 新建通用剪辑: the entrance (mock v4, S先生 2026-10-26). Heavy glass entrances, frosted purpose chips in one column,
+   beams that fan out with one light running each, a poster flow. Graphite by default; 暖雾 and 霜白 keep the same
+   glass in their own light. The stage is 1600×900, scaled to the page. */
+.ge-en {
+  --en-bg:radial-gradient(1200px 700px at 22% 40%,#1d1f24 0%,#121316 55%,#0b0c0e 100%);
+  --en-ink:#eef0f4; --en-muted:#8e929b; --en-accent:#f5b316; --en-accent-soft:#ffd36b; --en-accent-ink:#1d1404; --en-beam-end:#ffffff;
+  --en-slab:linear-gradient(155deg,#2a2c32 0%,#1b1c20 48%,#16171a 100%); --en-slab-line:#ffffff12; --en-slab-hi:#ffffff1a;
+  --en-slab-shadow:0 20px 50px #00000066; --en-shine:#ffffff12;
+  --en-icon:linear-gradient(160deg,#3a3d44,#24262b); --en-chip:linear-gradient(180deg,#26282e,#1c1d21); --en-chip-line:#ffffff14;
+  --en-chip-shadow:0 10px 26px #0006; --en-count:#ffffff0a; --en-card:linear-gradient(180deg,#202227,#17181b); --en-card-line:#ffffff1a;
+  --en-card-shadow:0 26px 50px #000b; --en-side:#0007; --en-field:#0f1012; --en-pill:#1f2125; --en-reflect:#ffffff0c; --en-dot:#ffffff26;
+  --en-glass:none;
+  position:relative;height:calc(100dvh - var(--workspace-nav-height,74px));overflow:hidden;color:var(--en-ink);
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif;-webkit-font-smoothing:antialiased;
+}
+html[data-ui-theme=original] .ge-en { background:var(--en-bg); }
+html[data-ui-theme=warm] .ge-en {
+  --en-ink:#302a24; --en-muted:#6a5f53; --en-accent:#d08a06; --en-accent-soft:#f0b43c; --en-accent-ink:#fff8e9; --en-beam-end:#5a4a36;
+  --en-slab:linear-gradient(155deg,#fff8ecb8 0%,#f3e9d68c 52%,#e6dac466 100%); --en-slab-line:#fff8e7b0; --en-slab-hi:#fffaf0d9;
+  --en-slab-shadow:0 20px 46px #4937222e; --en-shine:#ffffff38;
+  --en-icon:linear-gradient(160deg,#fffaf0,#efe3cd); --en-chip:linear-gradient(180deg,#fff9eec7,#f2e7d3a6); --en-chip-line:#fff8e7c0;
+  --en-chip-shadow:0 8px 22px #4937221f; --en-count:#5a4a3614; --en-card:linear-gradient(180deg,#fffaf2e6,#f3e9d6d9); --en-card-line:#fff8e7d0;
+  --en-card-shadow:0 24px 46px #49372233; --en-side:#3b2e2033; --en-field:#fffaf099; --en-pill:#fff8ecb0; --en-reflect:#fff8e955; --en-dot:#5a4a3633;
+  --en-glass:blur(22px) saturate(.9);
+}
+html[data-ui-theme=frost] .ge-en {
+  --en-ink:#293e3b; --en-muted:#5d716c; --en-accent:#c98a0a; --en-accent-soft:#f0b43c; --en-accent-ink:#fffaf0; --en-beam-end:#3a524d;
+  --en-slab:linear-gradient(155deg,#ffffffeb 0%,#f8f7f2c4 52%,#eff3eea3 100%); --en-slab-line:#ffffffd9; --en-slab-hi:#ffffff;
+  --en-slab-shadow:0 20px 44px #5b746b2e; --en-shine:#ffffff66;
+  --en-icon:linear-gradient(160deg,#ffffff,#eef3ef); --en-chip:linear-gradient(180deg,#ffffffe6,#f4f6f1c7); --en-chip-line:#ffffffe0;
+  --en-chip-shadow:0 8px 20px #5b746b24; --en-count:#29403b12; --en-card:linear-gradient(180deg,#fffffff0,#f5f7f3e6); --en-card-line:#ffffffe6;
+  --en-card-shadow:0 22px 44px #5b746b33; --en-side:#29403b26; --en-field:#ffffffb3; --en-pill:#ffffffcc; --en-reflect:#ffffff80; --en-dot:#29403b2e;
+  --en-glass:blur(26px) saturate(1.1);
+}
+.ge-en *,.ge-en *::before,.ge-en *::after { box-sizing:border-box; }
+.ge-en :where(button) { font:inherit;color:inherit; }
+.ge-en-stage { position:absolute;left:50%;top:50%;width:1600px;height:900px;transform-origin:50% 50%; }
+.ge-en h1 { position:absolute;left:72px;top:58px;margin:0;font-size:30px;letter-spacing:.5px;font-weight:700;transition:opacity .4s; }
+.ge-en h1 small { display:block;font-size:14px;font-weight:400;color:var(--en-muted);margin-top:6px;letter-spacing:0; }
+.ge-en-all { position:absolute;right:72px;top:64px;padding:8px 16px;border-radius:10px;cursor:pointer;background:var(--en-chip);border:1px solid var(--en-chip-line);
+  box-shadow:inset 0 1px 0 var(--en-slab-hi);backdrop-filter:var(--en-glass); }
+.ge-en-all:hover { border-color:var(--en-accent); }
+
+/* entrances: heavy glass slabs */
+.ge-en-ent { position:absolute;left:72px;width:380px;height:162px;border-radius:22px;padding:20px 24px;cursor:pointer;text-align:left;overflow:hidden;
+  background:var(--en-slab);border:1px solid var(--en-slab-line);backdrop-filter:var(--en-glass);
+  box-shadow:inset 0 1px 0 var(--en-slab-hi),inset 0 -1px 0 #0000001f,var(--en-slab-shadow);
+  transition:transform .6s cubic-bezier(.2,.9,.2,1),opacity .5s,filter .5s,box-shadow .5s,width .6s cubic-bezier(.2,.9,.2,1),padding .6s; }
+.ge-en-ent::after { content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(420px 140px at 10% 0%,var(--en-shine),transparent 60%);pointer-events:none; }
+.ge-en-ent .ic { display:grid;place-items:center;width:46px;height:46px;border-radius:14px;background:var(--en-icon);box-shadow:inset 0 1px 0 var(--en-slab-hi);color:var(--en-accent); }
+.ge-en-ent b { display:block;font-size:21px;margin-top:12px;white-space:nowrap; }
+.ge-en-ent .hint { display:block;color:var(--en-muted);font-size:13.5px;white-space:nowrap; }
+.ge-en-ent i { position:absolute;right:26px;top:26px;font-style:normal;font-size:13px;color:var(--en-muted); }
+.ge-en-ent i em { font-style:normal;font-size:26px;color:var(--en-ink);font-weight:700;margin-right:3px;font-variant-numeric:tabular-nums; }
+.ge-en-ent i em.free { font-size:15px;color:var(--en-accent); }
+.ge-en-ent b,.ge-en-ent .hint,.ge-en-ent i { transition:opacity .35s .2s; }
+.ge-en-ent:hover { transform:translateY(-3px); }
+.ge-en-ent[data-on] { transform:translateX(10px);box-shadow:inset 0 1px 0 var(--en-slab-hi),0 0 0 1px color-mix(in srgb,var(--en-accent) 70%,transparent),var(--en-slab-shadow),0 0 70px color-mix(in srgb,var(--en-accent) 14%,transparent); }
+.ge-en-ent[data-on] .ic { background:linear-gradient(160deg,#f7c548,#d99a0b);color:#1d1404; }
+.ge-en-ent[data-away] { opacity:.38;filter:saturate(.4);transform:scale(.97); }
+.ge-en-ent:focus-visible,.ge-en-cat:focus-visible,.ge-en-all:focus-visible { outline:2px solid var(--en-accent);outline-offset:3px; }
+
+/* beams: a thin light from the card, drawn once, one light running it */
+.ge-en-beams { position:absolute;inset:0;width:1600px;height:900px;pointer-events:none;overflow:visible; }
+.ge-en-beam { fill:none;stroke:url(#ge-en-g);stroke-width:1.2;stroke-dasharray:1;stroke-dashoffset:1;animation:ge-en-draw .5s cubic-bezier(.3,.7,.2,1) forwards;transition:opacity .2s; }
+.ge-en-beam[data-hot] { stroke:url(#ge-en-gh);stroke-width:1.6; }
+.ge-en-spark { fill:#ffe39a;filter:drop-shadow(0 0 5px #ffbf2e) drop-shadow(0 0 16px #ff9f0aaa); }
+@keyframes ge-en-draw { to { stroke-dashoffset:0; } }
+
+/* purposes: frosted chips in one column. The button only comes in (its own animation); the chip inside it does the rest
+   (chosen, set aside, folded), so the two never fight over one transform. */
+.ge-en-cat { position:absolute;padding:0;border:0;border-radius:999px;background:none;cursor:pointer;transform:translate(-30px,-50%) scale(.8);opacity:0;
+  animation:ge-en-in .55s cubic-bezier(.2,1.25,.3,1) forwards;transition:left .6s cubic-bezier(.2,.9,.2,1); }
+@keyframes ge-en-in { to { transform:translate(0,-50%) scale(1);opacity:1; } }
+.ge-en-chip { height:46px;padding:0 18px 0 20px;border-radius:999px;display:flex;align-items:center;gap:12px;white-space:nowrap;
+  background:var(--en-chip);border:1px solid var(--en-chip-line);backdrop-filter:var(--en-glass);box-shadow:inset 0 1px 0 var(--en-slab-hi),var(--en-chip-shadow);
+  transform-origin:0 50%;transition:transform .6s cubic-bezier(.2,.9,.2,1),opacity .35s,filter .4s,box-shadow .4s; }
+.ge-en-chip b { font-weight:600;font-size:15px; }
+.ge-en-chip i { font-style:normal;font-size:12px;color:var(--en-muted);padding:2px 8px;border-radius:999px;background:var(--en-count); }
+.ge-en-cat:hover .ge-en-chip { box-shadow:inset 0 1px 0 var(--en-slab-hi),0 0 0 1px var(--en-chip-line),var(--en-chip-shadow); }
+.ge-en-cat[data-on] .ge-en-chip { box-shadow:inset 0 1px 0 var(--en-slab-hi),0 0 0 1px var(--en-accent),0 0 40px color-mix(in srgb,var(--en-accent) 16%,transparent); }
+.ge-en-cat[data-on] .ge-en-chip i { background:var(--en-accent);color:var(--en-accent-ink); }
+.ge-en-cat[data-away] .ge-en-chip { opacity:.4;filter:saturate(.3); }
+
+/* 不用风格: straight to a composer */
+.ge-en-compose { position:absolute;left:560px;top:250px;width:620px;padding:22px;border-radius:22px;background:var(--en-slab);border:1px solid var(--en-slab-line);
+  backdrop-filter:var(--en-glass);box-shadow:inset 0 1px 0 var(--en-slab-hi),var(--en-slab-shadow);animation:ge-en-compose .55s .48s cubic-bezier(.2,1.1,.3,1) both; }
+@keyframes ge-en-compose { from { opacity:0;transform:translateX(-24px) scale(.97); } }
+.ge-en-compose textarea { display:block;width:100%;height:150px;resize:none;border-radius:14px;background:var(--en-field);border:1px solid var(--en-slab-line);padding:14px 16px;
+  color:var(--en-ink);font:15px/1.55 inherit;font-family:inherit;outline:none; }
+/* the box shows focus with its own thin border (the theme's field focus, an amber border and glow, stays off) */
+html[data-ui-theme] .ge-en .ge-en-compose textarea:not([disabled]):focus,.ge-en-compose textarea:focus { border-color:color-mix(in srgb,var(--en-accent) 55%,transparent);box-shadow:none;outline:none; }
+.ge-en-compose textarea::placeholder { color:var(--en-muted); }
+.ge-en-row { display:flex;gap:10px;margin-top:14px;align-items:center; }
+.ge-en-row button { display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:var(--en-pill);border:1px solid var(--en-chip-line);font-size:13px;cursor:pointer; }
+.ge-en-row button:hover:not(:disabled) { border-color:var(--en-accent); }
+.ge-en-tools { margin-left:auto;display:inline-flex;gap:6px;align-self:stretch; }
+.ge-en-row .ge-en-go { border:0;padding:10px 22px;border-radius:12px;background:linear-gradient(180deg,#f7c548,#e0a20f);color:#1d1404;font-weight:700;font-size:14px; }
+.ge-en-row .ge-en-go:disabled { opacity:.45;cursor:default; }
+.ge-en-compose small { display:block;color:var(--en-muted);margin-top:12px; }
+.ge-en-error { margin:12px 0 0;color:#e8604f;font-size:13px; }
+.ge-en-files { display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0;list-style:none; }
+.ge-en-files li { display:inline-flex;align-items:center;gap:6px;max-width:220px;padding:5px 6px 5px 11px;border-radius:999px;background:var(--en-pill);border:1px solid var(--en-chip-line);font-size:12.5px; }
+.ge-en-files li span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.ge-en-files button { display:grid;place-items:center;width:18px;height:18px;border:0;border-radius:50%;background:var(--en-count);cursor:pointer; }
+
+/* styles: a poster flow, like a film library: tall covers, picture above, notes below, the one in front faces you */
+.ge-en-flow { position:absolute;left:840px;top:185px;width:720px;height:600px;animation:ge-en-fade .45s .3s both;
+  transition:left .65s cubic-bezier(.2,.9,.2,1),width .65s cubic-bezier(.2,.9,.2,1); }
+@keyframes ge-en-fade { from { opacity:0; } }
+.ge-en-flow header { display:flex;align-items:center;justify-content:space-between;padding:0 20px; }
+.ge-en-flow header b { font-size:18px; }
+.ge-en-flow header small { color:var(--en-muted);margin-left:10px; }
+.ge-en-flow .nav { display:flex;gap:8px; }
+.ge-en-flow .nav button { display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:var(--en-chip);border:1px solid var(--en-chip-line);cursor:pointer; }
+.ge-en-flow .nav button:hover { border-color:var(--en-accent); }
+.ge-en-posters { position:absolute;left:0;right:0;top:64px;height:470px;perspective:1300px;perspective-origin:50% 40%; }
+.ge-en-pc { position:absolute;left:50%;top:10px;width:232px;height:400px;margin:0 0 0 -116px;border-radius:16px;overflow:hidden;cursor:pointer;
+  background:var(--en-card);border:1px solid var(--en-card-line);box-shadow:var(--en-card-shadow),inset 0 1px 0 var(--en-slab-hi);
+  transition:transform .7s cubic-bezier(.2,.85,.25,1),opacity .5s,box-shadow .4s;transform-style:preserve-3d; }
+.ge-en-pc img { display:block;width:100%;height:250px;object-fit:cover; }
+.ge-en-pc .txt { padding:13px 15px; }
+.ge-en-pc b { font-size:16px;display:flex;justify-content:space-between; }
+.ge-en-pc b em { font-style:normal;color:var(--en-accent); }
+.ge-en-pc p { margin:7px 0 0;color:var(--en-muted);font-size:12.5px;line-height:1.5;height:57px;overflow:hidden; }
+.ge-en-pc .tags { display:flex;gap:6px;margin-top:9px; }
+.ge-en-pc .tags i { font-style:normal;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--en-count); }
+.ge-en-pc[data-front] { box-shadow:0 0 0 1px color-mix(in srgb,var(--en-accent) 70%,transparent),var(--en-card-shadow),0 0 60px color-mix(in srgb,var(--en-accent) 10%,transparent); }
+.ge-en-pc::after { content:"";position:absolute;inset:0;pointer-events:none;transition:background .6s; }
+.ge-en-pc[data-side=l]::after { background:linear-gradient(90deg,var(--en-side),#0000 70%); }
+.ge-en-pc[data-side=r]::after { background:linear-gradient(270deg,var(--en-side),#0000 70%); }
+.ge-en-use { position:absolute;right:10px;top:206px;display:inline-flex;align-items:center;gap:2px;padding:6px 8px 6px 12px;border-radius:999px;
+  background:linear-gradient(180deg,#f7c548,#e0a20f);color:#1d1404;font-size:12.5px;font-weight:700;box-shadow:0 6px 16px #0006;animation:ge-en-fade .3s .25s both; }
+.ge-en-reflect { position:absolute;left:0;right:0;top:470px;height:70px;background:radial-gradient(50% 100% at 50% 0,var(--en-reflect),transparent 70%); }
+.ge-en-dots { position:absolute;left:0;right:0;top:552px;display:flex;gap:6px;justify-content:center; }
+.ge-en-dots i { width:6px;height:6px;border-radius:50%;background:var(--en-dot);transition:all .3s; }
+.ge-en-dots i[data-on] { background:var(--en-accent);width:18px;border-radius:3px; }
+
+/* the posters take the room: entrances and purposes fold away to the left like an accordion */
+.ge-en[data-wide] .ge-en-ent { width:84px;padding:20px 19px;transform:translateX(-40px) perspective(700px) rotateY(18deg);opacity:.75;filter:none; }
+.ge-en[data-wide] .ge-en-ent[data-on] { opacity:1; }
+.ge-en[data-wide] .ge-en-ent :is(b,.hint,i) { opacity:0;transition:opacity .2s; }
+.ge-en[data-wide] .ge-en-cat { left:150px !important; }
+.ge-en[data-wide] .ge-en-chip { transform:perspective(700px) rotateY(16deg) scale(.82); }
+.ge-en[data-wide] .ge-en-cat[data-away] .ge-en-chip { opacity:.5; }
+.ge-en[data-wide] .ge-en-beam { opacity:0; }
+.ge-en[data-wide] h1 { opacity:.4; }
+.ge-en[data-wide] .ge-en-flow { left:330px;width:1240px; }
+@media (prefers-reduced-motion:reduce) { .ge-en *,.ge-en *::before,.ge-en *::after { animation-duration:.01ms !important;transition-duration:.01ms !important; } }
+/* the model and 联网 capsule stands as tall as the 视频 · 图片 · 音乐 pills beside it */
+.ge-en-row .ge-model-group { height:auto;border-color:var(--en-chip-line);background:var(--en-pill); }
+.ge-en-row .ge-model-group .ge-model-pick { font-size:13px;padding:0 12px;color:var(--en-ink); }
+.ge-en-row .ge-model-group .ge-model-pick i { color:var(--en-muted); }
+/* 拿去剪：带着稿子来的，放在标题和三个入口之间 */
+.ge-en-from { position:absolute; left:72px; top:134px; width:500px; z-index:3; color:var(--en-ink); }

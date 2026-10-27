@@ -1,0 +1,55 @@
+{
+  "presets": {
+    "玻璃标题": {
+      "font": "Inter Tight",
+      "fontFile": "InterTightwght.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "weight": 200,
+      "size": 0.078,
+      "color": "#F5F8FA",
+      "accent": "#AEE4F4",
+      "lineHeight": 1.3,
+      "roles": [
+        "title"
+      ],
+      "tracking": 0.08
+    },
+    "轻透字幕": {
+      "font": "Inter Tight",
+      "fontFile": "InterTightwght.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "weight": 300,
+      "size": 0.042,
+      "color": "#F5F8FA",
+      "accent": "#AEE4F4",
+      "lineHeight": 1.3,
+      "roles": [
+        "caption"
+      ],
+      "box": true,
+      "boxColor": "rgba(20,30,38,.64)"
+    },
+    "产品细注": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "weight": 400,
+      "size": 0.03,
+      "color": "#D5E6EB",
+      "accent": "#AEE4F4",
+      "lineHeight": 1.3,
+      "roles": [
+        "label"
+      ],
+      "tracking": 0.1,
+      "uppercase": true
+    }
+  },
+  "finishes": [
+    "none",
+    "vignette"
+  ]
+}

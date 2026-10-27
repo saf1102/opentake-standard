@@ -1,0 +1,13 @@
+/* General projects inside the shared library (首页 · 我的工程, 剪辑台 · 最近工程). The teal is only the small dot. */
+.ge-runpill { position:absolute;left:10px;top:10px;z-index:4;display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:7px;background:#000000a6;color:#e9e9ec;
+  font-size:11.5px;line-height:1;white-space:nowrap;pointer-events:none; }
+.ge-runpill i { width:6px;height:6px;border-radius:50%;background:#c9cbd1; }
+.ge-runpill[data-tone=wait] i { background:#f2f2f4; }
+.ge-runpill[data-tone=failed] i { background:#ff6b61; }
+.ge-runpill .ge-spin { animation:ge-library-spin .9s linear infinite; }
+.project-cover .ge-runpill { left:26px;top:26px; }
+.ge-kindtag { display:inline-flex;align-items:center;gap:6px;font-weight:600; }
+.ge-kindtag i { width:6px;height:6px;border-radius:50%;background:#2fc6a4; }
+html[data-ui-theme=warm] .ge-kindtag i,html[data-ui-theme=frost] .ge-kindtag i { background:#1f9a80; }
+@keyframes ge-library-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ge-runpill .ge-spin { animation:none; } }

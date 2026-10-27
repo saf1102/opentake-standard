@@ -1,0 +1,83 @@
+/* Application chrome only. Video compositions keep their own styles and palette. */
+html.workspace-glass {
+  color-scheme: dark;
+  --ui-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --ui-ink: #e9eeeb;
+  --ui-muted: #a3b0ab;
+  --ui-mint: #a0d4bc;
+  --ui-line: #c8dfd322;
+  --ui-glass: linear-gradient(135deg,#ffffff0c,#ffffff03), #252b2bd9;
+  --ui-field: #111a1b9c;
+  --background: 180 10% 10%; --foreground: 145 12% 92%;
+  --card: 180 8% 16%; --card-foreground: 145 12% 92%;
+  --popover: 180 8% 16%; --popover-foreground: 145 12% 92%;
+  --primary: 151 34% 69%; --primary-foreground: 165 28% 12%;
+  --secondary: 170 8% 23%; --secondary-foreground: 145 12% 92%;
+  --muted: 170 8% 20%; --muted-foreground: 150 9% 67%;
+  --accent: 160 16% 25%; --accent-foreground: 145 20% 92%;
+  --border: 160 9% 28%; --input: 160 9% 30%; --ring: 151 34% 69%;
+  --destructive: 5 65% 56%; --destructive-foreground: 0 0% 100%;
+  --radius: .75rem;
+  --studio-accent: #9ed1b9; --studio-ink: #e9eeeb; --studio-muted: #a3b0ab;
+  --studio-bg: #191e20; --studio-panel: #252b2bd9; --studio-panel-2: #303837;
+  --studio-panel-3: #424e49; --studio-input-bg: #141c1d;
+  --studio-line: #c8dfd31c; --studio-control-line: #c8dfd333;
+  --studio-ok: #9ed1b9;
+}
+.workspace-glass body {
+  font-family: var(--ui-font); -webkit-font-smoothing: antialiased;
+  background: radial-gradient(ellipse at 72% 25%,#294c433c,transparent 48%),radial-gradient(ellipse at 30% 75%,#6951362e,transparent 50%),#191d20;
+  background-attachment: fixed;
+}
+.workspace-glass :where(button,input,textarea,select) { font-family: inherit; }
+.workspace-glass :where(button,a,input,textarea,select):focus-visible { outline:2px solid var(--ui-mint);outline-offset:3px; }
+.workspace-glass :where(input[type=range],input[type=checkbox],progress) { accent-color:var(--ui-mint); }
+.workspace-glass :where(select) { color-scheme:dark; }
+.workspace-glass :where(option) { background:#252c2a;color:var(--ui-ink); }
+.workspace-glass ::selection { background:#a0d4bc40;color:#fff; }
+.workspace-glass .workspace-nav { background:#303635c9;backdrop-filter:blur(24px);border-color:var(--ui-line);height:58px;min-height:58px;max-height:58px; }
+.workspace-glass { --workspace-nav-height:74px; }
+.workspace-wordmark { position:absolute;left:50%;transform:translateX(-50%);font-size:20px;letter-spacing:-.5px;font-weight:600;color:#d1d9d5;pointer-events:none; }
+.workspace-glass .workspace-switch>nav { background:#272f2ef5;backdrop-filter:blur(28px);border-color:var(--ui-line); }
+.workspace-glass .workspace-dashboard { background:transparent;padding-top:42px; }
+.workspace-glass .workspace-intro h1 {font-size:36px;letter-spacing:-1px;}
+.workspace-glass .workspace-intro p {color:var(--ui-muted);}
+.workspace-glass .workspace-module-card { --module-color:var(--ui-mint);background:var(--ui-glass);border-color:#c8dfd333;border-radius:16px;box-shadow:inset 0 1px #ffffff09,0 12px 30px #00000012;min-height:330px;padding:23px 20px; }
+.workspace-glass .workspace-module-card:hover { background:linear-gradient(135deg,#a0d4bc14,#ffffff06),#303b37d9;border-color:#a0d4bc88; }
+.workspace-glass .workspace-module-card h2 {margin:18px 0 8px;color:var(--ui-mint);font-weight:550;}
+.workspace-module-art {height:120px;display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 18px;color:#abd6c1;}
+.workspace-module-art>svg {padding:10px;width:70px;height:70px;border-radius:16px;border:1px solid #bde3ce55;background:linear-gradient(140deg,#9ed1b92e,#ffffff05);box-shadow:0 8px 20px #0003;}
+.workspace-module-art>div {width:60px;display:grid;gap:12px;transform:perspective(300px) rotateY(-15deg);}
+.workspace-module-art i {display:block;height:10px;border:1px solid #bde3ce30;background:#bde3ce24;border-radius:4px;}
+.workspace-module-art i:nth-child(2) {width:70%;}.workspace-module-art i:nth-child(3) {width:85%;}
+.workspace-module-art--motion>svg {transform:rotate(-12deg);}.workspace-module-art--library>div {gap:7px;}.workspace-module-art--library i {height:24px;}
+.workspace-glass .workspace-module-card>span {border-top:1px solid var(--ui-line);padding-top:16px;}
+.workspace-glass .workspace-project-list {border-color:var(--ui-line);border-radius:14px;}
+.workspace-glass .workspace-project-list article {background:var(--ui-glass);padding:20px;}
+.workspace-glass .workspace-project-list article+article {border-color:var(--ui-line);}
+.workspace-glass .workspace-project-actions a {border-color:var(--ui-line);background:#ffffff08;color:var(--ui-mint);border-radius:8px;}
+/* Shared reader/library primitives also cover Radix portals (details, settings, export). */
+.workspace-glass .reader-workspace {background:transparent;min-height:calc(100dvh - 58px);}
+.workspace-glass :is(.bg-card,[role=dialog],[role=alertdialog],[role=menu],[role=listbox],[data-radix-popper-content-wrapper]>div) {background:var(--ui-glass);border-color:var(--ui-line);box-shadow:0 18px 60px #0003;}
+.workspace-glass :is([role=dialog],[role=alertdialog],[role=menu],[role=listbox]) {backdrop-filter:blur(24px);}
+.workspace-glass :is(input:not([type=range]):not([type=color]):not([type=checkbox]),textarea,select) {border-color:var(--ui-line);}
+/* Explicit editor chrome; deliberately excludes rendered cards and preview canvas. */
+.workspace-glass :is(.studio-editor,.studio-projects,.motion-lab,.openscreen-workspace-shell) {font-family:var(--ui-font);background:transparent;color:var(--ui-ink);}
+.workspace-glass :is(.editor-header,.studio-projects__header,.media-panel,.preset-panel,.inspector-panel,.timeline-toolbar,.motion-lab__header,.motion-lab__detail,.motion-lab__catalog-head,.openscreen-hostbar) {background:var(--ui-glass);border-color:var(--ui-line);}
+.workspace-glass :is(.studio-dialog,.studio-drawer,.full-card-dialog,.agent-settings-dialog) {background:linear-gradient(140deg,#33453a33,transparent 55%),#242a2af7;border-color:#c8dfd338;color:var(--ui-ink);font-family:var(--ui-font);box-shadow:0 28px 90px #0008;}
+.workspace-glass :is(.full-card-fields,.agent-cli-section,.agent-settings-footer,.agent-module-head,.full-card-mode-banner,.motion-lab__cards>button) {background:#ffffff06;border-color:var(--ui-line);}
+.workspace-glass :is(.full-card-dialog,.agent-settings-dialog) :is(input,textarea,select) {background:var(--ui-field);color:var(--ui-ink);border-color:var(--ui-line);}
+.workspace-glass :is(.full-card-dialog footer>button,.full-card-controls>button,.agent-settings-footer .agent-settings-save,.motion-lab__catalog-head button.active) {background:var(--ui-mint);border-color:var(--ui-mint);color:#14291f;}
+.workspace-glass .full-card-fields h3 {color:var(--ui-mint);}
+.workspace-glass .full-card-dialog button:not([aria-checked=true]):not([aria-pressed=true]):not(:disabled) {border-color:var(--ui-line);}
+.workspace-glass .motion-library-backdrop .studio-drawer--presets {background:#242a2af7;}
+.workspace-glass .motion-lab__catalog-head {backdrop-filter:blur(20px);}
+.workspace-glass .motion-lab__cards>button.active {border-color:var(--ui-mint);box-shadow:inset 0 0 0 1px var(--ui-mint);}
+.workspace-glass .motion-lab__transport button.active {background:#a0d4bc22;border-color:var(--ui-mint);color:var(--ui-mint);}
+.workspace-glass .agent-settings-entry {background:#ffffff08;border-color:var(--ui-line);color:var(--ui-ink);}
+@media(max-width:1000px){.workspace-wordmark{display:none;}}
+@media(max-width:650px){.workspace-glass .workspace-module-card{min-height:270px;padding:18px 14px;}.workspace-module-art{height:90px;}.workspace-module-art>div{display:none;}.workspace-glass .workspace-intro h1{font-size:28px;}}
+@media(prefers-reduced-transparency:reduce){.workspace-glass :is(.workspace-nav,[role=dialog],[role=menu]){backdrop-filter:none;background:#252d2b;}}
+.workspace-glass .reader-workspace .text-emerald-700 {color:#9ed1b9;}
+.workspace-glass :is(.roughcut-dialog,.export-dialog,.roughcut-progress-dialog,.clip-context-menu) {background:var(--ui-glass);color:var(--ui-ink);border-color:var(--ui-line);backdrop-filter:blur(24px);font-family:var(--ui-font);}
+.workspace-glass :is(.roughcut-dialog>header,.roughcut-dialog>footer,.roughcut-dialog>textarea) {background:var(--ui-field);border-color:var(--ui-line);color:var(--ui-ink);}

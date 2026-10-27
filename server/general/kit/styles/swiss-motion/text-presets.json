@@ -1,0 +1,216 @@
+{
+  "presets": {
+    "瑞士大字": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "weight": 800,
+      "size": 0.078,
+      "color": "#111111",
+      "accent": "#E30613",
+      "lineHeight": 1.3,
+      "roles": [
+        "title"
+      ],
+      "tracking": -0.02,
+      "align": "left"
+    },
+    "网格字幕": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "weight": 500,
+      "size": 0.042,
+      "color": "#111111",
+      "accent": "#E30613",
+      "lineHeight": 1.3,
+      "roles": [
+        "caption"
+      ],
+      "align": "left"
+    },
+    "网格标签": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "weight": 600,
+      "size": 0.03,
+      "color": "#111111",
+      "accent": "#E30613",
+      "lineHeight": 1.3,
+      "roles": [
+        "label"
+      ],
+      "uppercase": true,
+      "align": "left",
+      "tracking": 0.06
+    },
+    "信号红字": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 800,
+      "size": 0.078,
+      "color": "#E30613",
+      "accent": "#111111",
+      "tracking": -0.02,
+      "roles": [
+        "title"
+      ]
+    },
+    "反白大字": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 800,
+      "size": 0.078,
+      "color": "#FFFFFF",
+      "accent": "#E30613",
+      "tracking": -0.02,
+      "box": true,
+      "boxColor": "#111111",
+      "radius": 0,
+      "roles": [
+        "title"
+      ]
+    },
+    "红块压印": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 800,
+      "size": 0.078,
+      "color": "#111111",
+      "accent": "#FFFFFF",
+      "tracking": -0.02,
+      "box": true,
+      "boxColor": "#E30613",
+      "radius": 0,
+      "roles": [
+        "title"
+      ]
+    },
+    "细线说明": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 500,
+      "size": 0.042,
+      "color": "#111111",
+      "accent": "#E30613",
+      "rule": "top",
+      "ruleColor": "#111111",
+      "ruleWidth": 0.04,
+      "roles": [
+        "caption"
+      ]
+    },
+    "红块关键词": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 600,
+      "size": 0.042,
+      "color": "#111111",
+      "accent": "#FFFFFF",
+      "accentStyle": "box",
+      "accentBox": "#E30613",
+      "roles": [
+        "caption"
+      ]
+    },
+    "反白字幕": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 500,
+      "size": 0.042,
+      "color": "#FFFFFF",
+      "accent": "#E30613",
+      "box": true,
+      "boxColor": "#111111",
+      "radius": 0,
+      "roles": [
+        "caption"
+      ]
+    },
+    "信号标签": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 700,
+      "size": 0.03,
+      "color": "#111111",
+      "accent": "#FFFFFF",
+      "box": true,
+      "boxColor": "#E30613",
+      "radius": 0,
+      "tracking": 0.04,
+      "roles": [
+        "label"
+      ]
+    },
+    "技术注记": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 500,
+      "size": 0.03,
+      "color": "#6B6B67",
+      "accent": "#E30613",
+      "rule": "top",
+      "ruleColor": "#9A9A96",
+      "ruleWidth": 0.05,
+      "roles": [
+        "label"
+      ]
+    },
+    "红线引注": {
+      "font": "Inter",
+      "fontFile": "Inter.ttf",
+      "fallback": "PingFang SC",
+      "layout": "content",
+      "lineHeight": 1.3,
+      "align": "left",
+      "weight": 600,
+      "size": 0.03,
+      "color": "#111111",
+      "accent": "#E30613",
+      "rule": "left",
+      "ruleColor": "#E30613",
+      "roles": [
+        "label"
+      ]
+    }
+  },
+  "finishes": [
+    "none"
+  ]
+}

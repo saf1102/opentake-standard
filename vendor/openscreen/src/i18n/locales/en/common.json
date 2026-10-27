@@ -1,0 +1,75 @@
+{
+	"actions": {
+		"cancel": "Cancel",
+		"save": "Save",
+		"delete": "Delete",
+		"close": "Close",
+		"share": "Share",
+		"done": "Done",
+		"open": "Open",
+		"checkForUpdates": "Check for Updates",
+		"viewRelease": "View Release",
+		"downloadUpdate": "Download Update",
+		"restartNow": "Restart Now",
+		"upload": "Upload",
+		"export": "Export",
+		"showInFolder": "Show in Folder",
+		"file": "File",
+		"edit": "Edit",
+		"view": "View",
+		"window": "Window",
+		"help": "Help",
+		"quit": "Quit",
+		"stopRecording": "Stop Recording",
+		"undo": "Undo",
+		"redo": "Redo",
+		"cut": "Cut",
+		"copy": "Copy",
+		"paste": "Paste",
+		"selectAll": "Select All",
+		"minimize": "Minimize",
+		"reload": "Reload",
+		"forceReload": "Force Reload",
+		"toggleDevTools": "Toggle Developer Tools",
+		"actualSize": "Actual Size",
+		"zoomIn": "Zoom In",
+		"zoomOut": "Zoom Out",
+		"toggleFullScreen": "Toggle Full Screen",
+		"recordingStatus": "Recording: {{source}}",
+		"about": "About OpenScreen",
+		"services": "Services",
+		"hide": "Hide OpenScreen",
+		"hideOthers": "Hide Others",
+		"unhide": "Show All",
+		"saveDiagnostics": "Save Diagnostics"
+	},
+	"updates": {
+		"available": "OpenScreen {{latestVersion}} is available. You are using {{currentVersion}}.",
+		"current": "OpenScreen is up to date ({{currentVersion}}).",
+		"readyToInstall": "OpenScreen {{latestVersion}} has been downloaded. Restart to finish installing.",
+		"blockedRecording": "Finish your recording before installing the update.",
+		"blockedLocation": "Move OpenScreen to your Applications folder before updating.",
+		"failed": "Could not check for updates.",
+		"downloadFailed": "Could not download the update."
+	},
+	"playback": {
+		"play": "Play",
+		"pause": "Pause",
+		"fullscreen": "Fullscreen",
+		"exitFullscreen": "Exit Fullscreen"
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} px/s",
+		"pixels": "{{value}} px"
+	},
+	"locale": {
+		"name": "English",
+		"short": "EN"
+	},
+	"recordingSource": {
+		"window": "Window",
+		"screen": "Screen",
+		"virtual": "Virtual display",
+		"unknown": "Screen recording"
+	}
+}

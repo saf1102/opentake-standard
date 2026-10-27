@@ -1,0 +1,54 @@
+/* Editor refinement tokens. The refinement sheets (editor-refine / -motion / -layout) apply to every theme and
+   read their colours only from these variables; each theme supplies its own set.
+   Card tones (--ed-card-s/m/f) colour motion-card clips by size; --ed-danger is the only red;
+   --ed-icon is the brand orange for menu icons, deepened on the light themes so it stays legible.
+   原色 is dark graphite with the brand amber; 暖雾 and 磨砂 are light glass, so their accents are their own
+   selection colours and their shadows are soft tints rather than black. */
+
+html {
+  --ed-control: 30px;
+  --ed-control-sm: 24px;
+  --ed-text: 12px;
+  --ed-text-sm: 11px;
+  --ed-text-xs: 10px;
+  --ed-ease: cubic-bezier(.2, .8, .2, 1);
+  --ed-fast: 120ms;
+  --ed-state: 180ms;
+  --ed-enter: 220ms;
+}
+
+html[data-ui-theme=original] {
+  --ed-icon: #ffb020;
+  --ed-card-s: #ffc24d; --ed-card-m: #ffb020; --ed-card-f: #d98e00; --ed-card-ink: #1b1c1f; --ed-danger: #ff5a4f;
+  --ed-accent: #ffb020; --ed-accent-hi: #ffc24d; --ed-accent-ink: #1b1c1f; --ed-accent-soft: #ffb02024; --ed-accent-text: #ffcf73;
+  --ed-ink: #f2f2f4; --ed-ink-2: #c9cbd1; --ed-muted: #8b8e96; --ed-faint: #5e6169;
+  --ed-raise: #28292e; --ed-raise-hi: #313339; --ed-line: #ffffff0f; --ed-line-2: #ffffff1c; --ed-input: #0f1012;
+  --ed-menu-bg: #28292e; --ed-hint-bg: #313339;
+  --ed-slot: #ffffff0a; --ed-slot-hover: #ffffff10; --ed-slot-rim: #ffffff0a; --ed-head-hover: #ffffff05;
+  --ed-clip-rim: #ffffff14; --ed-grip: #ffffff33; --ed-fader: #ffffff1f; --ed-tick: #ffffff24; --ed-playhead-halo: #00000088;
+  --ed-shadow-sm: 0 1px 2px #00000066; --ed-shadow-md: 0 4px 14px #000000aa; --ed-shadow-lg: 0 14px 30px #000000cc;
+}
+
+html[data-ui-theme=warm] {
+  --ed-icon: #b87200;
+  --ed-card-s: #ece2cf; --ed-card-m: #d2c09f; --ed-card-f: #a98f6c; --ed-card-ink: #302a24; --ed-danger: #c4453a;
+  --ed-accent: #6d5034; --ed-accent-hi: #8a6a48; --ed-accent-ink: #fff9ed; --ed-accent-soft: #6d503426; --ed-accent-text: #4a3826;
+  --ed-ink: #302a24; --ed-ink-2: #4a4138; --ed-muted: #62584d; --ed-faint: #6b6052;
+  --ed-raise: #fff8eb4d; --ed-raise-hi: #f4ead5; --ed-line: #74695835; --ed-line-2: #fff8e79c; --ed-input: #fff8eb38;
+  --ed-menu-bg: #f4ead5; --ed-hint-bg: #f8f0de;
+  --ed-slot: #fff8eb24; --ed-slot-hover: #fff8eb3a; --ed-slot-rim: #fff8eb40; --ed-head-hover: #fff8eb1f;
+  --ed-clip-rim: #ffffff26; --ed-grip: #30282040; --ed-fader: #30282033; --ed-tick: #30282033; --ed-playhead-halo: #fff8eb80;
+  --ed-shadow-sm: 0 1px 2px #3a2c1c33; --ed-shadow-md: 0 4px 14px #3a2c1c40; --ed-shadow-lg: 0 14px 30px #3a2c1c59;
+}
+
+html[data-ui-theme=frost] {
+  --ed-icon: #d98e00;
+  --ed-card-s: #dcf1ea; --ed-card-m: #addfcf; --ed-card-f: #71bca6; --ed-card-ink: #1f3633; --ed-danger: #cf4a44;
+  --ed-accent: #34786b; --ed-accent-hi: #4f9a8b; --ed-accent-ink: #ffffff; --ed-accent-soft: #34786b24; --ed-accent-text: #245a50;
+  --ed-ink: #293e3b; --ed-ink-2: #3d524e; --ed-muted: #536863; --ed-faint: #87a09a;
+  --ed-raise: #ffffff80; --ed-raise-hi: #ffffff; --ed-line: #9eb9b150; --ed-line-2: #ffffffd9; --ed-input: #ffffff66;
+  --ed-menu-bg: #fbfdfa; --ed-hint-bg: #ffffff;
+  --ed-slot: #ffffff4d; --ed-slot-hover: #ffffff80; --ed-slot-rim: #ffffffa6; --ed-head-hover: #ffffff40;
+  --ed-clip-rim: #ffffff40; --ed-grip: #293e3b33; --ed-fader: #293e3b26; --ed-tick: #293e3b26; --ed-playhead-halo: #ffffff99;
+  --ed-shadow-sm: 0 1px 2px #29403a26; --ed-shadow-md: 0 4px 14px #29403a33; --ed-shadow-lg: 0 14px 30px #29403a4d;
+}

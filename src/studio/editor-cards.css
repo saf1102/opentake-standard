@@ -1,0 +1,162 @@
+/* Enhanced motion-card lanes (图解 projects) and their legend.
+   Size reads from a frame pictogram (how much of the picture the card covers) plus a tone per size.
+   Progress reads from how filled the clip is: an empty dashed frame (待制作) → tinted (已提交 / 校验中) → solid (已落槽);
+   校验中 is the only state that moves, 失败 gets the theme's red, 待重制 a diagonal hatch.
+   The legend chips reuse the clip treatments, so the legend is a set of samples. Colours from editor-tokens.css. */
+
+html[data-ui-theme] [data-motion-card-type=small] { --card-tone: var(--ed-card-s); }
+html[data-ui-theme] [data-motion-card-type=half] { --card-tone: var(--ed-card-m); }
+html[data-ui-theme] [data-motion-card-type=full] { --card-tone: var(--ed-card-f); }
+
+/* ---------- clips: badge · status chip · title in one row ---------- */
+html[data-ui-theme] :is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px 0 5px !important;
+  border: 0 solid transparent;
+  background: var(--card-tone, var(--ed-card-m)) !important;
+  color: var(--ed-card-ink) !important;
+}
+html[data-ui-theme] :is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip > b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ed-text-sm);
+  font-weight: 600;
+  line-height: normal;
+}
+
+/* size badge: a small frame filled as much as the card fills the picture, then the letter */
+html[data-ui-theme] .motion-card-size-badge {
+  position: relative;
+  top: auto;
+  left: auto;
+  order: -1;
+  flex: none;
+  width: auto;
+  height: 18px;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 5px 0 4px;
+  border: 0;
+  border-radius: 5px;
+  transform: none;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  box-shadow: none;
+  color: inherit;
+  font: 700 10px/1 system-ui, sans-serif;
+  font-style: normal;
+}
+html[data-ui-theme] .motion-card-size-badge::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1.25px currentColor;
+  background: linear-gradient(currentColor, currentColor) no-repeat;
+}
+html[data-ui-theme] [data-motion-card-type=small] .motion-card-size-badge::before { background-size: 6px 3.5px; background-position: right 2.5px top 2.5px; }
+html[data-ui-theme] [data-motion-card-type=half] .motion-card-size-badge::before { background-size: 6px 5px; background-position: right 2.5px center; }
+html[data-ui-theme] [data-motion-card-type=full] .motion-card-size-badge::before { background-size: 11px 5px; background-position: center; }
+
+/* ---------- status chips ---------- */
+html[data-ui-theme] .timeline-card-status { gap: 4px; font-size: var(--ed-text-xs); font-weight: 600; }
+html[data-ui-theme] .timeline-card-state-icon {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  border: 0;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+  font-style: normal;
+}
+html[data-ui-theme] [data-card-state=empty] .timeline-card-state-icon { font-size: 0; background: transparent; border: 1.25px dashed currentColor; color: var(--ed-muted); }
+html[data-ui-theme] [data-card-state=submitted] .timeline-card-state-icon { background: var(--ed-ink); color: var(--ed-accent-ink); }
+html[data-ui-theme] [data-card-state=checking] .timeline-card-state-icon {
+  font-size: 0;
+  background: transparent;
+  border: 2px solid color-mix(in srgb, var(--ed-ink) 22%, transparent);
+  border-top-color: var(--ed-ink);
+  animation: ed-card-spin .9s linear infinite;
+}
+html[data-ui-theme] [data-card-state=ready] .timeline-card-state-icon,
+html[data-ui-theme] [data-card-state=rework] .timeline-card-state-icon { background: var(--ed-card-ink); color: var(--card-tone, var(--ed-card-m)); }
+html[data-ui-theme] [data-card-state=failed] .timeline-card-state-icon { background: var(--ed-danger); color: #fff; }
+
+/* ---------- state treatments, shared by clips and legend chips ---------- */
+html[data-ui-theme] :is(:is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip, .timeline-card-legend > span)[data-card-state=empty] {
+  background: color-mix(in srgb, var(--card-tone, var(--ed-card-m)) 8%, transparent) !important;
+  border: 1.5px dashed color-mix(in srgb, var(--card-tone, var(--ed-card-m)) 60%, transparent);
+  box-shadow: none !important;
+  color: var(--ed-ink-2) !important;
+}
+html[data-ui-theme] :is(:is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip, .timeline-card-legend > span):is([data-card-state=submitted], [data-card-state=checking]) {
+  background: color-mix(in srgb, var(--card-tone, var(--ed-card-m)) 30%, transparent) !important;
+  border: 1.5px dashed color-mix(in srgb, var(--card-tone, var(--ed-card-m)) 85%, transparent);
+  color: var(--ed-ink) !important;
+}
+html[data-ui-theme] :is(:is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip, .timeline-card-legend > span)[data-card-state=checking] { border-style: solid; overflow: hidden; }
+html[data-ui-theme] :is(:is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip, .timeline-card-legend > span)[data-card-state=checking]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(100deg, #0000 0%, color-mix(in srgb, var(--card-tone, var(--ed-card-m)) 55%, transparent) 50%, #0000 100%) no-repeat;
+  background-size: 40% 100%;
+  animation: ed-card-sweep 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+html[data-ui-theme] :is(:is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip, .timeline-card-legend > span)[data-card-state=failed] {
+  background: color-mix(in srgb, var(--card-tone, var(--ed-card-m)) 55%, var(--ed-raise)) !important;
+  box-shadow: inset 0 0 0 1.5px var(--ed-danger), inset 4px 0 0 var(--ed-danger) !important;
+}
+html[data-ui-theme] :is(:is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip, .timeline-card-legend > span)[data-card-state=rework] {
+  background-image: repeating-linear-gradient(135deg, #0000 0 5px, color-mix(in srgb, var(--ed-card-ink) 16%, transparent) 5px 10px) !important;
+}
+@keyframes ed-card-sweep { from { background-position: -50% 0; } to { background-position: 150% 0; } }
+@keyframes ed-card-spin { to { rotate: 360deg; } }
+
+/* ---------- legend bar above the card lanes ---------- */
+html[data-ui-theme] .timeline-card-actions { gap: 12px; min-height: 40px; padding: 0 12px; overflow-x: auto; }
+html[data-ui-theme] .timeline-card-actions > button {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px dashed color-mix(in srgb, var(--ed-accent) 60%, transparent) !important;
+  border-radius: 7px;
+  background: transparent !important;
+  color: var(--ed-accent-text) !important;
+  font-size: var(--ed-text);
+  transition: background-color var(--ed-fast) ease, border-color var(--ed-fast) ease;
+}
+html[data-ui-theme] .timeline-card-actions > button:hover:not(:disabled) { background: var(--ed-accent-soft) !important; border-style: solid !important; }
+.timeline-card-legend { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.timeline-card-legend--sizes { margin-left: auto; padding-left: 12px; border-left: 1px solid var(--ed-line-2); }
+html[data-ui-theme] .timeline-card-legend > span {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px 0 5px;
+  border-radius: 6px;
+  background: var(--card-tone, var(--ed-card-m));
+  color: var(--ed-card-ink);
+  font-size: var(--ed-text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+html[data-ui-theme] .timeline-card-legend > span > b { margin-left: 2px; font-weight: 700; font-variant-numeric: tabular-nums; }
+html[data-ui-theme] .timeline-card-legend > span.is-zero { opacity: .42; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-theme] [data-card-state=checking] .timeline-card-state-icon,
+  html[data-ui-theme] [data-card-state=checking]::after { animation: none; }
+}

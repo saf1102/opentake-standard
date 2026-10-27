@@ -1,0 +1,281 @@
+/* 原色 · 专业石墨（Graphite Pro）
+   Application chrome only, scoped to [data-ui-theme=original]; warm/frost and rendered media are untouched.
+   Brand palette, three colours on graphite: brand amber (the logo) for everything active — primary actions,
+   selection, switches that are on, progress, focus; white for primary text, icons and the playhead;
+   light grey for secondary text and idle controls. On the timeline, cards are solid amber (S/M/F) and
+   subtitles / voice / music / sfx are tints of the same orange family. Red only for destructive actions. */
+html.workspace-glass[data-ui-theme=original] {
+  color-scheme: dark;
+  --pro-bg: #121315;
+  --pro-panel: #1a1b1e;
+  --pro-bar: #1f2023;
+  --pro-raise: #28292e;
+  --pro-raise-hi: #313339;
+  --pro-press: #383a41;
+  --pro-input: #0f1012;
+  --pro-line: #ffffff0f;
+  --pro-line-2: #ffffff1c;
+  --pro-ink: #f2f2f4;
+  --pro-ink-2: #c9cbd1;
+  --pro-muted: #8b8e96;
+  --pro-faint: #5e6169;
+  --pro-accent: #ffb020;
+  --pro-accent-hi: #ffc24d;
+  --pro-accent-deep: #d98e00;
+  --pro-accent-ink: #1b1c1f;
+  --pro-accent-text: #ffcf73;
+  --pro-accent-soft: #ffb02024;
+  --pro-amber: #ffb020;
+  --pro-red: #ff5a4f;
+  --pro-playhead: #f2f2f4;
+
+  --ui-ink: var(--pro-ink); --ui-muted: var(--pro-muted); --ui-mint: var(--pro-accent);
+  --ui-line: var(--pro-line); --ui-field: var(--pro-input);
+  --ui-glass: var(--pro-panel);
+  --background: 228 7% 8%; --foreground: 228 9% 90%;
+  --card: 225 6% 11%; --card-foreground: 228 9% 90%;
+  --popover: 225 6% 12%; --popover-foreground: 228 9% 90%;
+  --primary: 39 100% 56%; --primary-foreground: 228 7% 11%;
+  --secondary: 228 6% 17%; --secondary-foreground: 228 9% 90%;
+  --muted: 228 6% 15%; --muted-foreground: 225 5% 56%;
+  --accent: 228 6% 19%; --accent-foreground: 228 9% 92%;
+  --border: 228 6% 20%; --input: 228 6% 22%; --ring: 39 100% 56%;
+
+  --studio-accent: var(--pro-accent); --studio-ink: var(--pro-ink); --studio-muted: var(--pro-muted); --studio-text: var(--pro-ink);
+  --studio-bg: var(--pro-bg); --studio-panel: var(--pro-panel); --studio-panel-2: var(--pro-raise); --studio-panel-3: var(--pro-raise-hi);
+  --studio-input-bg: var(--pro-input); --studio-line: var(--pro-line); --studio-control-line: var(--pro-line-2);
+  --studio-selection: var(--pro-amber); --studio-playhead: var(--pro-playhead); --studio-ok: var(--pro-accent); --studio-soft: var(--pro-raise);
+  --studio-role-overlay: #d98e00; --studio-role-subtitle: #3a2a10; --studio-role-video: #26282d;
+  --studio-role-voice: #2a1d08; --studio-role-music: #2b1808;
+  /* voice waveform (drawn on canvas, read by VoiceWaveform) */
+  --voice-wave-top: #ffe3a6; --voice-wave-mid: #ffb020; --voice-wave-bottom: #c97f00;
+  --voice-wave-glow: rgba(255, 176, 32, .28); --voice-wave-rim: rgba(255, 227, 166, .3); --voice-wave-axis: rgba(255, 176, 32, .18);
+}
+html.workspace-glass[data-ui-theme=original] body {
+  background: var(--pro-bg);
+}
+html[data-ui-theme=original] ::selection { background: #ffb02055; color: #fff; }
+html[data-ui-theme=original] :where(button, a, input, textarea, select):focus-visible { outline: 2px solid var(--pro-accent); outline-offset: 2px; }
+html[data-ui-theme=original] :where(input[type=range], input[type=checkbox], input[type=radio], progress) { accent-color: var(--pro-accent); }
+html[data-ui-theme=original] option { background: var(--pro-raise); color: var(--pro-ink); }
+
+/* ---------- surfaces: flat panels separated by hairlines, no glass, no blur ---------- */
+html[data-ui-theme=original] :is(.workspace-nav, .editor-header, .studio-projects__header, .media-panel, .preset-panel, .inspector-panel, .timeline-toolbar, .preview-controls, .motion-lab__header, .motion-lab__detail, .motion-lab__catalog-head, .openscreen-hostbar, .workspace-switch>nav) {
+  background: var(--pro-panel);
+  border-color: var(--pro-line);
+  box-shadow: none;
+  backdrop-filter: none;
+  color: var(--pro-ink);
+}
+html[data-ui-theme=original] :is(.workspace-nav, .editor-header, .studio-projects__header, .timeline-toolbar) { background: var(--pro-bar); }
+html[data-ui-theme=original] .workspace-nav { border-bottom: 1px solid var(--pro-line); }
+html[data-ui-theme=original] :is(.studio-editor, .studio-projects, .editor-top, .preview-panel) { background: var(--pro-bg); }
+/* The preview glow reaches past the frame (as in 暖雾), but darker and calmer so the graphite chrome still reads.
+   Panels around it turn into smoked glass; the timeline stays solid and neutral for judging colour. */
+html[data-ui-theme=original] .editor-preview-ambient { background: var(--pro-bg); }
+html[data-ui-theme=original] .editor-preview-ambient canvas { filter: blur(72px) saturate(1.4) brightness(.66); }
+html[data-ui-theme=original] .editor-preview-ambient canvas[data-ready="true"] { opacity: 1; }
+html[data-ui-theme=original] .editor-preview-ambient span { background: radial-gradient(140% 100% at 50% 26%, #12131500 38%, #12131573 74%, #121315d9 100%); }
+html[data-ui-theme=original] .preview-canvas { box-shadow: 0 22px 60px #000000a6, 0 2px 10px #00000066; }
+html[data-ui-theme=original] .preview-frame-outline { border-width: 1px; border-color: #ffffff38; }
+html[data-ui-theme=original] .workspace-nav-ambient-slot:not(:empty) ~ .workspace-content :is(.studio-editor, .editor-top, .preview-panel, .preview-stage-viewport) { background: transparent; }
+html[data-ui-theme=original] .workspace-nav-ambient-slot:not(:empty) ~ .workspace-content :is(.media-panel, .inspector-panel, .preset-panel, .preview-controls),
+html[data-ui-theme=original] .workspace-nav-ambient-slot:not(:empty) ~ .workspace-nav {
+  background: color-mix(in srgb, var(--pro-panel) 78%, transparent);
+  backdrop-filter: blur(40px) saturate(1.35);
+}
+html[data-ui-theme=original] .workspace-nav-ambient-slot:not(:empty) ~ .workspace-content .preview-controls { background: color-mix(in srgb, var(--pro-bar) 70%, transparent); }
+html[data-ui-theme=original] .workspace-nav-ambient-slot:not(:empty) ~ .workspace-content .editor-resizer { background: color-mix(in srgb, var(--pro-bg) 88%, transparent); }
+html[data-ui-theme=original] .preview-stage-viewport { background: #0b0b0c; }
+@media (prefers-reduced-transparency: reduce) {
+  html[data-ui-theme=original] .workspace-nav-ambient-slot:not(:empty) ~ .workspace-content :is(.media-panel, .inspector-panel, .preset-panel, .preview-controls),
+  html[data-ui-theme=original] .workspace-nav-ambient-slot:not(:empty) ~ .workspace-nav { background: var(--pro-panel); backdrop-filter: none; }
+}
+html[data-ui-theme=original] .editor-resizer { background: var(--pro-bg); }
+html[data-ui-theme=original] .editor-resizer::after { background: var(--pro-line-2); }
+html[data-ui-theme=original] .workspace-wordmark { color: var(--pro-ink-2); }
+
+/* ---------- text ---------- */
+html[data-ui-theme=original] :is(.media-panel, .inspector-panel, .preset-panel) :is(p, small, label, output, time, .media-item__meta, .media-library-summary, .inspector-empty-state, .media-drag-hint, .property-tray__trigger small, .inspector-field>span) { color: var(--pro-muted); text-shadow: none; }
+html[data-ui-theme=original] :is(.media-panel, .inspector-panel) :is(b, strong, h1, h2, h3, h4) { color: var(--pro-ink); }
+html[data-ui-theme=original] :is(input, textarea)::placeholder { color: var(--pro-faint); opacity: 1; }
+html[data-ui-theme=original] .editor-project-title { color: var(--pro-ink); }
+
+/* ---------- controls: one button language ---------- */
+html[data-ui-theme=original] :is(.editor-header, .media-panel, .inspector-panel, .preset-panel, .timeline-toolbar, .preview-controls, .workspace-nav, .studio-projects__header) :is(button, .upload-button, a.plain-action) {
+  background-color: var(--pro-raise);
+  border-color: var(--pro-line-2);
+  color: var(--pro-ink-2);
+  box-shadow: none;
+}
+html[data-ui-theme=original] :is(.editor-header, .media-panel, .inspector-panel, .preset-panel, .timeline-toolbar, .preview-controls, .workspace-nav, .studio-projects__header) :is(button, .upload-button):hover:not(:disabled) {
+  background-color: var(--pro-raise-hi);
+  border-color: #ffffff2b;
+  color: var(--pro-ink);
+}
+html[data-ui-theme=original] :is(.editor-header, .media-panel, .inspector-panel, .timeline-toolbar, .preview-controls) button:active:not(:disabled) { background-color: var(--pro-press); }
+html[data-ui-theme=original] :is(.editor-header, .media-panel, .inspector-panel, .timeline-toolbar, .preview-controls) button:disabled { background-color: transparent; border-color: var(--pro-line); color: var(--pro-faint); }
+/* primary action: the one blue button per area */
+html[data-ui-theme=original] :is(.editor-primary, .media-import, .qe-start, .media-panel .upload-button, .agent-settings-footer .agent-settings-save) {
+  background: var(--pro-accent) !important;
+  border-color: var(--pro-accent) !important;
+  color: var(--pro-accent-ink) !important;
+  box-shadow: 0 1px 0 #ffffff40 inset, 0 2px 8px #ffb02026;
+}
+html[data-ui-theme=original] :is(.editor-primary, .media-import, .qe-start, .media-panel .upload-button):hover { background: var(--pro-accent-hi) !important; border-color: var(--pro-accent-hi) !important; }
+/* segmented groups (theme, render style, language, quality, display mode, tabs): recessed track, raised selection */
+html[data-ui-theme=original] :is(.ui-theme-switch, .preview-style-switch, .preview-quality-switch, .inspector-tabs, .timeline-display-mode, .media-view-toggle, .project-archive-tabs, .qe-style) {
+  background: var(--pro-input);
+  border: 1px solid var(--pro-line);
+  box-shadow: none;
+}
+html[data-ui-theme=original] :is(.ui-theme-switch, .preview-style-switch, .preview-quality-switch, .inspector-tabs, .timeline-display-mode, .media-view-toggle, .project-archive-tabs, .qe-style) button {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--pro-muted) !important;
+  box-shadow: none !important;
+}
+html[data-ui-theme=original] :is(.ui-theme-switch, .preview-style-switch, .preview-quality-switch, .inspector-tabs, .timeline-display-mode, .media-view-toggle, .project-archive-tabs, .qe-style) button:hover { color: var(--pro-ink) !important; }
+html[data-ui-theme=original] :is(.ui-theme-switch, .preview-style-switch, .preview-quality-switch, .inspector-tabs, .timeline-display-mode, .media-view-toggle, .project-archive-tabs, .qe-style) button:is(.active, .is-active, [aria-pressed=true], [aria-selected=true]) {
+  background: var(--pro-raise-hi) !important;
+  color: var(--pro-ink) !important;
+  box-shadow: 0 1px 2px #0006, inset 0 1px 0 #ffffff12 !important;
+}
+/* toggles and filters that are "on" inside panels: accent text on a soft accent tint */
+html[data-ui-theme=original] :is(.media-panel, .inspector-panel, .timeline-toolbar, .preview-controls, .preset-panel) button:is(.active, .is-active, [aria-pressed=true]):not(.editor-primary) {
+  background: var(--pro-accent-soft) !important;
+  border-color: #ffb02066 !important;
+  color: var(--pro-accent-text) !important;
+}
+html[data-ui-theme=original] :is(.inspector-tabs, .timeline-display-mode, .media-view-toggle) button:is(.active, .is-active, [aria-pressed=true]) {
+  background: var(--pro-raise-hi) !important; border-color: transparent !important; color: var(--pro-ink) !important;
+}
+/* fields */
+html[data-ui-theme=original] :is(.editor-header, .media-panel, .inspector-panel, .preset-panel, .timeline-toolbar, .preview-controls, .studio-dialog, .agent-settings-dialog, .roughcut-dialog, .export-dialog, .full-card-dialog, .workspace-nav, .studio-projects) :is(input:not([type=range]):not([type=color]):not([type=checkbox]):not([type=radio]), textarea, select, .media-search) {
+  background-color: var(--pro-input);
+  border-color: var(--pro-line-2);
+  color: var(--pro-ink);
+}
+html[data-ui-theme=original] :is(input:not([type=range]):not([type=checkbox]):not([type=radio]), textarea, select):focus { border-color: var(--pro-accent); box-shadow: 0 0 0 3px var(--pro-accent-soft); }
+
+/* ---------- media library ---------- */
+html[data-ui-theme=original] :is(.media-item, .media-category, .inspector-section, .visual-mask-group, .property-tray) { background-color: var(--pro-raise); border-color: var(--pro-line); }
+html[data-ui-theme=original] .media-item:hover { background-color: var(--pro-raise-hi); border-color: var(--pro-line-2); }
+html[data-ui-theme=original] .media-type-filters button { background: var(--pro-raise) !important; border-color: var(--pro-line) !important; color: var(--pro-muted) !important; }
+html[data-ui-theme=original] .media-type-filters button span { color: var(--pro-faint); }
+html[data-ui-theme=original] .media-type-filters button:is(.active, [aria-pressed=true]) { background: var(--pro-accent-soft) !important; border-color: #ffb02073 !important; color: var(--pro-accent-text) !important; }
+html[data-ui-theme=original] .media-type-filters button:is(.active, [aria-pressed=true]) span { color: #ffcf73b3; }
+html[data-ui-theme=original] .media-used-badge { background: #000000b3; color: #e4e5e9; border: 1px solid #ffffff1f; }
+html[data-ui-theme=original] .media-type-badge { background: #000000a6; color: #fff; }
+
+/* ---------- preview transport ---------- */
+html[data-ui-theme=original] .preview-controls { border-top: 1px solid var(--pro-line); }
+html[data-ui-theme=original] .preview-controls :is(time, span, output) { color: var(--pro-muted); }
+html[data-ui-theme=original] .preview-play { background: var(--pro-ink) !important; border-color: var(--pro-ink) !important; color: #111 !important; }
+html[data-ui-theme=original] .preview-play:hover { background: #fff !important; }
+html[data-ui-theme=original] .preview-progress { accent-color: var(--pro-accent); }
+html[data-ui-theme=original] .preview-chapter-marker { background: var(--pro-faint); }
+
+/* ---------- timeline ---------- */
+html[data-ui-theme=original] .timeline-shell { background: var(--pro-bg); border-color: var(--pro-line); }
+html[data-ui-theme=original] :is(.timeline-ruler, .ruler-spacer) { background: var(--pro-bar); border-color: var(--pro-line); color: var(--pro-faint); }
+html[data-ui-theme=original] .timeline-ruler :is(span, small, time) { color: var(--pro-faint); }
+html[data-ui-theme=original] .track-heads, html[data-ui-theme=original] .track-head { background: var(--pro-panel); border-color: var(--pro-line); color: var(--pro-ink-2); }
+html[data-ui-theme=original] .track-head :is(button) { background: transparent !important; border-color: transparent !important; color: var(--pro-faint) !important; }
+html[data-ui-theme=original] .track-head button:hover { color: var(--pro-ink) !important; background: var(--pro-raise) !important; }
+html[data-ui-theme=original] .track-head button:is(.active, [aria-pressed=true]) { color: var(--pro-amber) !important; }
+html[data-ui-theme=original] :is(.timeline-body, .timeline-scroll, .timeline-content) { background: #151619; }
+html[data-ui-theme=original] .track-lane { background: #151619; border-bottom-color: #ffffff08; }
+html[data-ui-theme=original] .track-lane:nth-child(even) { background: #17181b; }
+html[data-ui-theme=original] .track-volume-control { color: var(--pro-faint); }
+html[data-ui-theme=original] .track-volume-control output { color: var(--pro-muted); }
+html[data-ui-theme=original] .track-volume-control input[type=range] { accent-color: #aeb2ba; }
+html[data-ui-theme=original] .playhead { --studio-playhead: var(--pro-playhead); }
+
+/* clips: brand palette — motion cards in three amber steps (S/M/F), light-grey subtitles, media as filmstrips
+   on graphite, audio as light-grey waveforms; selection is the amber outline */
+html[data-ui-theme=original] .timeline-clip { border-color: #00000080; border-radius: 4px; box-shadow: inset 0 1px 0 #ffffff12; }
+html[data-ui-theme=original] .timeline-clip.selected { outline: 2px solid var(--pro-accent); outline-offset: 0; }
+html[data-ui-theme=original] :is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip { color: #1b1c1f !important; }
+html[data-ui-theme=original] :is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip[data-motion-card-type=small] { background: #ffc24d !important; }
+html[data-ui-theme=original] :is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip[data-motion-card-type=half] { background: #ffb020 !important; }
+html[data-ui-theme=original] :is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip[data-motion-card-type=full] { background: #d98e00 !important; }
+html[data-ui-theme=original] :is(.track-lane--overlay, .track-lane--enhanced) .timeline-clip.selected { outline-color: var(--pro-ink); }
+html[data-ui-theme=original] .track-lane--subtitle .timeline-clip { background: #3a2a10 !important; color: #ffd690 !important; border-color: #ffb02059; }
+html[data-ui-theme=original] .track-lane--subtitle .timeline-clip.selected { background: #5a3f12 !important; color: #fff1d6 !important; outline-color: var(--pro-ink); }
+html[data-ui-theme=original] .track-lane--subtitle .timeline-clip b { color: inherit; }
+html[data-ui-theme=original] :is(.track-lane--video, .track-lane--proxy) .timeline-clip { background: #26282d !important; border-color: #ffffff1f; }
+html[data-ui-theme=original] :is(.track-lane--visual, .track-lane--camera) .timeline-clip { background: #34363c !important; color: var(--pro-ink) !important; border-color: #ffffff1f; }
+html[data-ui-theme=original] .track-lane--composition .timeline-clip { background: #2b2e35 !important; color: var(--pro-ink-2) !important; }
+html[data-ui-theme=original] .track-lane--voice .timeline-clip { background: #2a1d08 !important; border-color: #ffb02040; color: #ffd690 !important; }
+html[data-ui-theme=original] :is(.track-lane--music, .track-lane--source-bed) .timeline-clip { background: #2b1808 !important; border-color: #ff8a3040; color: #ffc08f !important; }
+html[data-ui-theme=original] .track-lane--sfx .timeline-clip { background: #2b1409 !important; border-color: #f0703040; color: #ffb48a !important; }
+html[data-ui-theme=original] .timeline-clip--timeline-gap { background: #24262b !important; }
+/* the server renders music/sfx waveforms in light cyan (#9de3db): re-tint them into the orange family
+   (voice is drawn on canvas from --voice-wave-*) */
+html[data-ui-theme=original] .timeline-waveform { background-color: transparent; }
+html[data-ui-theme=original] :is(.track-lane--music, .track-lane--source-bed) .timeline-waveform { filter: grayscale(1) brightness(.8) sepia(1) saturate(4) hue-rotate(-30deg); }
+html[data-ui-theme=original] .track-lane--sfx .timeline-waveform { filter: grayscale(1) brightness(.72) sepia(1) saturate(5) hue-rotate(-38deg); }
+html[data-ui-theme=original] .media-waveform { filter: grayscale(1) brightness(.8) sepia(1) saturate(4) hue-rotate(-30deg); }
+html[data-ui-theme=original] .voice-waveform { background-color: #2a1d08; }
+html[data-ui-theme=original] .voice-pause-marker { opacity: .7; }
+
+/* ---------- dialogs, drawers, menus ---------- */
+html[data-ui-theme=original] :is(.studio-dialog, .studio-drawer, .full-card-dialog, .agent-settings-dialog, .roughcut-dialog, .export-dialog, .roughcut-progress-dialog, .clip-context-menu, [role=dialog], [role=alertdialog], [role=menu], [role=listbox], [data-radix-popper-content-wrapper]>div) {
+  background: #1e1f23;
+  border-color: var(--pro-line-2);
+  color: var(--pro-ink);
+  backdrop-filter: none;
+  box-shadow: 0 24px 64px #000a, 0 0 0 1px #00000080;
+}
+html[data-ui-theme=original] :is(.full-card-fields, .agent-cli-section, .agent-settings-footer, .agent-module-head, .full-card-mode-banner, .roughcut-dialog>header, .roughcut-dialog>footer, .export-dialog :is(.export-header, .export-footer)) { background: var(--pro-panel); border-color: var(--pro-line); }
+html[data-ui-theme=original] :is(.full-card-dialog footer>button, .full-card-controls>button.primary, .motion-lab__catalog-head button.active) { background: var(--pro-accent); border-color: var(--pro-accent); color: var(--pro-accent-ink); }
+html[data-ui-theme=original] .full-card-fields h3 { color: var(--pro-ink); }
+html[data-ui-theme=original] .clip-context-menu button:hover, html[data-ui-theme=original] [role=menuitem]:hover { background: var(--pro-raise-hi); color: var(--pro-ink); }
+html[data-ui-theme=original] .export-progress__track i { background: var(--pro-accent); }
+
+/* ---------- workspace home and project lists (same theme, so the app reads as one) ---------- */
+html[data-ui-theme=original] .workspace-dashboard { background: transparent; }
+html[data-ui-theme=original] .workspace-module-card { --module-color: var(--pro-accent); background: var(--pro-panel); border-color: var(--pro-line); box-shadow: none; }
+html[data-ui-theme=original] .workspace-module-card:hover { background: var(--pro-raise); border-color: var(--pro-line-2); }
+html[data-ui-theme=original] .workspace-module-card h2 { color: var(--pro-ink); }
+html[data-ui-theme=original] .workspace-module-card p { color: var(--pro-muted); }
+html[data-ui-theme=original] .workspace-module-art { color: var(--pro-ink-2); }
+html[data-ui-theme=original] .workspace-module-art>svg { border-color: var(--pro-line-2); background: var(--pro-raise); box-shadow: none; }
+html[data-ui-theme=original] .workspace-module-art i { border-color: var(--pro-line-2); background: #ffffff0d; }
+html[data-ui-theme=original] .workspace-project-list article, html[data-ui-theme=original] .studio-projects .project-card { background: var(--pro-panel); border-color: var(--pro-line); }
+html[data-ui-theme=original] .workspace-project-actions a { background: var(--pro-raise); border-color: var(--pro-line-2); color: var(--pro-ink-2); }
+html[data-ui-theme=original] .reader-workspace .text-emerald-700 { color: var(--pro-accent); }
+
+/* ---------- project cards (studio list + home recents): their base is warm grey glass, made graphite here ---------- */
+html[data-ui-theme=original] :is(.studio-projects .project-card, .workspace-project-list .workspace-project-card) { background: var(--pro-panel) !important; border-color: var(--pro-line-2) !important; box-shadow: 0 10px 28px #0006 !important; }
+html[data-ui-theme=original] :is(.studio-projects .project-card, .workspace-project-list .workspace-project-card):hover { border-color: #ffffff38 !important; background: var(--pro-raise) !important; }
+html[data-ui-theme=original] :is(.studio-projects .project-card__archive, .workspace-project-archive) { background: linear-gradient(160deg, #26282d, #1d1e22) !important; backdrop-filter: none !important; border-left: 1px solid var(--pro-line); }
+html[data-ui-theme=original] :is(.studio-projects .project-card .project-info span, .workspace-project-archive small, .studio-projects .project-card footer time) { color: var(--pro-muted) !important; }
+html[data-ui-theme=original] .studio-projects .project-card footer { border-top-color: var(--pro-line); }
+html[data-ui-theme=original] :is(.project-card__quick-actions, .workspace-project-quick-actions) button,
+html[data-ui-theme=original] .workspace-project-actions a { background: var(--pro-raise) !important; border-color: var(--pro-line-2) !important; color: var(--pro-ink-2) !important; box-shadow: none !important; }
+html[data-ui-theme=original] :is(.project-card__quick-actions, .workspace-project-quick-actions) button:hover { background: var(--pro-raise-hi) !important; color: var(--pro-ink) !important; }
+html[data-ui-theme=original] :is(.project-card__quick-actions, .workspace-project-quick-actions) button.is-delete:hover { background: #4a1f1c !important; color: #ffb4ab !important; border-color: #ff6b5f66 !important; }
+html[data-ui-theme=original] .studio-projects .project-card--blank { background: var(--pro-panel) !important; border: 1px dashed #ffffff2e !important; }
+html[data-ui-theme=original] .studio-projects .project-card--trash footer button { color: var(--pro-ink-2); background: var(--pro-raise); }
+html[data-ui-theme=original] .project-archive-tabs { background: var(--pro-input); border-color: var(--pro-line); box-shadow: none; backdrop-filter: none; }
+html[data-ui-theme=original] .project-archive-tabs button[aria-selected=true] { background: var(--pro-raise-hi) !important; border-color: transparent !important; box-shadow: 0 1px 2px #0006 !important; }
+
+/* ---------- leftovers coloured in component CSS (blue audio grounds, export method tiles) ---------- */
+html[data-ui-theme=original] .timeline-media-strip.is-audio .timeline-waveform { background-color: transparent; }
+html[data-ui-theme=original] :is(.media-placeholder--audio, .media-waveform) { background-color: #1f2024; color: var(--pro-ink-2); }
+html[data-ui-theme=original] .export-dialog .export-method-icon { color: var(--pro-ink); }
+html[data-ui-theme=original] .export-dialog .export-method-icon--video { background: var(--pro-accent); color: var(--pro-accent-ink); }
+html[data-ui-theme=original] .export-dialog :is(.export-method-icon--jianying, .export-method-icon--files) { background: var(--pro-raise-hi); color: var(--pro-ink); }
+
+/* ---------- motion lab chrome (its --lab-red also colours card previews, so only the controls are re-coloured) ---------- */
+html[data-ui-theme=original] .motion-lab__styles button { background: var(--pro-raise) !important; border-color: var(--pro-line-2) !important; color: var(--pro-ink-2) !important; }
+html[data-ui-theme=original] .motion-lab__styles button[aria-pressed=true] { background: var(--pro-accent) !important; border-color: var(--pro-accent) !important; color: var(--pro-accent-ink) !important; }
+html[data-ui-theme=original] .motion-lab__transport button { background: var(--pro-raise); border-color: var(--pro-line-2); color: var(--pro-ink-2); }
+html[data-ui-theme=original] .motion-lab__transport button.primary { background: var(--pro-ink); color: #111; }
+html[data-ui-theme=original] .motion-lab__transport button.active { border-color: var(--pro-accent); background: var(--pro-accent-soft); color: var(--pro-accent-text); }
+html[data-ui-theme=original] .motion-lab__transport input { accent-color: var(--pro-accent); }
+html[data-ui-theme=original] .motion-lab__detail small { color: var(--pro-accent-text); }
+html[data-ui-theme=original] .motion-lab__cards > button.active { border-color: var(--pro-accent); box-shadow: inset 0 0 0 1px var(--pro-accent); }
+html[data-ui-theme=original] :is(.motion-sound-library button[aria-pressed=true], .motion-sound-library button.matched) { border-color: var(--pro-accent); background: var(--pro-accent-soft); color: var(--pro-accent-text); }

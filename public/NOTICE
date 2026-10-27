@@ -1,0 +1,4278 @@
+OpenTake Standard — Third-party notices
+
+OpenTake original code: AGPL-3.0-only, see LICENSE. OpenTake name and T mark are excluded; see TRADEMARK.md.
+
+lemo-opuscar, copyright 2026 LemoLab, MIT; upstream https://github.com/lemomo-ai/lemo-opuscar (3961ddb3d24d8876e0e2754f7790d66908acee51). Standard includes ten style guides and common authoring helpers. Full MIT text: server/general/kit/LICENSE.lemo-opuscar. Attribution: server/general/kit/ATTRIBUTION.md.
+Style preview images and videos: copyright LemoLab, CC BY 4.0, excerpts cropped for preview; individual credits and other included material are listed in src/workspace/style-library/style-library.json and displayed in the style detail.
+
+HyperFrames, copyright HeyGen contributors, Apache-2.0. Source: https://github.com/heygen-com/hyperframes. The package license texts are retained under licenses/npm, and the authoring skill NOTICE follows:
+# 来源与授权
+
+本目录的技能文档来自 HyperFrames（https://github.com/heygen-com/hyperframes），授权为 Apache License 2.0。原样随 OpenTake 分发，供出片智能体查阅，未作修改。HyperFrames 是 HeyGen 的项目，OpenTake 与其没有隶属关系。
+
+OpenScreen, MIT, copyright OpenScreen contributors including Etienne Lescot and Siddharth Vaddem, https://github.com/getopenscreen/openscreen. The embedded editor and its native host source are retained; Standard supplies screen-only storage and API adapters. Original LICENSE and THIRD-PARTY-NOTICES.md are preserved in vendor/openscreen. The upstream notices describe upstream installers; this source export includes none of their native executables, models, DLLs or installers.
+
+FFmpeg: LGPLv3 shared build (with OpenSSL 3); no FFmpeg executable is distributed in this source export. Users provide their compatible LGPL build. FFmpeg licensing: https://ffmpeg.org/legal.html; source: https://ffmpeg.org/download.html. Installation and corresponding modified-build source distribution are task 11 responsibilities. Do not redistribute a modified binary without its exact corresponding source, patches, configure command and LGPL dependency sources.
+
+Headless browser: Playwright Core Apache-2.0; Chromium/BSD and third-party licenses, https://chromium.googlesource.com/chromium/src/+/main/LICENSE. No browser binary is distributed. Any separately installed browser retains its own LICENSE and credits.
+
+Semantic icons: Lucide ISC and Simple Icons CC0; attribution and upstream brands retain their trademarks. Three.js MIT, d3 ISC, React MIT, React Router MIT, Lucide ISC, Radix MIT, Vite MIT, Tailwind MIT, TypeScript Apache-2.0. Exact installed dependency versions and all top-level license/NOTICE files follow and are preserved under licenses/npm.
+
+Electron: MIT, copyright Electron contributors, https://github.com/electron/electron. Electron includes Chromium, Node.js and third-party components; the local App retains Electron's LICENSE and LICENSES.chromium.html. electron-builder: MIT, copyright electron-builder contributors, https://github.com/electron-userland/electron-builder. Full installed package licenses are included in licenses/npm.
+
+OpenScreen: MIT, Siddharth Vaddem and contributors. Complete upstream notices: vendor/openscreen/LICENSE and vendor/openscreen/THIRD-PARTY-NOTICES.md. OpenTake modifications are AGPL-3.0.
+
+
+## OpenScreen upstream notices
+
+MIT License
+
+Copyright (c) 2025 Siddharth Vaddem
+Copyright (c) 2025-2026 OpenScreen contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+# Third-party notices
+
+OpenScreen is MIT licensed (see [LICENSE](LICENSE)). The installers additionally
+bundle the pre-built native components below. This file ships inside the
+application resources and satisfies the attribution and source-offer obligations
+that come with them.
+
+npm dependencies are not listed here: they are resolved from `package.json` and
+distributed by their own registries, not redistributed inside our binaries.
+
+---
+
+## FFmpeg — shared libraries (Windows only)
+
+- **Components**: `avcodec-*.dll`, `avformat-*.dll`, `avutil-*.dll`,
+  `swresample-*.dll`, `swscale-*.dll` and their siblings, under
+  `resources/electron/native/bin/win32-*/`.
+- **Used by**: the native D3D11 compositor addon, which links against them at
+  load time.
+- **License**: **GNU Lesser General Public License v2.1 or later**
+  (<https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>). FFmpeg's own
+  licensing page: <https://ffmpeg.org/legal.html>.
+- **This is an LGPL build, not a GPL one.** It is configured without
+  `--enable-gpl` and without `--enable-nonfree`, and links no GPL-only library
+  (x264, x265, xvid, vidstab, rubberband, frei0r, …). `scripts/fetch-ffmpeg.mjs`
+  verifies this before vendoring — it reads `ffmpeg -L`, `-buildconf` and
+  `-encoders` and refuses any binary that reports otherwise.
+- **Upstream binaries**: BtbN/FFmpeg-Builds, release
+  `autobuild-2026-07-31-14-10`, the `*-lgpl-shared-8.1` assets. Pinned by
+  SHA-256 in `scripts/fetch-ffmpeg.mjs`; the digests there identify the exact
+  artifacts we ship.
+  <https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-07-31-14-10>
+- **Corresponding source**: FFmpeg n8.1.2, commit `9b6c8969e0`, from
+  <https://github.com/FFmpeg/FFmpeg>. The build configuration and scripts that
+  produced these exact binaries are published at
+  <https://github.com/BtbN/FFmpeg-Builds>.
+- **Relinking**: as required by the LGPL, these are dynamic libraries. You may
+  replace them with your own build of the same FFmpeg version by overwriting the
+  DLLs in `resources/electron/native/bin/win32-*/`.
+
+## whisper.cpp and ggml
+
+- **Components**: `whisper-stt-server` and its ggml backend sidecars, under
+  `resources/electron/native/bin/<platform>-<arch>/`.
+- **License**: MIT — <https://github.com/ggml-org/whisper.cpp> and
+  <https://github.com/ggml-org/ggml>.
+- Built from source by `scripts/build-whisper-stt.sh`; the pinned upstream
+  revision is in `electron/native/whisper-stt/CMakeLists.txt`.
+- The speech model (`ggml-*.bin`) is **not** bundled — it is downloaded into the
+  user's data directory on first use by `electron/stt/modelManager.ts`.
+
+## Microsoft OpenMP runtime — `vcomp140.dll` (Windows only)
+
+- **Component**: `resources/electron/native/bin/win32-x64/vcomp140.dll`.
+- **License**: redistributable under the Microsoft Visual C++ Redistributable
+  terms accompanying Visual Studio; the copy shipped is taken from the
+  `VC\Redist\MSVC\<version>\x64\Microsoft.VC<nnn>.OpenMP\` directory of the
+  Visual Studio installation that builds the release, never from `System32`.
+- **Why it ships**: the ggml backends above are compiled with OpenMP and import
+  it. It is **not** part of Windows, so without it `whisper-stt-server` dies in
+  the loader before `main()` on any machine that has no Visual C++
+  Redistributable, and transcription and captions fail with no usable error.
+  Staged by `scripts/stage-vcomp-runtime.mjs`; `scripts/before-pack.cjs` refuses
+  to package if it is missing while anything still imports it.
+
+## PipeWire — headers (Linux only)
+
+- **Components**: header sources under
+  `electron/native/pipewire-capture/vendor/pipewire-1.0.5/include/`, compiled
+  into `openscreen-pipewire-helper` (the Linux cursor/capture helper) under
+  `resources/electron/native/bin/linux-*/`.
+- **License**: **MIT** — <https://gitlab.freedesktop.org/pipewire/pipewire>.
+  Every vendored file keeps its upstream `SPDX-License-Identifier: MIT` header,
+  and the project's licence text is copied alongside them as `COPYING`.
+- **Upstream**: PipeWire release 1.0.5. Only the header subset the helper
+  includes was vendored; `vendor/README.md` records exactly what was copied and
+  how to reproduce the selection.
+- **No PipeWire binary is redistributed.** The helper resolves
+  `libpipewire-0.3.so.0` with `dlopen` at runtime, from the user's own system,
+  so nothing of PipeWire's ships inside our installers beyond the compiled
+  result of its headers (inline functions and struct layouts).
+
+## OpenScreen native helpers
+
+`wgc-capture` (Windows Graphics Capture), the ScreenCaptureKit helper (macOS),
+the PipeWire helper (Linux) and the compositor addon are part of this repository
+and are covered by [LICENSE](LICENSE).
+
+---
+
+To report an omission or request source for anything bundled here, open an issue
+at <https://github.com/getopenscreen/openscreen/issues>.
+
+
+## npm dependency inventory
+
+@acemir/cssom 0.9.32 — MIT
+licenses/npm/node_modules__@acemir__cssom/LICENSE.txt
+
+@alloc/quick-lru 5.2.0 — MIT
+licenses/npm/node_modules__@alloc__quick-lru/license
+
+@asamuzakjp/css-color 6.0.7 — MIT
+licenses/npm/node_modules__@asamuzakjp__css-color/LICENSE
+
+lru-cache 11.5.2 — BlueOak-1.0.0
+licenses/npm/node_modules__@asamuzakjp__css-color__node_modules__lru-cache/LICENSE.md
+
+@asamuzakjp/dom-selector 8.3.2 — MIT
+licenses/npm/node_modules__@asamuzakjp__dom-selector/LICENSE
+
+lru-cache 11.5.2 — BlueOak-1.0.0
+licenses/npm/node_modules__@asamuzakjp__dom-selector__node_modules__lru-cache/LICENSE.md
+
+@babel/code-frame 7.29.7 — MIT
+licenses/npm/node_modules__@babel__code-frame/LICENSE
+
+@babel/compat-data 7.29.7 — MIT
+licenses/npm/node_modules__@babel__compat-data/LICENSE
+
+@babel/core 7.28.5 — MIT
+licenses/npm/node_modules__@babel__core/LICENSE
+
+@babel/generator 7.29.8 — MIT
+licenses/npm/node_modules__@babel__generator/LICENSE
+
+@babel/helper-compilation-targets 7.29.7 — MIT
+licenses/npm/node_modules__@babel__helper-compilation-targets/LICENSE
+
+@babel/helper-globals 7.29.7 — MIT
+licenses/npm/node_modules__@babel__helper-globals/LICENSE
+
+@babel/helper-module-imports 7.29.7 — MIT
+licenses/npm/node_modules__@babel__helper-module-imports/LICENSE
+
+@babel/helper-module-transforms 7.29.7 — MIT
+licenses/npm/node_modules__@babel__helper-module-transforms/LICENSE
+
+@babel/helper-plugin-utils 7.29.7 — MIT
+licenses/npm/node_modules__@babel__helper-plugin-utils/LICENSE
+
+@babel/helper-string-parser 7.29.7 — MIT
+licenses/npm/node_modules__@babel__helper-string-parser/LICENSE
+
+@babel/helper-validator-identifier 7.29.7 — MIT
+licenses/npm/node_modules__@babel__helper-validator-identifier/LICENSE
+
+@babel/helper-validator-option 7.29.7 — MIT
+licenses/npm/node_modules__@babel__helper-validator-option/LICENSE
+
+@babel/helpers 7.28.4 — MIT
+licenses/npm/node_modules__@babel__helpers/LICENSE
+
+@babel/parser 7.29.8 — MIT
+licenses/npm/node_modules__@babel__parser/LICENSE
+
+@babel/plugin-transform-react-jsx-self 7.27.1 — MIT
+licenses/npm/node_modules__@babel__plugin-transform-react-jsx-self/LICENSE
+
+@babel/plugin-transform-react-jsx-source 7.27.1 — MIT
+licenses/npm/node_modules__@babel__plugin-transform-react-jsx-source/LICENSE
+
+@babel/template 7.29.7 — MIT
+licenses/npm/node_modules__@babel__template/LICENSE
+
+@babel/traverse 7.29.8 — MIT
+licenses/npm/node_modules__@babel__traverse/LICENSE
+
+@babel/types 7.29.8 — MIT
+licenses/npm/node_modules__@babel__types/LICENSE
+
+@bramus/specificity 2.4.2 — MIT
+licenses/npm/node_modules__@bramus__specificity/LICENSE
+
+@chenglou/pretext 0.0.5 — MIT
+licenses/npm/node_modules__@chenglou__pretext/LICENSE
+
+@csstools/color-helpers 6.1.1 — MIT-0
+licenses/npm/node_modules__@csstools__color-helpers/LICENSE.md
+
+@csstools/css-calc 3.3.0 — MIT
+licenses/npm/node_modules__@csstools__css-calc/LICENSE.md
+
+@csstools/css-color-parser 4.2.0 — MIT
+licenses/npm/node_modules__@csstools__css-color-parser/LICENSE.md
+
+@csstools/css-parser-algorithms 4.0.0 — MIT
+licenses/npm/node_modules__@csstools__css-parser-algorithms/LICENSE.md
+
+@csstools/css-syntax-patches-for-csstree 1.1.8 — MIT-0
+licenses/npm/node_modules__@csstools__css-syntax-patches-for-csstree/LICENSE.md
+
+@csstools/css-tokenizer 4.0.0 — MIT
+licenses/npm/node_modules__@csstools__css-tokenizer/LICENSE.md
+
+@electron-internal/extract-zip 1.0.6 — MIT
+licenses/npm/node_modules__@electron-internal__extract-zip/LICENSE
+
+@electron/asar 3.4.1 — MIT
+licenses/npm/node_modules__@electron__asar/LICENSE.md
+
+balanced-match 1.0.2 — MIT
+licenses/npm/node_modules__@electron__asar__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 1.1.21 — MIT
+licenses/npm/node_modules__@electron__asar__node_modules__brace-expansion/LICENSE
+
+commander 5.1.0 — MIT
+licenses/npm/node_modules__@electron__asar__node_modules__commander/LICENSE
+
+minimatch 3.1.5 — ISC
+licenses/npm/node_modules__@electron__asar__node_modules__minimatch/LICENSE
+
+@electron/fuses 1.8.0 — MIT
+licenses/npm/node_modules__@electron__fuses/LICENSE
+
+fs-extra 9.1.0 — MIT
+licenses/npm/node_modules__@electron__fuses__node_modules__fs-extra/LICENSE
+
+@electron/get 5.1.0 — MIT
+licenses/npm/node_modules__@electron__get/LICENSE
+
+semver 7.8.5 — ISC
+licenses/npm/node_modules__@electron__get__node_modules__semver/LICENSE
+
+undici 7.30.1 — MIT
+licenses/npm/node_modules__@electron__get__node_modules__undici/LICENSE
+
+@electron/notarize 2.5.0 — MIT
+licenses/npm/node_modules__@electron__notarize/LICENSE
+
+fs-extra 9.1.0 — MIT
+licenses/npm/node_modules__@electron__notarize__node_modules__fs-extra/LICENSE
+
+@electron/osx-sign 1.3.3 — BSD-2-Clause
+licenses/npm/node_modules__@electron__osx-sign/LICENSE
+
+isbinaryfile 4.0.10 — MIT
+licenses/npm/node_modules__@electron__osx-sign__node_modules__isbinaryfile/LICENSE.txt
+
+@electron/rebuild 4.2.1 — MIT
+licenses/npm/node_modules__@electron__rebuild/LICENSE
+
+@electron/universal 2.0.3 — MIT
+licenses/npm/node_modules__@electron__universal/LICENSE
+
+balanced-match 1.0.2 — MIT
+licenses/npm/node_modules__@electron__universal__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 2.1.7 — MIT
+licenses/npm/node_modules__@electron__universal__node_modules__brace-expansion/LICENSE
+
+fs-extra 11.4.1 — MIT
+licenses/npm/node_modules__@electron__universal__node_modules__fs-extra/LICENSE
+
+minimatch 9.0.9 — ISC
+licenses/npm/node_modules__@electron__universal__node_modules__minimatch/LICENSE
+
+@electron/windows-sign 1.2.2 — BSD-2-Clause
+licenses/npm/node_modules__@electron__windows-sign/LICENSE
+
+fs-extra 11.4.1 — MIT
+licenses/npm/node_modules__@electron__windows-sign__node_modules__fs-extra/LICENSE
+
+@emnapi/runtime 1.11.3 — MIT
+licenses/npm/node_modules__@emnapi__runtime/LICENSE
+
+@esbuild/darwin-arm64 0.27.2 — MIT
+
+
+@exodus/bytes 1.15.1 — MIT
+licenses/npm/node_modules__@exodus__bytes/LICENSE
+
+@floating-ui/core 1.7.3 — MIT
+licenses/npm/node_modules__@floating-ui__core/LICENSE
+
+@floating-ui/dom 1.7.4 — MIT
+licenses/npm/node_modules__@floating-ui__dom/LICENSE
+
+@floating-ui/react-dom 2.1.6 — MIT
+licenses/npm/node_modules__@floating-ui__react-dom/LICENSE
+
+@floating-ui/utils 0.2.10 — MIT
+licenses/npm/node_modules__@floating-ui__utils/LICENSE
+
+@hono/node-server 2.1.5 — MIT
+licenses/npm/node_modules__@hono__node-server/LICENSE
+
+@hyperframes/core 0.8.198 — Apache-2.0
+licenses/npm/node_modules__@hyperframes__core/LICENSE
+
+@esbuild/darwin-arm64 0.28.2 — MIT
+
+
+esbuild 0.28.2 — MIT
+licenses/npm/node_modules__@hyperframes__core__node_modules__esbuild/LICENSE.md
+
+@hyperframes/engine 0.8.198 — Apache-2.0
+licenses/npm/node_modules__@hyperframes__engine/LICENSE
+
+@hyperframes/lint 0.8.198 — Apache-2.0
+licenses/npm/node_modules__@hyperframes__lint/LICENSE
+
+postcss-selector-parser 7.1.7 — MIT
+licenses/npm/node_modules__@hyperframes__lint__node_modules__postcss-selector-parser/LICENSE-MIT
+
+@hyperframes/parsers 0.8.198 — Apache-2.0
+licenses/npm/node_modules__@hyperframes__parsers/LICENSE
+
+entities 7.0.1 — BSD-2-Clause
+licenses/npm/node_modules__@hyperframes__parsers__node_modules__entities/LICENSE
+
+@hyperframes/producer 0.8.198 — Apache-2.0
+licenses/npm/node_modules__@hyperframes__producer/LICENSE
+
+@hyperframes/studio-server 0.8.198 — Apache-2.0
+licenses/npm/node_modules__@hyperframes__studio-server/LICENSE
+
+postcss-selector-parser 7.1.7 — MIT
+licenses/npm/node_modules__@hyperframes__studio-server__node_modules__postcss-selector-parser/LICENSE-MIT
+
+@img/colour 1.1.0 — MIT
+licenses/npm/node_modules__@img__colour/LICENSE.md
+
+@img/sharp-darwin-arm64 0.35.5 — Apache-2.0
+licenses/npm/node_modules__@img__sharp-darwin-arm64/LICENSE
+
+@img/sharp-libvips-darwin-arm64 1.3.4 — LGPL-3.0-or-later
+
+
+@img/sharp-wasm32 0.35.5 — Apache-2.0 AND LGPL-3.0-or-later AND MIT
+licenses/npm/node_modules__@img__sharp-wasm32/LICENSE
+
+@isaacs/fs-minipass 4.0.1 — ISC
+licenses/npm/node_modules__@isaacs__fs-minipass/LICENSE
+
+@jridgewell/gen-mapping 0.3.13 — MIT
+licenses/npm/node_modules__@jridgewell__gen-mapping/LICENSE
+
+@jridgewell/remapping 2.3.5 — MIT
+licenses/npm/node_modules__@jridgewell__remapping/LICENSE
+
+@jridgewell/resolve-uri 3.1.2 — MIT
+licenses/npm/node_modules__@jridgewell__resolve-uri/LICENSE
+
+@jridgewell/sourcemap-codec 1.5.5 — MIT
+licenses/npm/node_modules__@jridgewell__sourcemap-codec/LICENSE
+
+@jridgewell/trace-mapping 0.3.31 — MIT
+licenses/npm/node_modules__@jridgewell__trace-mapping/LICENSE
+
+@malept/cross-spawn-promise 2.0.0 — Apache-2.0
+licenses/npm/node_modules__@malept__cross-spawn-promise/LICENSE
+
+@malept/flatpak-bundler 0.4.0 — MIT
+licenses/npm/node_modules__@malept__flatpak-bundler/LICENSE
+
+fs-extra 9.1.0 — MIT
+licenses/npm/node_modules__@malept__flatpak-bundler__node_modules__fs-extra/LICENSE
+
+@noble/hashes 2.4.0 — MIT
+licenses/npm/node_modules__@noble__hashes/LICENSE
+
+@nodelib/fs.scandir 2.1.5 — MIT
+licenses/npm/node_modules__@nodelib__fs.scandir/LICENSE
+
+@nodelib/fs.stat 2.0.5 — MIT
+licenses/npm/node_modules__@nodelib__fs.stat/LICENSE
+
+@nodelib/fs.walk 1.2.8 — MIT
+licenses/npm/node_modules__@nodelib__fs.walk/LICENSE
+
+@peculiar/asn1-schema 2.11.1 — MIT
+licenses/npm/node_modules__@peculiar__asn1-schema/LICENSE
+
+@peculiar/json-schema 1.1.12 — MIT
+licenses/npm/node_modules__@peculiar__json-schema/LICENSE
+
+@peculiar/utils 2.0.3 — MIT
+licenses/npm/node_modules__@peculiar__utils/LICENSE
+
+@peculiar/webcrypto 1.7.1 — MIT
+licenses/npm/node_modules__@peculiar__webcrypto/LICENSE.md
+
+@puppeteer/browsers 3.2.6 — Apache-2.0
+
+
+@radix-ui/primitive 1.1.3 — MIT
+licenses/npm/node_modules__@radix-ui__primitive/LICENSE
+
+@radix-ui/react-arrow 1.1.7 — MIT
+licenses/npm/node_modules__@radix-ui__react-arrow/LICENSE
+
+@radix-ui/react-collection 1.1.7 — MIT
+licenses/npm/node_modules__@radix-ui__react-collection/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/node_modules__@radix-ui__react-collection__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-compose-refs 1.1.2 — MIT
+
+
+@radix-ui/react-context 1.1.2 — MIT
+
+
+@radix-ui/react-dialog 1.1.15 — MIT
+licenses/npm/node_modules__@radix-ui__react-dialog/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/node_modules__@radix-ui__react-dialog__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-direction 1.1.1 — MIT
+
+
+@radix-ui/react-dismissable-layer 1.1.11 — MIT
+licenses/npm/node_modules__@radix-ui__react-dismissable-layer/LICENSE
+
+@radix-ui/react-dropdown-menu 2.1.16 — MIT
+licenses/npm/node_modules__@radix-ui__react-dropdown-menu/LICENSE
+
+@radix-ui/react-focus-guards 1.1.3 — MIT
+licenses/npm/node_modules__@radix-ui__react-focus-guards/LICENSE
+
+@radix-ui/react-focus-scope 1.1.7 — MIT
+licenses/npm/node_modules__@radix-ui__react-focus-scope/LICENSE
+
+@radix-ui/react-id 1.1.1 — MIT
+
+
+@radix-ui/react-menu 2.1.16 — MIT
+licenses/npm/node_modules__@radix-ui__react-menu/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/node_modules__@radix-ui__react-menu__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-popper 1.2.8 — MIT
+licenses/npm/node_modules__@radix-ui__react-popper/LICENSE
+
+@radix-ui/react-portal 1.1.9 — MIT
+licenses/npm/node_modules__@radix-ui__react-portal/LICENSE
+
+@radix-ui/react-presence 1.1.5 — MIT
+licenses/npm/node_modules__@radix-ui__react-presence/LICENSE
+
+@radix-ui/react-primitive 2.1.3 — MIT
+licenses/npm/node_modules__@radix-ui__react-primitive/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/node_modules__@radix-ui__react-primitive__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-roving-focus 1.1.11 — MIT
+licenses/npm/node_modules__@radix-ui__react-roving-focus/LICENSE
+
+@radix-ui/react-use-callback-ref 1.1.1 — MIT
+
+
+@radix-ui/react-use-controllable-state 1.2.2 — MIT
+licenses/npm/node_modules__@radix-ui__react-use-controllable-state/LICENSE
+
+@radix-ui/react-use-effect-event 0.0.2 — MIT
+licenses/npm/node_modules__@radix-ui__react-use-effect-event/LICENSE
+
+@radix-ui/react-use-escape-keydown 1.1.1 — MIT
+
+
+@radix-ui/react-use-layout-effect 1.1.1 — MIT
+
+
+@radix-ui/react-use-rect 1.1.1 — MIT
+
+
+@radix-ui/react-use-size 1.1.1 — MIT
+
+
+@radix-ui/rect 1.1.1 — MIT
+
+
+@rolldown/pluginutils 1.0.0-beta.53 — MIT
+licenses/npm/node_modules__@rolldown__pluginutils/LICENSE
+
+@rollup/rollup-darwin-arm64 4.55.1 — MIT
+
+
+@sindresorhus/is 4.6.0 — MIT
+licenses/npm/node_modules__@sindresorhus__is/license
+
+@szmarczak/http-timer 4.0.6 — MIT
+licenses/npm/node_modules__@szmarczak__http-timer/LICENSE
+
+@types/babel__core 7.20.5 — MIT
+licenses/npm/node_modules__@types__babel__core/LICENSE
+
+@types/babel__generator 7.27.0 — MIT
+licenses/npm/node_modules__@types__babel__generator/LICENSE
+
+@types/babel__template 7.4.4 — MIT
+licenses/npm/node_modules__@types__babel__template/LICENSE
+
+@types/babel__traverse 7.28.0 — MIT
+licenses/npm/node_modules__@types__babel__traverse/LICENSE
+
+@types/cacheable-request 6.0.3 — MIT
+licenses/npm/node_modules__@types__cacheable-request/LICENSE
+
+@types/debug 4.1.13 — MIT
+licenses/npm/node_modules__@types__debug/LICENSE
+
+@types/estree 1.0.8 — MIT
+licenses/npm/node_modules__@types__estree/LICENSE
+
+@types/fs-extra 9.0.13 — MIT
+licenses/npm/node_modules__@types__fs-extra/LICENSE
+
+@types/http-cache-semantics 4.2.0 — MIT
+licenses/npm/node_modules__@types__http-cache-semantics/LICENSE
+
+@types/keyv 3.1.4 — MIT
+licenses/npm/node_modules__@types__keyv/LICENSE
+
+@types/ms 2.1.0 — MIT
+licenses/npm/node_modules__@types__ms/LICENSE
+
+@types/node 24.10.4 — MIT
+licenses/npm/node_modules__@types__node/LICENSE
+
+@types/react 19.2.7 — MIT
+licenses/npm/node_modules__@types__react/LICENSE
+
+@types/react-dom 19.2.3 — MIT
+licenses/npm/node_modules__@types__react-dom/LICENSE
+
+@types/responselike 1.0.3 — MIT
+licenses/npm/node_modules__@types__responselike/LICENSE
+
+@vitejs/plugin-react 5.1.2 — MIT
+licenses/npm/node_modules__@vitejs__plugin-react/LICENSE
+
+@xmldom/xmldom 0.8.15 — MIT
+licenses/npm/node_modules__@xmldom__xmldom/LICENSE
+
+abbrev 4.0.0 — ISC
+licenses/npm/node_modules__abbrev/LICENSE
+
+acorn 8.19.0 — MIT
+licenses/npm/node_modules__acorn/LICENSE
+
+acorn-walk 8.3.5 — MIT
+licenses/npm/node_modules__acorn-walk/LICENSE
+
+agent-base 7.1.4 — MIT
+licenses/npm/node_modules__agent-base/LICENSE
+
+ajv 8.20.0 — MIT
+licenses/npm/node_modules__ajv/LICENSE
+
+ansi-regex 6.4.0 — MIT
+licenses/npm/node_modules__ansi-regex/license
+
+ansi-styles 4.3.0 — MIT
+licenses/npm/node_modules__ansi-styles/license
+
+any-promise 1.3.0 — MIT
+licenses/npm/node_modules__any-promise/LICENSE
+
+anymatch 3.1.3 — ISC
+licenses/npm/node_modules__anymatch/LICENSE
+
+picomatch 2.3.1 — MIT
+licenses/npm/node_modules__anymatch__node_modules__picomatch/LICENSE
+
+app-builder-lib 26.15.3 — MIT
+
+
+@electron/get 3.1.0 — MIT
+licenses/npm/node_modules__app-builder-lib__node_modules__@electron__get/LICENSE
+
+fs-extra 8.1.0 — MIT
+licenses/npm/node_modules__app-builder-lib__node_modules__@electron__get__node_modules__fs-extra/LICENSE
+
+semver 6.3.1 — ISC
+licenses/npm/node_modules__app-builder-lib__node_modules__@electron__get__node_modules__semver/LICENSE
+
+ci-info 4.3.1 — MIT
+licenses/npm/node_modules__app-builder-lib__node_modules__ci-info/LICENSE
+
+env-paths 2.2.1 — MIT
+licenses/npm/node_modules__app-builder-lib__node_modules__env-paths/license
+
+jiti 2.7.0 — MIT
+licenses/npm/node_modules__app-builder-lib__node_modules__jiti/LICENSE
+
+jsonfile 4.0.0 — MIT
+licenses/npm/node_modules__app-builder-lib__node_modules__jsonfile/LICENSE
+
+semver 7.7.4 — ISC
+licenses/npm/node_modules__app-builder-lib__node_modules__semver/LICENSE
+
+universalify 0.1.2 — MIT
+licenses/npm/node_modules__app-builder-lib__node_modules__universalify/LICENSE
+
+arg 5.0.2 — MIT
+licenses/npm/node_modules__arg/LICENSE.md
+
+argparse 2.0.1 — Python-2.0
+licenses/npm/node_modules__argparse/LICENSE
+
+aria-hidden 1.2.6 — MIT
+licenses/npm/node_modules__aria-hidden/LICENSE
+
+asn1js 3.1.0 — BSD-3-Clause
+licenses/npm/node_modules__asn1js/LICENSE
+
+ast-types 0.16.3 — MIT
+licenses/npm/node_modules__ast-types/LICENSE
+
+async 3.2.6 — MIT
+licenses/npm/node_modules__async/LICENSE
+
+async-exit-hook 2.0.1 — MIT
+licenses/npm/node_modules__async-exit-hook/license
+
+asynckit 0.4.0 — MIT
+licenses/npm/node_modules__asynckit/LICENSE
+
+at-least-node 1.0.0 — ISC
+licenses/npm/node_modules__at-least-node/LICENSE
+
+autoprefixer 10.4.23 — MIT
+licenses/npm/node_modules__autoprefixer/LICENSE
+
+aws4 1.13.2 — MIT
+licenses/npm/node_modules__aws4/LICENSE
+
+balanced-match 4.0.4 — MIT
+licenses/npm/node_modules__balanced-match/LICENSE.md
+
+base64-js 1.5.1 — MIT
+licenses/npm/node_modules__base64-js/LICENSE
+
+baseline-browser-mapping 2.11.16 — Apache-2.0
+licenses/npm/node_modules__baseline-browser-mapping/LICENSE.txt
+
+bidi-js 1.0.3 — MIT
+licenses/npm/node_modules__bidi-js/LICENSE.txt
+
+binary-extensions 2.3.0 — MIT
+licenses/npm/node_modules__binary-extensions/license
+
+bluebird 3.7.2 — MIT
+licenses/npm/node_modules__bluebird/LICENSE
+
+boolbase 2.0.0 — ISC
+licenses/npm/node_modules__boolbase/LICENSE
+
+boolean 3.2.0 — MIT
+licenses/npm/node_modules__boolean/LICENSE.txt
+
+brace-expansion 5.0.12 — MIT
+licenses/npm/node_modules__brace-expansion/LICENSE
+
+braces 3.0.3 — MIT
+licenses/npm/node_modules__braces/LICENSE
+
+browserslist 4.28.8 — MIT
+licenses/npm/node_modules__browserslist/LICENSE
+
+buffer-from 1.1.2 — MIT
+licenses/npm/node_modules__buffer-from/LICENSE
+
+builder-util 26.15.3 — MIT
+licenses/npm/node_modules__builder-util/LICENSE
+
+builder-util-runtime 9.7.0 — MIT
+licenses/npm/node_modules__builder-util-runtime/LICENSE
+
+bytestreamjs 2.0.1 — BSD-3-Clause
+licenses/npm/node_modules__bytestreamjs/LICENSE
+
+cacheable-lookup 5.0.4 — MIT
+licenses/npm/node_modules__cacheable-lookup/LICENSE
+
+cacheable-request 7.0.4 — MIT
+licenses/npm/node_modules__cacheable-request/LICENSE
+
+call-bind-apply-helpers 1.0.2 — MIT
+licenses/npm/node_modules__call-bind-apply-helpers/LICENSE
+
+camelcase-css 2.0.1 — MIT
+licenses/npm/node_modules__camelcase-css/license
+
+caniuse-lite 1.0.30001809 — CC-BY-4.0
+licenses/npm/node_modules__caniuse-lite/LICENSE
+
+chalk 4.1.2 — MIT
+licenses/npm/node_modules__chalk/license
+
+chokidar 3.6.0 — MIT
+licenses/npm/node_modules__chokidar/LICENSE
+
+glob-parent 5.1.2 — ISC
+licenses/npm/node_modules__chokidar__node_modules__glob-parent/LICENSE
+
+chownr 3.0.0 — BlueOak-1.0.0
+licenses/npm/node_modules__chownr/LICENSE.md
+
+chromium-bidi 157.0.8090-0 — Apache-2.0
+licenses/npm/node_modules__chromium-bidi/LICENSE
+
+chromium-pickle-js 0.2.0 — MIT
+
+
+ci-info 4.4.0 — MIT
+licenses/npm/node_modules__ci-info/LICENSE
+
+cliui 9.0.1 — ISC
+licenses/npm/node_modules__cliui/LICENSE.txt
+
+string-width 7.2.0 — MIT
+licenses/npm/node_modules__cliui__node_modules__string-width/license
+
+clone-response 1.0.3 — MIT
+licenses/npm/node_modules__clone-response/LICENSE
+
+clsx 2.1.1 — MIT
+licenses/npm/node_modules__clsx/license
+
+color-convert 2.0.1 — MIT
+licenses/npm/node_modules__color-convert/LICENSE
+
+color-name 1.1.4 — MIT
+licenses/npm/node_modules__color-name/LICENSE
+
+combined-stream 1.0.8 — MIT
+licenses/npm/node_modules__combined-stream/License
+
+commander 4.1.1 — MIT
+licenses/npm/node_modules__commander/LICENSE
+
+compare-version 0.1.2 — MIT
+
+
+concat-map 0.0.1 — MIT
+licenses/npm/node_modules__concat-map/LICENSE
+
+convert-source-map 2.0.0 — MIT
+licenses/npm/node_modules__convert-source-map/LICENSE
+
+cookie 1.1.1 — MIT
+licenses/npm/node_modules__cookie/LICENSE
+
+core-util-is 1.0.3 — MIT
+licenses/npm/node_modules__core-util-is/LICENSE
+
+cross-dirname 0.1.0 — MIT
+
+
+cross-spawn 7.0.6 — MIT
+licenses/npm/node_modules__cross-spawn/LICENSE
+
+isexe 2.0.0 — ISC
+licenses/npm/node_modules__cross-spawn__node_modules__isexe/LICENSE
+
+which 2.0.2 — ISC
+licenses/npm/node_modules__cross-spawn__node_modules__which/LICENSE
+
+css-select 7.0.0 — BSD-2-Clause
+licenses/npm/node_modules__css-select/LICENSE
+
+dom-serializer 3.1.1 — MIT
+licenses/npm/node_modules__css-select__node_modules__dom-serializer/LICENSE
+
+domelementtype 3.0.0 — BSD-2-Clause
+licenses/npm/node_modules__css-select__node_modules__domelementtype/LICENSE
+
+domhandler 6.0.1 — BSD-2-Clause
+licenses/npm/node_modules__css-select__node_modules__domhandler/LICENSE
+
+domutils 4.0.2 — BSD-2-Clause
+licenses/npm/node_modules__css-select__node_modules__domutils/LICENSE
+
+css-tree 3.2.1 — MIT
+licenses/npm/node_modules__css-tree/LICENSE
+
+css-what 8.0.0 — BSD-2-Clause
+licenses/npm/node_modules__css-what/LICENSE
+
+cssesc 3.0.0 — MIT
+licenses/npm/node_modules__cssesc/LICENSE-MIT.txt
+
+csstype 3.2.3 — MIT
+licenses/npm/node_modules__csstype/LICENSE
+
+d3-array 3.2.4 — ISC
+licenses/npm/node_modules__d3-array/LICENSE
+
+d3-color 3.1.0 — ISC
+licenses/npm/node_modules__d3-color/LICENSE
+
+d3-ease 3.0.1 — BSD-3-Clause
+licenses/npm/node_modules__d3-ease/LICENSE
+
+d3-format 3.1.0 — ISC
+licenses/npm/node_modules__d3-format/LICENSE
+
+d3-interpolate 3.0.1 — ISC
+licenses/npm/node_modules__d3-interpolate/LICENSE
+
+d3-path 3.1.0 — ISC
+licenses/npm/node_modules__d3-path/LICENSE
+
+d3-scale 4.0.2 — ISC
+licenses/npm/node_modules__d3-scale/LICENSE
+
+d3-shape 3.2.0 — ISC
+licenses/npm/node_modules__d3-shape/LICENSE
+
+d3-time 3.1.0 — ISC
+licenses/npm/node_modules__d3-time/LICENSE
+
+d3-time-format 4.1.0 — ISC
+licenses/npm/node_modules__d3-time-format/LICENSE
+
+d3-timer 3.0.1 — ISC
+licenses/npm/node_modules__d3-timer/LICENSE
+
+data-urls 7.0.0 — MIT
+licenses/npm/node_modules__data-urls/LICENSE.txt
+
+whatwg-url 16.0.1 — MIT
+licenses/npm/node_modules__data-urls__node_modules__whatwg-url/LICENSE.txt
+
+debug 4.4.3 — MIT
+licenses/npm/node_modules__debug/LICENSE
+
+decimal.js 10.6.0 — MIT
+licenses/npm/node_modules__decimal.js/LICENCE.md
+
+decompress-response 6.0.0 — MIT
+licenses/npm/node_modules__decompress-response/license
+
+mimic-response 3.1.0 — MIT
+licenses/npm/node_modules__decompress-response__node_modules__mimic-response/license
+
+defer-to-connect 2.0.1 — MIT
+licenses/npm/node_modules__defer-to-connect/LICENSE
+
+define-data-property 1.1.4 — MIT
+licenses/npm/node_modules__define-data-property/LICENSE
+
+define-properties 1.2.1 — MIT
+licenses/npm/node_modules__define-properties/LICENSE
+
+delayed-stream 1.0.0 — MIT
+licenses/npm/node_modules__delayed-stream/License
+
+detect-libc 2.1.2 — Apache-2.0
+licenses/npm/node_modules__detect-libc/LICENSE
+
+detect-node 2.1.0 — MIT
+licenses/npm/node_modules__detect-node/LICENSE
+
+detect-node-es 1.1.0 — MIT
+licenses/npm/node_modules__detect-node-es/LICENSE
+
+devtools-protocol 0.0.1704951 — BSD-3-Clause
+licenses/npm/node_modules__devtools-protocol/LICENSE
+
+didyoumean 1.2.2 — Apache-2.0
+licenses/npm/node_modules__didyoumean/LICENSE
+
+dir-compare 4.2.0 — MIT
+licenses/npm/node_modules__dir-compare/LICENSE
+
+balanced-match 1.0.2 — MIT
+licenses/npm/node_modules__dir-compare__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 1.1.21 — MIT
+licenses/npm/node_modules__dir-compare__node_modules__brace-expansion/LICENSE
+
+minimatch 3.1.5 — ISC
+licenses/npm/node_modules__dir-compare__node_modules__minimatch/LICENSE
+
+dlv 1.1.3 — MIT
+
+
+dmg-builder 26.15.3 — MIT
+
+
+dom-serializer 2.0.0 — MIT
+licenses/npm/node_modules__dom-serializer/LICENSE
+
+entities 4.5.0 — BSD-2-Clause
+licenses/npm/node_modules__dom-serializer__node_modules__entities/LICENSE
+
+domelementtype 2.3.0 — BSD-2-Clause
+licenses/npm/node_modules__domelementtype/LICENSE
+
+domhandler 5.0.3 — BSD-2-Clause
+licenses/npm/node_modules__domhandler/LICENSE
+
+domutils 3.2.2 — BSD-2-Clause
+licenses/npm/node_modules__domutils/LICENSE
+
+dotenv 16.6.1 — BSD-2-Clause
+licenses/npm/node_modules__dotenv/LICENSE
+
+dotenv-expand 11.0.7 — BSD-2-Clause
+licenses/npm/node_modules__dotenv-expand/LICENSE
+
+dunder-proto 1.0.1 — MIT
+licenses/npm/node_modules__dunder-proto/LICENSE
+
+duplexer2 0.1.4 — BSD-3-Clause
+licenses/npm/node_modules__duplexer2/LICENSE.md
+
+ejs 3.1.10 — Apache-2.0
+licenses/npm/node_modules__ejs/LICENSE
+
+electron 41.10.7 — MIT
+licenses/npm/node_modules__electron/LICENSE
+
+electron-builder 26.15.3 — MIT
+licenses/npm/node_modules__electron-builder/LICENSE
+
+electron-builder-squirrel-windows 26.15.3 — MIT
+licenses/npm/node_modules__electron-builder-squirrel-windows/LICENSE
+
+ansi-regex 5.0.1 — MIT
+licenses/npm/node_modules__electron-builder__node_modules__ansi-regex/license
+
+cliui 8.0.1 — ISC
+licenses/npm/node_modules__electron-builder__node_modules__cliui/LICENSE.txt
+
+emoji-regex 8.0.0 — MIT
+licenses/npm/node_modules__electron-builder__node_modules__emoji-regex/LICENSE-MIT.txt
+
+string-width 4.2.3 — MIT
+licenses/npm/node_modules__electron-builder__node_modules__string-width/license
+
+strip-ansi 6.0.1 — MIT
+licenses/npm/node_modules__electron-builder__node_modules__strip-ansi/license
+
+wrap-ansi 7.0.0 — MIT
+licenses/npm/node_modules__electron-builder__node_modules__wrap-ansi/license
+
+yargs 17.7.3 — MIT
+licenses/npm/node_modules__electron-builder__node_modules__yargs/LICENSE
+
+yargs-parser 21.1.1 — ISC
+licenses/npm/node_modules__electron-builder__node_modules__yargs-parser/LICENSE.txt
+
+electron-publish 26.15.3 — MIT
+licenses/npm/node_modules__electron-publish/LICENSE
+
+electron-to-chromium 1.5.412 — ISC
+licenses/npm/node_modules__electron-to-chromium/LICENSE
+
+electron-winstaller 5.4.0 — MIT
+licenses/npm/node_modules__electron-winstaller/LICENSE
+
+fs-extra 7.0.1 — MIT
+licenses/npm/node_modules__electron-winstaller__node_modules__fs-extra/LICENSE
+
+jsonfile 4.0.0 — MIT
+licenses/npm/node_modules__electron-winstaller__node_modules__jsonfile/LICENSE
+
+universalify 0.1.2 — MIT
+licenses/npm/node_modules__electron-winstaller__node_modules__universalify/LICENSE
+
+emoji-regex 10.6.0 — MIT
+licenses/npm/node_modules__emoji-regex/LICENSE-MIT.txt
+
+end-of-stream 1.4.5 — MIT
+licenses/npm/node_modules__end-of-stream/LICENSE
+
+entities 8.0.0 — BSD-2-Clause
+licenses/npm/node_modules__entities/LICENSE
+
+env-paths 3.0.0 — MIT
+licenses/npm/node_modules__env-paths/license
+
+err-code 2.0.3 — MIT
+
+
+es-define-property 1.0.1 — MIT
+licenses/npm/node_modules__es-define-property/LICENSE
+
+es-errors 1.3.0 — MIT
+licenses/npm/node_modules__es-errors/LICENSE
+
+es-object-atoms 1.1.2 — MIT
+licenses/npm/node_modules__es-object-atoms/LICENSE
+
+es-set-tostringtag 2.1.0 — MIT
+licenses/npm/node_modules__es-set-tostringtag/LICENSE
+
+es6-error 4.1.1 — MIT
+licenses/npm/node_modules__es6-error/LICENSE.md
+
+esbuild 0.27.2 — MIT
+licenses/npm/node_modules__esbuild/LICENSE.md
+
+escalade 3.2.0 — MIT
+licenses/npm/node_modules__escalade/license
+
+escape-string-regexp 4.0.0 — MIT
+licenses/npm/node_modules__escape-string-regexp/license
+
+esprima 4.0.1 — BSD-2-Clause
+licenses/npm/node_modules__esprima/LICENSE.BSD
+
+exponential-backoff 3.1.3 — Apache-2.0
+licenses/npm/node_modules__exponential-backoff/LICENSE
+
+fast-deep-equal 3.1.3 — MIT
+licenses/npm/node_modules__fast-deep-equal/LICENSE
+
+fast-glob 3.3.3 — MIT
+licenses/npm/node_modules__fast-glob/LICENSE
+
+glob-parent 5.1.2 — ISC
+licenses/npm/node_modules__fast-glob__node_modules__glob-parent/LICENSE
+
+fast-uri 3.1.9 — BSD-3-Clause
+licenses/npm/node_modules__fast-uri/LICENSE
+
+fastq 1.20.1 — ISC
+licenses/npm/node_modules__fastq/LICENSE
+
+fdir 6.5.0 — MIT
+licenses/npm/node_modules__fdir/LICENSE
+
+filelist 1.0.6 — Apache-2.0
+
+
+balanced-match 1.0.2 — MIT
+licenses/npm/node_modules__filelist__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 2.1.7 — MIT
+licenses/npm/node_modules__filelist__node_modules__brace-expansion/LICENSE
+
+minimatch 5.1.9 — ISC
+licenses/npm/node_modules__filelist__node_modules__minimatch/LICENSE
+
+fill-range 7.1.1 — MIT
+licenses/npm/node_modules__fill-range/LICENSE
+
+form-data 4.0.6 — MIT
+licenses/npm/node_modules__form-data/License
+
+fraction.js 5.3.4 — MIT
+licenses/npm/node_modules__fraction.js/LICENSE
+
+fs-extra 10.1.0 — MIT
+licenses/npm/node_modules__fs-extra/LICENSE
+
+fs.realpath 1.0.0 — ISC
+licenses/npm/node_modules__fs.realpath/LICENSE
+
+fsevents 2.3.3 — MIT
+licenses/npm/node_modules__fsevents/LICENSE
+
+function-bind 1.1.2 — MIT
+licenses/npm/node_modules__function-bind/LICENSE
+
+gensync 1.0.0-beta.2 — MIT
+licenses/npm/node_modules__gensync/LICENSE
+
+get-caller-file 2.0.5 — ISC
+licenses/npm/node_modules__get-caller-file/LICENSE.md
+
+get-east-asian-width 1.7.0 — MIT
+licenses/npm/node_modules__get-east-asian-width/license
+
+get-intrinsic 1.3.0 — MIT
+licenses/npm/node_modules__get-intrinsic/LICENSE
+
+get-nonce 1.0.1 — MIT
+licenses/npm/node_modules__get-nonce/LICENSE
+
+get-proto 1.0.1 — MIT
+licenses/npm/node_modules__get-proto/LICENSE
+
+get-stream 5.2.0 — MIT
+licenses/npm/node_modules__get-stream/license
+
+glob 7.2.3 — ISC
+licenses/npm/node_modules__glob/LICENSE
+
+glob-parent 6.0.2 — ISC
+licenses/npm/node_modules__glob-parent/LICENSE
+
+balanced-match 1.0.2 — MIT
+licenses/npm/node_modules__glob__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 1.1.21 — MIT
+licenses/npm/node_modules__glob__node_modules__brace-expansion/LICENSE
+
+minimatch 3.1.5 — ISC
+licenses/npm/node_modules__glob__node_modules__minimatch/LICENSE
+
+global-agent 3.0.0 — BSD-3-Clause
+licenses/npm/node_modules__global-agent/LICENSE
+
+semver 7.8.5 — ISC
+licenses/npm/node_modules__global-agent__node_modules__semver/LICENSE
+
+globalthis 1.0.4 — MIT
+licenses/npm/node_modules__globalthis/LICENSE
+
+gopd 1.2.0 — MIT
+licenses/npm/node_modules__gopd/LICENSE
+
+got 11.8.6 — MIT
+licenses/npm/node_modules__got/license
+
+graceful-fs 4.2.11 — ISC
+licenses/npm/node_modules__graceful-fs/LICENSE
+
+has-flag 4.0.0 — MIT
+licenses/npm/node_modules__has-flag/license
+
+has-property-descriptors 1.0.2 — MIT
+licenses/npm/node_modules__has-property-descriptors/LICENSE
+
+has-symbols 1.1.0 — MIT
+licenses/npm/node_modules__has-symbols/LICENSE
+
+has-tostringtag 1.0.2 — MIT
+licenses/npm/node_modules__has-tostringtag/LICENSE
+
+hasown 2.0.4 — MIT
+licenses/npm/node_modules__hasown/LICENSE
+
+hono 4.13.14 — MIT
+licenses/npm/node_modules__hono/LICENSE
+
+hosted-git-info 4.1.0 — ISC
+licenses/npm/node_modules__hosted-git-info/LICENSE
+
+lru-cache 6.0.0 — ISC
+licenses/npm/node_modules__hosted-git-info__node_modules__lru-cache/LICENSE
+
+yallist 4.0.0 — ISC
+licenses/npm/node_modules__hosted-git-info__node_modules__yallist/LICENSE
+
+html-encoding-sniffer 6.0.0 — MIT
+licenses/npm/node_modules__html-encoding-sniffer/LICENSE.txt
+
+html-escaper 3.0.3 — MIT
+licenses/npm/node_modules__html-escaper/LICENSE.txt
+
+htmlparser2 10.1.0 — MIT
+licenses/npm/node_modules__htmlparser2/LICENSE
+
+entities 7.0.1 — BSD-2-Clause
+licenses/npm/node_modules__htmlparser2__node_modules__entities/LICENSE
+
+http-cache-semantics 4.3.0 — BSD-2-Clause
+licenses/npm/node_modules__http-cache-semantics/LICENSE
+
+http-proxy-agent 7.0.2 — MIT
+licenses/npm/node_modules__http-proxy-agent/LICENSE
+
+http2-wrapper 1.0.3 — MIT
+licenses/npm/node_modules__http2-wrapper/LICENSE
+
+https-proxy-agent 7.0.6 — MIT
+licenses/npm/node_modules__https-proxy-agent/LICENSE
+
+inflight 1.0.6 — ISC
+licenses/npm/node_modules__inflight/LICENSE
+
+inherits 2.0.4 — ISC
+licenses/npm/node_modules__inherits/LICENSE
+
+internmap 2.0.3 — ISC
+licenses/npm/node_modules__internmap/LICENSE
+
+is-binary-path 2.1.0 — MIT
+licenses/npm/node_modules__is-binary-path/license
+
+is-core-module 2.16.1 — MIT
+licenses/npm/node_modules__is-core-module/LICENSE
+
+is-extglob 2.1.1 — MIT
+licenses/npm/node_modules__is-extglob/LICENSE
+
+is-fullwidth-code-point 3.0.0 — MIT
+licenses/npm/node_modules__is-fullwidth-code-point/license
+
+is-glob 4.0.3 — MIT
+licenses/npm/node_modules__is-glob/LICENSE
+
+is-number 7.0.0 — MIT
+licenses/npm/node_modules__is-number/LICENSE
+
+is-potential-custom-element-name 1.0.1 — MIT
+licenses/npm/node_modules__is-potential-custom-element-name/LICENSE-MIT.txt
+
+isarray 1.0.0 — MIT
+
+
+isbinaryfile 5.0.7 — MIT
+licenses/npm/node_modules__isbinaryfile/LICENSE.txt
+
+isexe 3.1.5 — BlueOak-1.0.0
+licenses/npm/node_modules__isexe/LICENSE.md
+
+jake 10.9.4 — Apache-2.0
+
+
+jiti 1.21.7 — MIT
+licenses/npm/node_modules__jiti/LICENSE
+
+js-tokens 4.0.0 — MIT
+licenses/npm/node_modules__js-tokens/LICENSE
+
+js-yaml 4.3.2 — MIT
+licenses/npm/node_modules__js-yaml/LICENSE
+
+jsdom 30.0.1 — MIT
+licenses/npm/node_modules__jsdom/LICENSE.txt
+
+lru-cache 11.5.2 — BlueOak-1.0.0
+licenses/npm/node_modules__jsdom__node_modules__lru-cache/LICENSE.md
+
+jsesc 3.1.0 — MIT
+licenses/npm/node_modules__jsesc/LICENSE-MIT.txt
+
+json-buffer 3.0.1 — MIT
+licenses/npm/node_modules__json-buffer/LICENSE
+
+json-schema-traverse 1.0.0 — MIT
+licenses/npm/node_modules__json-schema-traverse/LICENSE
+
+json-stringify-safe 5.0.1 — ISC
+licenses/npm/node_modules__json-stringify-safe/LICENSE
+
+json5 2.2.3 — MIT
+licenses/npm/node_modules__json5/LICENSE.md
+
+jsonfile 6.2.1 — MIT
+licenses/npm/node_modules__jsonfile/LICENSE
+
+keyv 4.5.4 — MIT
+
+
+lazy-val 1.0.5 — MIT
+
+
+lilconfig 3.1.3 — MIT
+licenses/npm/node_modules__lilconfig/LICENSE
+
+lines-and-columns 1.2.4 — MIT
+licenses/npm/node_modules__lines-and-columns/LICENSE
+
+linkedom 0.18.14 — ISC
+licenses/npm/node_modules__linkedom/LICENSE
+
+lodash 4.18.1 — MIT
+licenses/npm/node_modules__lodash/LICENSE
+
+lowercase-keys 2.0.0 — MIT
+licenses/npm/node_modules__lowercase-keys/license
+
+lru-cache 5.1.1 — ISC
+licenses/npm/node_modules__lru-cache/LICENSE
+
+lucide-react 0.562.0 — ISC
+licenses/npm/node_modules__lucide-react/LICENSE
+
+magic-string 0.30.21 — MIT
+licenses/npm/node_modules__magic-string/LICENSE
+
+matcher 3.0.0 — MIT
+licenses/npm/node_modules__matcher/license
+
+math-intrinsics 1.1.0 — MIT
+licenses/npm/node_modules__math-intrinsics/LICENSE
+
+mdn-data 2.27.1 — CC0-1.0
+licenses/npm/node_modules__mdn-data/LICENSE
+
+merge2 1.4.1 — MIT
+licenses/npm/node_modules__merge2/LICENSE
+
+micromatch 4.0.8 — MIT
+licenses/npm/node_modules__micromatch/LICENSE
+
+picomatch 2.3.1 — MIT
+licenses/npm/node_modules__micromatch__node_modules__picomatch/LICENSE
+
+mime 2.6.0 — MIT
+licenses/npm/node_modules__mime/LICENSE
+
+mime-db 1.52.0 — MIT
+licenses/npm/node_modules__mime-db/LICENSE
+
+mime-types 2.1.35 — MIT
+licenses/npm/node_modules__mime-types/LICENSE
+
+mimic-response 1.0.1 — MIT
+licenses/npm/node_modules__mimic-response/license
+
+minimatch 10.2.6 — BlueOak-1.0.0
+licenses/npm/node_modules__minimatch/LICENSE.md
+
+minimist 1.2.8 — MIT
+licenses/npm/node_modules__minimist/LICENSE
+
+minipass 7.1.3 — BlueOak-1.0.0
+licenses/npm/node_modules__minipass/LICENSE.md
+
+minizlib 3.1.0 — MIT
+licenses/npm/node_modules__minizlib/LICENSE
+
+mitt 3.0.1 — MIT
+licenses/npm/node_modules__mitt/LICENSE
+
+mkdirp 0.5.6 — MIT
+licenses/npm/node_modules__mkdirp/LICENSE
+
+modern-tar 0.8.6 — MIT
+licenses/npm/node_modules__modern-tar/LICENSE
+
+ms 2.1.3 — MIT
+licenses/npm/node_modules__ms/license.md
+
+mz 2.7.0 — MIT
+licenses/npm/node_modules__mz/LICENSE
+
+nanoid 3.3.20 — MIT
+licenses/npm/node_modules__nanoid/LICENSE
+
+node-abi 4.40.0 — MIT
+licenses/npm/node_modules__node-abi/LICENSE
+
+semver 7.8.5 — ISC
+licenses/npm/node_modules__node-abi__node_modules__semver/LICENSE
+
+node-api-version 0.2.1 — MIT
+
+
+semver 7.8.5 — ISC
+licenses/npm/node_modules__node-api-version__node_modules__semver/LICENSE
+
+node-gyp 12.4.0 — MIT
+licenses/npm/node_modules__node-gyp/LICENSE
+
+env-paths 2.2.1 — MIT
+licenses/npm/node_modules__node-gyp__node_modules__env-paths/license
+
+isexe 4.0.0 — BlueOak-1.0.0
+licenses/npm/node_modules__node-gyp__node_modules__isexe/LICENSE.md
+
+semver 7.8.5 — ISC
+licenses/npm/node_modules__node-gyp__node_modules__semver/LICENSE
+
+undici 6.29.1 — MIT
+licenses/npm/node_modules__node-gyp__node_modules__undici/LICENSE
+
+which 6.0.1 — ISC
+licenses/npm/node_modules__node-gyp__node_modules__which/LICENSE
+
+node-int64 0.4.0 — MIT
+licenses/npm/node_modules__node-int64/LICENSE
+
+node-releases 2.0.53 — MIT
+licenses/npm/node_modules__node-releases/LICENSE
+
+nopt 9.0.0 — ISC
+licenses/npm/node_modules__nopt/LICENSE
+
+normalize-path 3.0.0 — MIT
+licenses/npm/node_modules__normalize-path/LICENSE
+
+normalize-url 6.1.0 — MIT
+licenses/npm/node_modules__normalize-url/license
+
+nth-check 3.0.1 — BSD-2-Clause
+licenses/npm/node_modules__nth-check/LICENSE
+
+object-assign 4.1.1 — MIT
+licenses/npm/node_modules__object-assign/license
+
+object-hash 3.0.0 — MIT
+licenses/npm/node_modules__object-hash/LICENSE
+
+object-keys 1.1.1 — MIT
+licenses/npm/node_modules__object-keys/LICENSE
+
+once 1.4.0 — ISC
+licenses/npm/node_modules__once/LICENSE
+
+p-cancelable 2.1.1 — MIT
+licenses/npm/node_modules__p-cancelable/license
+
+p-limit 3.1.0 — MIT
+licenses/npm/node_modules__p-limit/license
+
+parse5 8.0.1 — MIT
+licenses/npm/node_modules__parse5/LICENSE
+
+path-is-absolute 1.0.1 — MIT
+licenses/npm/node_modules__path-is-absolute/license
+
+path-key 3.1.1 — MIT
+licenses/npm/node_modules__path-key/license
+
+path-parse 1.0.7 — MIT
+licenses/npm/node_modules__path-parse/LICENSE
+
+pe-library 0.4.1 — MIT
+licenses/npm/node_modules__pe-library/LICENSE
+
+picocolors 1.1.1 — ISC
+licenses/npm/node_modules__picocolors/LICENSE
+
+picomatch 4.0.3 — MIT
+licenses/npm/node_modules__picomatch/LICENSE
+
+pify 2.3.0 — MIT
+licenses/npm/node_modules__pify/license
+
+pirates 4.0.7 — MIT
+licenses/npm/node_modules__pirates/LICENSE
+
+pkijs 3.4.3 — BSD-3-Clause
+licenses/npm/node_modules__pkijs/LICENSE
+
+@noble/hashes 1.8.0 — MIT
+licenses/npm/node_modules__pkijs__node_modules__@noble__hashes/LICENSE
+
+playwright-core 1.63.0 — Apache-2.0
+licenses/npm/node_modules__playwright-core/LICENSE
+licenses/npm/node_modules__playwright-core/NOTICE
+
+plist 3.1.0 — MIT
+licenses/npm/node_modules__plist/LICENSE
+
+postcss 8.5.31 — MIT
+licenses/npm/node_modules__postcss/LICENSE
+
+postcss-import 15.1.0 — MIT
+licenses/npm/node_modules__postcss-import/LICENSE
+
+postcss-js 4.1.0 — MIT
+licenses/npm/node_modules__postcss-js/LICENSE
+
+postcss-load-config 6.0.1 — MIT
+licenses/npm/node_modules__postcss-load-config/LICENSE
+
+postcss-nested 6.2.0 — MIT
+licenses/npm/node_modules__postcss-nested/LICENSE
+
+postcss-selector-parser 6.1.2 — MIT
+licenses/npm/node_modules__postcss-selector-parser/LICENSE-MIT
+
+postcss-value-parser 4.2.0 — MIT
+licenses/npm/node_modules__postcss-value-parser/LICENSE
+
+postject 1.0.0-alpha.6 — MIT
+licenses/npm/node_modules__postject/LICENSE
+
+commander 9.5.0 — MIT
+licenses/npm/node_modules__postject__node_modules__commander/LICENSE
+
+proc-log 6.1.0 — ISC
+licenses/npm/node_modules__proc-log/LICENSE
+
+process-nextick-args 2.0.1 — MIT
+licenses/npm/node_modules__process-nextick-args/license.md
+
+progress 2.0.3 — MIT
+licenses/npm/node_modules__progress/LICENSE
+
+promise-retry 2.0.1 — MIT
+licenses/npm/node_modules__promise-retry/LICENSE
+
+proper-lockfile 4.1.2 — MIT
+licenses/npm/node_modules__proper-lockfile/LICENSE
+
+pump 3.0.4 — MIT
+licenses/npm/node_modules__pump/LICENSE
+
+punycode 2.3.1 — MIT
+licenses/npm/node_modules__punycode/LICENSE-MIT.txt
+
+puppeteer 25.16.0 — Apache-2.0
+
+
+puppeteer-core 25.16.0 — Apache-2.0
+
+
+pvtsutils 1.3.6 — MIT
+licenses/npm/node_modules__pvtsutils/LICENSE
+
+pvutils 1.2.0 — MIT
+licenses/npm/node_modules__pvutils/LICENSE
+
+queue-microtask 1.2.3 — MIT
+licenses/npm/node_modules__queue-microtask/LICENSE
+
+quick-lru 5.1.1 — MIT
+licenses/npm/node_modules__quick-lru/license
+
+react 19.2.3 — MIT
+licenses/npm/node_modules__react/LICENSE
+
+react-dom 19.2.3 — MIT
+licenses/npm/node_modules__react-dom/LICENSE
+
+react-refresh 0.18.0 — MIT
+licenses/npm/node_modules__react-refresh/LICENSE
+
+react-remove-scroll 2.7.2 — MIT
+licenses/npm/node_modules__react-remove-scroll/LICENSE
+
+react-remove-scroll-bar 2.3.8 — MIT
+
+
+react-router 7.18.2 — MIT
+licenses/npm/node_modules__react-router/LICENSE.md
+
+react-style-singleton 2.2.3 — MIT
+licenses/npm/node_modules__react-style-singleton/LICENSE
+
+read-binary-file-arch 1.0.6 — MIT
+
+
+read-cache 1.0.0 — MIT
+licenses/npm/node_modules__read-cache/LICENSE
+
+readable-stream 2.3.8 — MIT
+licenses/npm/node_modules__readable-stream/LICENSE
+
+readdirp 3.6.0 — MIT
+licenses/npm/node_modules__readdirp/LICENSE
+
+picomatch 2.3.1 — MIT
+licenses/npm/node_modules__readdirp__node_modules__picomatch/LICENSE
+
+recast 0.23.21 — MIT
+licenses/npm/node_modules__recast/LICENSE
+
+require-directory 2.1.1 — MIT
+licenses/npm/node_modules__require-directory/LICENSE
+
+require-from-string 2.0.2 — MIT
+licenses/npm/node_modules__require-from-string/license
+
+resedit 1.7.2 — MIT
+licenses/npm/node_modules__resedit/LICENSE
+
+resolve 1.22.11 — MIT
+licenses/npm/node_modules__resolve/LICENSE
+
+resolve-alpn 1.2.1 — MIT
+licenses/npm/node_modules__resolve-alpn/LICENSE
+
+responselike 2.0.1 — MIT
+licenses/npm/node_modules__responselike/LICENSE
+
+retry 0.12.0 — MIT
+licenses/npm/node_modules__retry/License
+
+reusify 1.1.0 — MIT
+licenses/npm/node_modules__reusify/LICENSE
+
+rimraf 2.6.3 — ISC
+licenses/npm/node_modules__rimraf/LICENSE
+
+roarr 2.15.4 — BSD-3-Clause
+licenses/npm/node_modules__roarr/LICENSE
+
+rollup 4.55.1 — MIT
+licenses/npm/node_modules__rollup/LICENSE.md
+
+run-parallel 1.2.0 — MIT
+licenses/npm/node_modules__run-parallel/LICENSE
+
+safe-buffer 5.1.2 — MIT
+licenses/npm/node_modules__safe-buffer/LICENSE
+
+sanitize-filename 1.6.4 — WTFPL OR ISC
+licenses/npm/node_modules__sanitize-filename/LICENSE.md
+
+sax 1.6.1 — BlueOak-1.0.0
+licenses/npm/node_modules__sax/LICENSE.md
+
+saxes 6.0.0 — ISC
+
+
+scheduler 0.27.0 — MIT
+licenses/npm/node_modules__scheduler/LICENSE
+
+semver 6.3.1 — ISC
+licenses/npm/node_modules__semver/LICENSE
+
+semver-compare 1.0.0 — MIT
+licenses/npm/node_modules__semver-compare/LICENSE
+
+serialize-error 7.0.1 — MIT
+licenses/npm/node_modules__serialize-error/license
+
+set-cookie-parser 2.7.2 — MIT
+licenses/npm/node_modules__set-cookie-parser/LICENSE
+
+sharp 0.35.5 — Apache-2.0
+licenses/npm/node_modules__sharp/LICENSE
+
+semver 7.8.5 — ISC
+licenses/npm/node_modules__sharp__node_modules__semver/LICENSE
+
+shebang-command 2.0.0 — MIT
+licenses/npm/node_modules__shebang-command/license
+
+shebang-regex 3.0.0 — MIT
+licenses/npm/node_modules__shebang-regex/license
+
+signal-exit 3.0.7 — ISC
+licenses/npm/node_modules__signal-exit/LICENSE.txt
+
+simple-update-notifier 2.0.0 — MIT
+licenses/npm/node_modules__simple-update-notifier/LICENSE
+
+semver 7.8.5 — ISC
+licenses/npm/node_modules__simple-update-notifier__node_modules__semver/LICENSE
+
+sonner 2.0.7 — MIT
+licenses/npm/node_modules__sonner/LICENSE.md
+
+source-map 0.6.1 — BSD-3-Clause
+licenses/npm/node_modules__source-map/LICENSE
+
+source-map-js 1.2.2 — BSD-3-Clause
+licenses/npm/node_modules__source-map-js/LICENSE
+
+source-map-support 0.5.21 — MIT
+licenses/npm/node_modules__source-map-support/LICENSE.md
+
+sprintf-js 1.1.3 — BSD-3-Clause
+licenses/npm/node_modules__sprintf-js/LICENSE
+
+stat-mode 1.0.0 — MIT
+licenses/npm/node_modules__stat-mode/LICENSE
+
+string_decoder 1.1.1 — MIT
+licenses/npm/node_modules__string_decoder/LICENSE
+
+string-width 8.3.0 — MIT
+licenses/npm/node_modules__string-width/license
+
+strip-ansi 7.2.0 — MIT
+licenses/npm/node_modules__strip-ansi/license
+
+sucrase 3.35.1 — MIT
+licenses/npm/node_modules__sucrase/LICENSE
+
+sumchecker 3.0.1 — Apache-2.0
+licenses/npm/node_modules__sumchecker/LICENSE
+
+supports-color 7.2.0 — MIT
+licenses/npm/node_modules__supports-color/license
+
+supports-preserve-symlinks-flag 1.0.0 — MIT
+licenses/npm/node_modules__supports-preserve-symlinks-flag/LICENSE
+
+symbol-tree 3.2.4 — MIT
+licenses/npm/node_modules__symbol-tree/LICENSE
+
+tailwind-merge 3.4.0 — MIT
+licenses/npm/node_modules__tailwind-merge/LICENSE.md
+
+tailwindcss 3.4.19 — MIT
+licenses/npm/node_modules__tailwindcss/LICENSE
+
+tailwindcss-animate 1.0.7 — MIT
+licenses/npm/node_modules__tailwindcss-animate/LICENSE
+
+tar 7.5.22 — BlueOak-1.0.0
+licenses/npm/node_modules__tar/LICENSE.md
+
+yallist 5.0.0 — BlueOak-1.0.0
+licenses/npm/node_modules__tar__node_modules__yallist/LICENSE.md
+
+temp 0.9.4 — MIT
+licenses/npm/node_modules__temp/LICENSE
+
+temp-file 3.4.0 — MIT
+
+
+thenify 3.3.1 — MIT
+licenses/npm/node_modules__thenify/LICENSE
+
+thenify-all 1.6.0 — MIT
+licenses/npm/node_modules__thenify-all/LICENSE
+
+three 0.180.0 — MIT
+licenses/npm/node_modules__three/LICENSE
+
+tiny-async-pool 1.3.0 — MIT
+licenses/npm/node_modules__tiny-async-pool/LICENSE-MIT
+
+semver 5.7.2 — ISC
+licenses/npm/node_modules__tiny-async-pool__node_modules__semver/LICENSE
+
+tiny-invariant 1.3.3 — MIT
+licenses/npm/node_modules__tiny-invariant/LICENSE
+
+tinyglobby 0.2.15 — MIT
+licenses/npm/node_modules__tinyglobby/LICENSE
+
+tldts 7.4.10 — MIT
+licenses/npm/node_modules__tldts/LICENSE
+
+tldts-core 7.4.10 — MIT
+licenses/npm/node_modules__tldts-core/LICENSE
+
+tmp 0.2.7 — MIT
+licenses/npm/node_modules__tmp/LICENSE
+
+tmp-promise 3.0.3 — MIT
+
+
+to-regex-range 5.0.1 — MIT
+licenses/npm/node_modules__to-regex-range/LICENSE
+
+tough-cookie 6.0.2 — BSD-3-Clause
+licenses/npm/node_modules__tough-cookie/LICENSE
+
+tr46 6.0.0 — MIT
+licenses/npm/node_modules__tr46/LICENSE.md
+
+truncate-utf8-bytes 1.0.2 — WTFPL
+
+
+ts-interface-checker 0.1.13 — Apache-2.0
+licenses/npm/node_modules__ts-interface-checker/LICENSE
+
+tslib 2.8.1 — 0BSD
+licenses/npm/node_modules__tslib/LICENSE.txt
+
+type-fest 0.13.1 — (MIT OR CC0-1.0)
+licenses/npm/node_modules__type-fest/license
+
+typed-query-selector 2.12.3 — MIT
+licenses/npm/node_modules__typed-query-selector/LICENSE
+
+typescript 5.9.3 — Apache-2.0
+licenses/npm/node_modules__typescript/LICENSE.txt
+
+uhyphen 0.2.0 — ISC
+licenses/npm/node_modules__uhyphen/LICENSE
+
+undici 8.10.0 — MIT
+licenses/npm/node_modules__undici/LICENSE
+
+undici-types 7.16.0 — MIT
+licenses/npm/node_modules__undici-types/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/node_modules__universalify/LICENSE
+
+unzipper 0.12.5 — MIT
+licenses/npm/node_modules__unzipper/LICENSE
+
+fs-extra 11.3.1 — MIT
+licenses/npm/node_modules__unzipper__node_modules__fs-extra/LICENSE
+
+update-browserslist-db 1.3.1 — MIT
+licenses/npm/node_modules__update-browserslist-db/LICENSE
+
+use-callback-ref 1.3.3 — MIT
+licenses/npm/node_modules__use-callback-ref/LICENSE
+
+use-sidecar 1.1.3 — MIT
+licenses/npm/node_modules__use-sidecar/LICENSE
+
+utf8-byte-length 1.0.5 — (WTFPL OR MIT)
+licenses/npm/node_modules__utf8-byte-length/LICENSE.MIT.txt
+licenses/npm/node_modules__utf8-byte-length/LICENSE.WTFPL.txt
+
+util-deprecate 1.0.2 — MIT
+licenses/npm/node_modules__util-deprecate/LICENSE
+
+vite 7.3.0 — MIT
+licenses/npm/node_modules__vite/LICENSE.md
+
+w3c-xmlserializer 5.0.0 — MIT
+licenses/npm/node_modules__w3c-xmlserializer/LICENSE.md
+
+wawoff2 2.0.1 — MIT
+licenses/npm/node_modules__wawoff2/LICENSE
+
+webcrypto-core 1.9.2 — MIT
+licenses/npm/node_modules__webcrypto-core/LICENSE
+
+webdriver-bidi-protocol 1.0.1 — Apache-2.0
+licenses/npm/node_modules__webdriver-bidi-protocol/LICENSE
+
+webidl-conversions 8.0.1 — BSD-2-Clause
+licenses/npm/node_modules__webidl-conversions/LICENSE.md
+
+whatwg-mimetype 5.0.0 — MIT
+licenses/npm/node_modules__whatwg-mimetype/LICENSE.txt
+
+whatwg-url 17.1.0 — MIT
+licenses/npm/node_modules__whatwg-url/LICENSE.txt
+
+which 5.0.0 — ISC
+licenses/npm/node_modules__which/LICENSE
+
+wrap-ansi 9.0.2 — MIT
+licenses/npm/node_modules__wrap-ansi/license
+
+ansi-styles 6.2.3 — MIT
+licenses/npm/node_modules__wrap-ansi__node_modules__ansi-styles/license
+
+string-width 7.2.0 — MIT
+licenses/npm/node_modules__wrap-ansi__node_modules__string-width/license
+
+wrappy 1.0.2 — ISC
+licenses/npm/node_modules__wrappy/LICENSE
+
+ws 8.22.0 — MIT
+licenses/npm/node_modules__ws/LICENSE
+
+xml-name-validator 5.0.0 — Apache-2.0
+licenses/npm/node_modules__xml-name-validator/LICENSE.txt
+
+xmlbuilder 15.1.1 — MIT
+licenses/npm/node_modules__xmlbuilder/LICENSE
+
+xmlchars 2.2.0 — MIT
+licenses/npm/node_modules__xmlchars/LICENSE
+
+y18n 5.0.8 — ISC
+licenses/npm/node_modules__y18n/LICENSE
+
+yallist 3.1.1 — ISC
+licenses/npm/node_modules__yallist/LICENSE
+
+yargs 18.2.0 — MIT
+licenses/npm/node_modules__yargs/LICENSE
+
+yargs-parser 22.0.0 — ISC
+licenses/npm/node_modules__yargs-parser/LICENSE.txt
+
+yocto-queue 0.1.0 — MIT
+licenses/npm/node_modules__yocto-queue/license
+
+zod 4.6.7 — MIT
+licenses/npm/node_modules__zod/LICENSE
+
+@actions/core 3.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@actions__core/LICENSE.md
+
+@actions/exec 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@actions__exec/LICENSE.md
+
+@actions/github 9.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@actions__github/LICENSE.md
+
+@actions/http-client 3.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@actions__github__node_modules__@actions__http-client/LICENSE
+
+undici 6.27.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@actions__github__node_modules__undici/LICENSE
+
+@actions/http-client 4.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@actions__http-client/LICENSE
+
+undici 6.27.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@actions__http-client__node_modules__undici/LICENSE
+
+@actions/io 3.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@actions__io/LICENSE.md
+
+@adobe/css-tools 4.4.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__@adobe__css-tools/LICENSE
+
+@alloc/quick-lru 5.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@alloc__quick-lru/license
+
+@anthropic-ai/sdk 0.103.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@anthropic-ai__sdk/LICENSE
+
+@asamuzakjp/css-color 5.1.11 — MIT
+licenses/npm/vendor__openscreen__node_modules__@asamuzakjp__css-color/LICENSE
+
+@asamuzakjp/dom-selector 7.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@asamuzakjp__dom-selector/LICENSE
+
+@asamuzakjp/generational-cache 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@asamuzakjp__generational-cache/LICENSE
+
+@asamuzakjp/nwsapi 2.3.9 — MIT
+licenses/npm/vendor__openscreen__node_modules__@asamuzakjp__nwsapi/LICENSE
+
+@babel/code-frame 7.29.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__code-frame/LICENSE
+
+@babel/compat-data 7.29.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__compat-data/LICENSE
+
+@babel/core 7.29.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__core/LICENSE
+
+@babel/generator 7.29.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__generator/LICENSE
+
+@babel/helper-compilation-targets 7.28.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helper-compilation-targets/LICENSE
+
+@babel/helper-globals 7.28.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helper-globals/LICENSE
+
+@babel/helper-module-imports 7.28.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helper-module-imports/LICENSE
+
+@babel/helper-module-transforms 7.28.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helper-module-transforms/LICENSE
+
+@babel/helper-plugin-utils 7.28.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helper-plugin-utils/LICENSE
+
+@babel/helper-string-parser 7.27.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helper-string-parser/LICENSE
+
+@babel/helper-validator-identifier 7.28.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helper-validator-identifier/LICENSE
+
+@babel/helper-validator-option 7.27.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helper-validator-option/LICENSE
+
+@babel/helpers 7.29.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__helpers/LICENSE
+
+@babel/parser 7.29.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__parser/LICENSE
+
+@babel/plugin-transform-react-jsx-self 7.27.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__plugin-transform-react-jsx-self/LICENSE
+
+@babel/plugin-transform-react-jsx-source 7.27.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__plugin-transform-react-jsx-source/LICENSE
+
+@babel/runtime 7.29.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__runtime/LICENSE
+
+@babel/template 7.28.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__template/LICENSE
+
+@babel/traverse 7.29.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__traverse/LICENSE
+
+@babel/types 7.29.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@babel__types/LICENSE
+
+@biomejs/biome 2.4.12 — MIT OR Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__@biomejs__biome/LICENSE-APACHE
+licenses/npm/vendor__openscreen__node_modules__@biomejs__biome/LICENSE-MIT
+
+@biomejs/cli-darwin-arm64 2.4.12 — MIT OR Apache-2.0
+
+
+@bramus/specificity 2.4.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@bramus__specificity/LICENSE
+
+@cfworker/json-schema 4.1.1 — MIT
+
+
+@csstools/color-helpers 6.0.2 — MIT-0
+licenses/npm/vendor__openscreen__node_modules__@csstools__color-helpers/LICENSE.md
+
+@csstools/css-calc 3.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@csstools__css-calc/LICENSE.md
+
+@csstools/css-color-parser 4.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@csstools__css-color-parser/LICENSE.md
+
+@csstools/css-parser-algorithms 4.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@csstools__css-parser-algorithms/LICENSE.md
+
+@csstools/css-syntax-patches-for-csstree 1.1.3 — MIT-0
+licenses/npm/vendor__openscreen__node_modules__@csstools__css-syntax-patches-for-csstree/LICENSE.md
+
+@csstools/css-tokenizer 4.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@csstools__css-tokenizer/LICENSE.md
+
+@electron/asar 3.4.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__asar/LICENSE.md
+
+balanced-match 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__asar__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 1.1.18 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__asar__node_modules__brace-expansion/LICENSE
+
+minimatch 3.1.5 — ISC
+licenses/npm/vendor__openscreen__node_modules__@electron__asar__node_modules__minimatch/LICENSE
+
+@electron/fuses 1.8.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__fuses/LICENSE
+
+fs-extra 9.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__fuses__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__fuses__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__fuses__node_modules__universalify/LICENSE
+
+@electron/get 2.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__get/LICENSE
+
+@electron/notarize 2.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__notarize/LICENSE
+
+fs-extra 9.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__notarize__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__notarize__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__notarize__node_modules__universalify/LICENSE
+
+@electron/osx-sign 1.3.3 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__@electron__osx-sign/LICENSE
+
+fs-extra 10.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__osx-sign__node_modules__fs-extra/LICENSE
+
+isbinaryfile 4.0.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__osx-sign__node_modules__isbinaryfile/LICENSE.txt
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__osx-sign__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__osx-sign__node_modules__universalify/LICENSE
+
+@electron/rebuild 4.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__rebuild/LICENSE
+
+@electron/universal 2.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__universal/LICENSE
+
+balanced-match 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__universal__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 2.1.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__universal__node_modules__brace-expansion/LICENSE
+
+fs-extra 11.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__universal__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__universal__node_modules__jsonfile/LICENSE
+
+minimatch 9.0.9 — ISC
+licenses/npm/vendor__openscreen__node_modules__@electron__universal__node_modules__minimatch/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__universal__node_modules__universalify/LICENSE
+
+@electron/windows-sign 1.2.2 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__@electron__windows-sign/LICENSE
+
+fs-extra 11.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__windows-sign__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__windows-sign__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@electron__windows-sign__node_modules__universalify/LICENSE
+
+@esbuild/darwin-arm64 0.28.1 — MIT
+
+
+@exodus/bytes 1.15.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@exodus__bytes/LICENSE
+
+@fix-webm-duration/fix 1.0.1 — MIT
+
+
+@fix-webm-duration/parser 1.0.1 — MIT
+
+
+@floating-ui/core 1.7.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__@floating-ui__core/LICENSE
+
+@floating-ui/dom 1.7.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@floating-ui__dom/LICENSE
+
+@floating-ui/react-dom 2.1.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__@floating-ui__react-dom/LICENSE
+
+@floating-ui/utils 0.2.11 — MIT
+licenses/npm/vendor__openscreen__node_modules__@floating-ui__utils/LICENSE
+
+@isaacs/fs-minipass 4.0.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__@isaacs__fs-minipass/LICENSE
+
+@jridgewell/gen-mapping 0.3.13 — MIT
+licenses/npm/vendor__openscreen__node_modules__@jridgewell__gen-mapping/LICENSE
+
+@jridgewell/remapping 2.3.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__@jridgewell__remapping/LICENSE
+
+@jridgewell/resolve-uri 3.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@jridgewell__resolve-uri/LICENSE
+
+@jridgewell/source-map 0.3.11 — MIT
+licenses/npm/vendor__openscreen__node_modules__@jridgewell__source-map/LICENSE
+
+@jridgewell/sourcemap-codec 1.5.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__@jridgewell__sourcemap-codec/LICENSE
+
+@jridgewell/trace-mapping 0.3.31 — MIT
+licenses/npm/vendor__openscreen__node_modules__@jridgewell__trace-mapping/LICENSE
+
+@langchain/anthropic 1.5.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__anthropic/LICENSE
+
+@langchain/core 1.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__core/LICENSE
+
+@langchain/langgraph 1.4.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__langgraph/LICENSE
+
+@langchain/langgraph-checkpoint 1.1.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__langgraph-checkpoint/LICENSE
+
+@langchain/langgraph-sdk 1.9.25 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__langgraph-sdk/LICENSE
+
+eventemitter3 5.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__langgraph-sdk__node_modules__eventemitter3/LICENSE
+
+p-queue 9.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__langgraph-sdk__node_modules__p-queue/license
+
+p-timeout 7.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__langgraph-sdk__node_modules__p-timeout/license
+
+@langchain/mistralai 1.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__mistralai/LICENSE
+
+@langchain/openai 1.5.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__openai/LICENSE
+
+@langchain/protocol 0.0.18 — MIT
+licenses/npm/vendor__openscreen__node_modules__@langchain__protocol/LICENSE
+
+@malept/cross-spawn-promise 2.0.0 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__@malept__cross-spawn-promise/LICENSE
+
+@malept/flatpak-bundler 0.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@malept__flatpak-bundler/LICENSE
+
+fs-extra 9.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@malept__flatpak-bundler__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@malept__flatpak-bundler__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@malept__flatpak-bundler__node_modules__universalify/LICENSE
+
+@mistralai/mistralai 2.2.1 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__@mistralai__mistralai/LICENSE
+
+@noble/hashes 2.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@noble__hashes/LICENSE
+
+@nodelib/fs.scandir 2.1.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__@nodelib__fs.scandir/LICENSE
+
+@nodelib/fs.stat 2.0.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__@nodelib__fs.stat/LICENSE
+
+@nodelib/fs.walk 1.2.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__@nodelib__fs.walk/LICENSE
+
+@octokit/auth-token 6.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__auth-token/LICENSE
+
+@octokit/core 7.0.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__core/LICENSE
+
+@octokit/endpoint 11.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__endpoint/LICENSE
+
+@octokit/graphql 9.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__graphql/LICENSE
+
+@octokit/openapi-types 27.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__openapi-types/LICENSE
+
+@octokit/plugin-paginate-rest 14.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__plugin-paginate-rest/LICENSE
+
+@octokit/plugin-rest-endpoint-methods 17.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__plugin-rest-endpoint-methods/LICENSE
+
+@octokit/request 10.0.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__request/LICENSE
+
+@octokit/request-error 7.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__request-error/LICENSE
+
+@octokit/types 16.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@octokit__types/LICENSE
+
+@peculiar/asn1-schema 2.8.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@peculiar__asn1-schema/LICENSE
+
+@peculiar/json-schema 1.1.12 — MIT
+licenses/npm/vendor__openscreen__node_modules__@peculiar__json-schema/LICENSE
+
+@peculiar/utils 2.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@peculiar__utils/LICENSE
+
+@peculiar/webcrypto 1.7.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@peculiar__webcrypto/LICENSE.md
+
+@playwright/test 1.59.1 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__@playwright__test/LICENSE
+licenses/npm/vendor__openscreen__node_modules__@playwright__test/NOTICE
+
+@radix-ui/number 1.1.1 — MIT
+
+
+@radix-ui/primitive 1.1.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__primitive/LICENSE
+
+@radix-ui/react-accordion 1.2.12 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-accordion/LICENSE
+
+@radix-ui/react-arrow 1.1.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-arrow/LICENSE
+
+@radix-ui/react-collapsible 1.1.12 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-collapsible/LICENSE
+
+@radix-ui/react-collection 1.1.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-collection/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-collection__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-compose-refs 1.1.2 — MIT
+
+
+@radix-ui/react-context 1.1.2 — MIT
+
+
+@radix-ui/react-dialog 1.1.15 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-dialog/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-dialog__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-direction 1.1.1 — MIT
+
+
+@radix-ui/react-dismissable-layer 1.1.11 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-dismissable-layer/LICENSE
+
+@radix-ui/react-dropdown-menu 2.1.16 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-dropdown-menu/LICENSE
+
+@radix-ui/react-focus-guards 1.1.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-focus-guards/LICENSE
+
+@radix-ui/react-focus-scope 1.1.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-focus-scope/LICENSE
+
+@radix-ui/react-id 1.1.1 — MIT
+
+
+@radix-ui/react-menu 2.1.16 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-menu/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-menu__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-popover 1.1.15 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-popover/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-popover__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-popper 1.2.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-popper/LICENSE
+
+@radix-ui/react-portal 1.1.9 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-portal/LICENSE
+
+@radix-ui/react-presence 1.1.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-presence/LICENSE
+
+@radix-ui/react-primitive 2.1.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-primitive/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-primitive__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-roving-focus 1.1.11 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-roving-focus/LICENSE
+
+@radix-ui/react-select 2.2.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-select/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-select__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-slider 1.3.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-slider/LICENSE
+
+@radix-ui/react-slot 1.2.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-switch 1.2.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-switch/LICENSE
+
+@radix-ui/react-tabs 1.1.13 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-tabs/LICENSE
+
+@radix-ui/react-toggle 1.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-toggle/LICENSE
+
+@radix-ui/react-toggle-group 1.1.11 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-toggle-group/LICENSE
+
+@radix-ui/react-tooltip 1.2.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-tooltip/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-tooltip__node_modules__@radix-ui__react-slot/LICENSE
+
+@radix-ui/react-use-callback-ref 1.1.1 — MIT
+
+
+@radix-ui/react-use-controllable-state 1.2.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-use-controllable-state/LICENSE
+
+@radix-ui/react-use-effect-event 0.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-use-effect-event/LICENSE
+
+@radix-ui/react-use-escape-keydown 1.1.1 — MIT
+
+
+@radix-ui/react-use-layout-effect 1.1.1 — MIT
+
+
+@radix-ui/react-use-previous 1.1.1 — MIT
+
+
+@radix-ui/react-use-rect 1.1.1 — MIT
+
+
+@radix-ui/react-use-size 1.1.1 — MIT
+
+
+@radix-ui/react-visually-hidden 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@radix-ui__react-visually-hidden/LICENSE
+
+@radix-ui/rect 1.1.1 — MIT
+
+
+@rolldown/pluginutils 1.0.0-rc.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@rolldown__pluginutils/LICENSE
+
+@rollup/rollup-darwin-arm64 4.60.2 — MIT
+
+
+@sindresorhus/is 4.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@sindresorhus__is/license
+
+@stablelib/base64 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@stablelib__base64/LICENSE
+
+@standard-schema/spec 1.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@standard-schema__spec/LICENSE
+
+@szmarczak/http-timer 4.0.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@szmarczak__http-timer/LICENSE
+
+@testing-library/dom 10.4.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@testing-library__dom/LICENSE
+
+@testing-library/jest-dom 6.9.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@testing-library__jest-dom/LICENSE
+
+dom-accessibility-api 0.6.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@testing-library__jest-dom__node_modules__dom-accessibility-api/LICENSE.md
+
+@testing-library/react 16.3.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@testing-library__react/LICENSE
+
+@testing-library/user-event 14.6.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__@testing-library__user-event/LICENSE
+
+@tiptap/core 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__core/LICENSE.md
+
+@tiptap/extension-blockquote 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-blockquote/LICENSE.md
+
+@tiptap/extension-bold 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-bold/LICENSE.md
+
+@tiptap/extension-bubble-menu 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-bubble-menu/LICENSE.md
+
+@tiptap/extension-bullet-list 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-bullet-list/LICENSE.md
+
+@tiptap/extension-code 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-code/LICENSE.md
+
+@tiptap/extension-code-block 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-code-block/LICENSE.md
+
+@tiptap/extension-document 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-document/LICENSE.md
+
+@tiptap/extension-dropcursor 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-dropcursor/LICENSE.md
+
+@tiptap/extension-floating-menu 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-floating-menu/LICENSE.md
+
+@tiptap/extension-gapcursor 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-gapcursor/LICENSE.md
+
+@tiptap/extension-hard-break 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-hard-break/LICENSE.md
+
+@tiptap/extension-heading 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-heading/LICENSE.md
+
+@tiptap/extension-horizontal-rule 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-horizontal-rule/LICENSE.md
+
+@tiptap/extension-italic 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-italic/LICENSE.md
+
+@tiptap/extension-link 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-link/LICENSE.md
+
+@tiptap/extension-list 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-list/LICENSE.md
+
+@tiptap/extension-list-item 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-list-item/LICENSE.md
+
+@tiptap/extension-list-keymap 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-list-keymap/LICENSE.md
+
+@tiptap/extension-ordered-list 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-ordered-list/LICENSE.md
+
+@tiptap/extension-paragraph 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-paragraph/LICENSE.md
+
+@tiptap/extension-strike 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-strike/LICENSE.md
+
+@tiptap/extension-text 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-text/LICENSE.md
+
+@tiptap/extension-text-style 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-text-style/LICENSE.md
+
+@tiptap/extension-underline 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extension-underline/LICENSE.md
+
+@tiptap/extensions 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__extensions/LICENSE.md
+
+@tiptap/pm 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__pm/LICENSE
+
+@tiptap/react 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__react/LICENSE.md
+
+@tiptap/starter-kit 3.27.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@tiptap__starter-kit/LICENSE.md
+
+@types/aria-query 5.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__aria-query/LICENSE
+
+@types/babel__core 7.20.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__babel__core/LICENSE
+
+@types/babel__generator 7.27.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__babel__generator/LICENSE
+
+@types/babel__template 7.4.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__babel__template/LICENSE
+
+@types/babel__traverse 7.28.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__babel__traverse/LICENSE
+
+@types/cacheable-request 6.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__cacheable-request/LICENSE
+
+@types/chai 5.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__chai/LICENSE
+
+@types/debug 4.1.13 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__debug/LICENSE
+
+@types/deep-eql 4.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__deep-eql/LICENSE
+
+@types/dom-mediacapture-transform 0.1.11 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__dom-mediacapture-transform/LICENSE
+
+@types/dom-webcodecs 0.1.13 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__dom-webcodecs/LICENSE
+
+@types/estree 1.0.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__estree/LICENSE
+
+@types/fs-extra 9.0.13 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__fs-extra/LICENSE
+
+@types/http-cache-semantics 4.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__http-cache-semantics/LICENSE
+
+@types/json-schema 7.0.15 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__json-schema/LICENSE
+
+@types/keyv 3.1.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__keyv/LICENSE
+
+@types/ms 2.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__ms/LICENSE
+
+@types/node 22.19.17 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__node/LICENSE
+
+@types/prop-types 15.7.15 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__prop-types/LICENSE
+
+@types/react 18.3.28 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__react/LICENSE
+
+@types/react-dom 18.3.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__react-dom/LICENSE
+
+@types/responselike 1.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__responselike/LICENSE
+
+@types/use-sync-external-store 0.0.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__use-sync-external-store/LICENSE
+
+@types/yauzl 2.10.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__@types__yauzl/LICENSE
+
+@uiw/color-convert 2.10.1 — MIT
+
+
+@uiw/react-color-alpha 2.9.6 — MIT
+
+
+@uiw/color-convert 2.9.6 — MIT
+
+
+@uiw/react-color-block 2.10.1 — MIT
+
+
+@uiw/react-color-colorful 2.9.6 — MIT
+
+
+@uiw/color-convert 2.9.6 — MIT
+
+
+@uiw/react-color-editable-input 2.10.1 — MIT
+
+
+@uiw/react-color-hue 2.9.6 — MIT
+
+
+@uiw/color-convert 2.9.6 — MIT
+
+
+@uiw/react-color-saturation 2.9.6 — MIT
+
+
+@uiw/color-convert 2.9.6 — MIT
+
+
+@uiw/react-color-swatch 2.10.1 — MIT
+
+
+@uiw/react-drag-event-interactive 2.9.6 — MIT
+
+
+@vitejs/plugin-react 5.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__@vitejs__plugin-react/LICENSE
+
+@vitest/expect 4.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@vitest__expect/LICENSE
+
+@vitest/mocker 4.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@vitest__mocker/LICENSE
+
+@vitest/pretty-format 4.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@vitest__pretty-format/LICENSE
+
+@vitest/runner 4.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@vitest__runner/LICENSE
+
+@vitest/snapshot 4.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@vitest__snapshot/LICENSE
+
+@vitest/spy 4.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@vitest__spy/LICENSE
+
+@vitest/utils 4.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__@vitest__utils/LICENSE
+
+@xmldom/xmldom 0.8.13 — MIT
+licenses/npm/vendor__openscreen__node_modules__@xmldom__xmldom/LICENSE
+
+abbrev 4.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__abbrev/LICENSE
+
+acorn 8.16.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__acorn/LICENSE
+
+agent-base 7.1.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__agent-base/LICENSE
+
+ajv 8.20.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__ajv/LICENSE
+
+ansi-escapes 7.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__ansi-escapes/license
+
+ansi-regex 5.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__ansi-regex/license
+
+ansi-styles 4.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__ansi-styles/license
+
+any-promise 1.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__any-promise/LICENSE
+
+anymatch 3.1.3 — ISC
+licenses/npm/vendor__openscreen__node_modules__anymatch/LICENSE
+
+picomatch 2.3.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__anymatch__node_modules__picomatch/LICENSE
+
+app-builder-lib 26.15.3 — MIT
+
+
+@electron/get 3.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__app-builder-lib__node_modules__@electron__get/LICENSE
+
+fs-extra 8.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__app-builder-lib__node_modules__@electron__get__node_modules__fs-extra/LICENSE
+
+semver 6.3.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__app-builder-lib__node_modules__@electron__get__node_modules__semver/LICENSE
+
+ci-info 4.3.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__app-builder-lib__node_modules__ci-info/LICENSE
+
+fs-extra 10.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__app-builder-lib__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__app-builder-lib__node_modules__fs-extra__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__app-builder-lib__node_modules__fs-extra__node_modules__universalify/LICENSE
+
+semver 7.7.4 — ISC
+licenses/npm/vendor__openscreen__node_modules__app-builder-lib__node_modules__semver/LICENSE
+
+arg 5.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__arg/LICENSE.md
+
+argparse 2.0.1 — Python-2.0
+licenses/npm/vendor__openscreen__node_modules__argparse/LICENSE
+
+aria-hidden 1.2.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__aria-hidden/LICENSE
+
+aria-query 5.3.0 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__aria-query/LICENSE
+
+asn1js 3.0.10 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__asn1js/LICENSE
+
+assertion-error 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__assertion-error/LICENSE
+
+async 3.2.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__async/LICENSE
+
+async-exit-hook 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__async-exit-hook/license
+
+asynckit 0.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__asynckit/LICENSE
+
+at-least-node 1.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__at-least-node/LICENSE
+
+autoprefixer 10.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__autoprefixer/LICENSE
+
+aws4 1.13.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__aws4/LICENSE
+
+balanced-match 4.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__balanced-match/LICENSE.md
+
+base64-js 1.5.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__base64-js/LICENSE
+
+baseline-browser-mapping 2.10.20 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__baseline-browser-mapping/LICENSE.txt
+
+before-after-hook 4.0.0 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__before-after-hook/LICENSE
+
+bidi-js 1.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__bidi-js/LICENSE.txt
+
+binary-extensions 2.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__binary-extensions/license
+
+bluebird 3.7.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__bluebird/LICENSE
+
+boolean 3.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__boolean/LICENSE.txt
+
+brace-expansion 5.0.9 — MIT
+licenses/npm/vendor__openscreen__node_modules__brace-expansion/LICENSE
+
+braces 3.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__braces/LICENSE
+
+browserslist 4.28.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__browserslist/LICENSE
+
+buffer-crc32 0.2.13 — MIT
+licenses/npm/vendor__openscreen__node_modules__buffer-crc32/LICENSE
+
+buffer-from 1.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__buffer-from/LICENSE
+
+builder-util 26.15.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__builder-util/LICENSE
+
+builder-util-runtime 9.7.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__builder-util-runtime/LICENSE
+
+fs-extra 10.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__builder-util__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__builder-util__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__builder-util__node_modules__universalify/LICENSE
+
+bytestreamjs 2.0.1 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__bytestreamjs/LICENSE
+
+cacheable-lookup 5.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__cacheable-lookup/LICENSE
+
+cacheable-request 7.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__cacheable-request/LICENSE
+
+call-bind-apply-helpers 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__call-bind-apply-helpers/LICENSE
+
+camelcase-css 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__camelcase-css/license
+
+caniuse-lite 1.0.30001788 — CC-BY-4.0
+licenses/npm/vendor__openscreen__node_modules__caniuse-lite/LICENSE
+
+chai 6.2.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__chai/LICENSE
+
+chalk 4.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__chalk/license
+
+chokidar 3.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__chokidar/LICENSE
+
+glob-parent 5.1.2 — ISC
+licenses/npm/vendor__openscreen__node_modules__chokidar__node_modules__glob-parent/LICENSE
+
+chownr 3.0.0 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__chownr/LICENSE.md
+
+chromium-pickle-js 0.2.0 — MIT
+
+
+ci-info 4.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__ci-info/LICENSE
+
+class-variance-authority 0.7.1 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__class-variance-authority/LICENSE
+
+cli-cursor 5.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__cli-cursor/license
+
+cliui 8.0.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__cliui/LICENSE.txt
+
+strip-ansi 6.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__cliui__node_modules__strip-ansi/license
+
+wrap-ansi 7.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__cliui__node_modules__wrap-ansi/license
+
+clone-response 1.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__clone-response/LICENSE
+
+clsx 2.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__clsx/license
+
+color-convert 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__color-convert/LICENSE
+
+color-name 1.1.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__color-name/LICENSE
+
+colorette 2.0.20 — MIT
+licenses/npm/vendor__openscreen__node_modules__colorette/LICENSE.md
+
+combined-stream 1.0.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__combined-stream/License
+
+commander 5.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__commander/LICENSE
+
+compare-version 0.1.2 — MIT
+
+
+concat-map 0.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__concat-map/LICENSE
+
+content-type 2.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__content-type/LICENSE
+
+convert-source-map 2.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__convert-source-map/LICENSE
+
+core-util-is 1.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__core-util-is/LICENSE
+
+cross-dirname 0.1.0 — MIT
+
+
+cross-spawn 7.0.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__cross-spawn/LICENSE
+
+isexe 2.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__cross-spawn__node_modules__isexe/LICENSE
+
+which 2.0.2 — ISC
+licenses/npm/vendor__openscreen__node_modules__cross-spawn__node_modules__which/LICENSE
+
+css-tree 3.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__css-tree/LICENSE
+
+css.escape 1.5.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__css.escape/LICENSE-MIT.txt
+
+cssesc 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__cssesc/LICENSE-MIT.txt
+
+csstype 3.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__csstype/LICENSE
+
+data-urls 7.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__data-urls/LICENSE.txt
+
+debug 4.4.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__debug/LICENSE
+
+decimal.js 10.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__decimal.js/LICENCE.md
+
+decompress-response 6.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__decompress-response/license
+
+mimic-response 3.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__decompress-response__node_modules__mimic-response/license
+
+defer-to-connect 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__defer-to-connect/LICENSE
+
+define-data-property 1.1.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__define-data-property/LICENSE
+
+define-properties 1.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__define-properties/LICENSE
+
+delayed-stream 1.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__delayed-stream/License
+
+dequal 2.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__dequal/license
+
+detect-node 2.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__detect-node/LICENSE
+
+detect-node-es 1.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__detect-node-es/LICENSE
+
+didyoumean 1.2.2 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__didyoumean/LICENSE
+
+dir-compare 4.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__dir-compare/LICENSE
+
+balanced-match 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__dir-compare__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 1.1.18 — MIT
+licenses/npm/vendor__openscreen__node_modules__dir-compare__node_modules__brace-expansion/LICENSE
+
+minimatch 3.1.5 — ISC
+licenses/npm/vendor__openscreen__node_modules__dir-compare__node_modules__minimatch/LICENSE
+
+dlv 1.1.3 — MIT
+
+
+dmg-builder 26.15.3 — MIT
+
+
+fs-extra 10.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__dmg-builder__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__dmg-builder__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__dmg-builder__node_modules__universalify/LICENSE
+
+dom-accessibility-api 0.5.16 — MIT
+licenses/npm/vendor__openscreen__node_modules__dom-accessibility-api/LICENSE.md
+
+dotenv 16.6.1 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__dotenv/LICENSE
+
+dotenv-expand 11.0.7 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__dotenv-expand/LICENSE
+
+dunder-proto 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__dunder-proto/LICENSE
+
+duplexer2 0.1.4 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__duplexer2/LICENSE.md
+
+ejs 3.1.10 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__ejs/LICENSE
+
+electron 41.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron/LICENSE
+
+electron-builder 26.15.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-builder/LICENSE
+
+electron-builder-squirrel-windows 26.15.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-builder-squirrel-windows/LICENSE
+
+fs-extra 10.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-builder__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-builder__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-builder__node_modules__universalify/LICENSE
+
+electron-publish 26.15.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-publish/LICENSE
+
+fs-extra 10.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-publish__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-publish__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-publish__node_modules__universalify/LICENSE
+
+electron-to-chromium 1.5.340 — ISC
+licenses/npm/vendor__openscreen__node_modules__electron-to-chromium/LICENSE
+
+electron-updater 6.8.9 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-updater/LICENSE
+
+fs-extra 10.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-updater__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-updater__node_modules__jsonfile/LICENSE
+
+semver 7.7.4 — ISC
+licenses/npm/vendor__openscreen__node_modules__electron-updater__node_modules__semver/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-updater__node_modules__universalify/LICENSE
+
+electron-winstaller 5.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-winstaller/LICENSE
+
+fs-extra 7.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron-winstaller__node_modules__fs-extra/LICENSE
+
+@types/node 24.12.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron__node_modules__@types__node/LICENSE
+
+undici-types 7.16.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__electron__node_modules__undici-types/LICENSE
+
+emoji-regex 8.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__emoji-regex/LICENSE-MIT.txt
+
+end-of-stream 1.4.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__end-of-stream/LICENSE
+
+entities 8.0.0 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__entities/LICENSE
+
+env-paths 2.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__env-paths/license
+
+environment 1.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__environment/license
+
+err-code 2.0.3 — MIT
+
+
+es-define-property 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__es-define-property/LICENSE
+
+es-errors 1.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__es-errors/LICENSE
+
+es-module-lexer 2.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__es-module-lexer/LICENSE
+
+es-object-atoms 1.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__es-object-atoms/LICENSE
+
+es-set-tostringtag 2.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__es-set-tostringtag/LICENSE
+
+es6-error 4.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__es6-error/LICENSE.md
+
+esbuild 0.28.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__esbuild/LICENSE.md
+
+escalade 3.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__escalade/license
+
+escape-string-regexp 4.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__escape-string-regexp/license
+
+estree-walker 3.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__estree-walker/LICENSE
+
+eventemitter3 4.0.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__eventemitter3/LICENSE
+
+expect-type 1.3.0 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__expect-type/LICENSE
+
+exponential-backoff 3.1.3 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__exponential-backoff/LICENSE
+
+extract-zip 2.0.1 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__extract-zip/LICENSE
+
+fast-check 4.7.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__fast-check/LICENSE
+
+fast-deep-equal 3.1.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__fast-deep-equal/LICENSE
+
+fast-equals 5.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__fast-equals/LICENSE
+
+fast-glob 3.3.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__fast-glob/LICENSE
+
+glob-parent 5.1.2 — ISC
+licenses/npm/vendor__openscreen__node_modules__fast-glob__node_modules__glob-parent/LICENSE
+
+fast-sha256 1.3.0 — Unlicense
+licenses/npm/vendor__openscreen__node_modules__fast-sha256/LICENSE
+
+fast-uri 3.1.5 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__fast-uri/LICENSE
+
+fastq 1.20.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__fastq/LICENSE
+
+fd-slicer 1.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__fd-slicer/LICENSE
+
+fdir 6.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__fdir/LICENSE
+
+filelist 1.0.6 — Apache-2.0
+
+
+balanced-match 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__filelist__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 2.1.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__filelist__node_modules__brace-expansion/LICENSE
+
+minimatch 5.1.9 — ISC
+licenses/npm/vendor__openscreen__node_modules__filelist__node_modules__minimatch/LICENSE
+
+fill-range 7.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__fill-range/LICENSE
+
+form-data 4.0.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__form-data/License
+
+fraction.js 5.3.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__fraction.js/LICENSE
+
+framer-motion 12.38.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__framer-motion/LICENSE.md
+
+fs-extra 8.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__fs-extra/LICENSE
+
+fs.realpath 1.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__fs.realpath/LICENSE
+
+fsevents 2.3.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__fsevents/LICENSE
+
+function-bind 1.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__function-bind/LICENSE
+
+gensync 1.0.0-beta.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__gensync/LICENSE
+
+get-caller-file 2.0.5 — ISC
+licenses/npm/vendor__openscreen__node_modules__get-caller-file/LICENSE.md
+
+get-east-asian-width 1.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__get-east-asian-width/license
+
+get-intrinsic 1.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__get-intrinsic/LICENSE
+
+get-nonce 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__get-nonce/LICENSE
+
+get-proto 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__get-proto/LICENSE
+
+get-stream 5.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__get-stream/license
+
+glob 7.2.3 — ISC
+licenses/npm/vendor__openscreen__node_modules__glob/LICENSE
+
+glob-parent 6.0.2 — ISC
+licenses/npm/vendor__openscreen__node_modules__glob-parent/LICENSE
+
+balanced-match 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__glob__node_modules__balanced-match/LICENSE.md
+
+brace-expansion 1.1.18 — MIT
+licenses/npm/vendor__openscreen__node_modules__glob__node_modules__brace-expansion/LICENSE
+
+minimatch 3.1.5 — ISC
+licenses/npm/vendor__openscreen__node_modules__glob__node_modules__minimatch/LICENSE
+
+global-agent 3.0.0 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__global-agent/LICENSE
+
+semver 7.7.4 — ISC
+licenses/npm/vendor__openscreen__node_modules__global-agent__node_modules__semver/LICENSE
+
+globalthis 1.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__globalthis/LICENSE
+
+gopd 1.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__gopd/LICENSE
+
+got 11.8.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__got/license
+
+graceful-fs 4.2.11 — ISC
+licenses/npm/vendor__openscreen__node_modules__graceful-fs/LICENSE
+
+has-flag 4.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__has-flag/license
+
+has-property-descriptors 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__has-property-descriptors/LICENSE
+
+has-symbols 1.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__has-symbols/LICENSE
+
+has-tostringtag 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__has-tostringtag/LICENSE
+
+hasown 2.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__hasown/LICENSE
+
+hosted-git-info 4.1.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__hosted-git-info/LICENSE
+
+lru-cache 6.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__hosted-git-info__node_modules__lru-cache/LICENSE
+
+yallist 4.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__hosted-git-info__node_modules__yallist/LICENSE
+
+html-encoding-sniffer 6.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__html-encoding-sniffer/LICENSE.txt
+
+http-cache-semantics 4.2.0 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__http-cache-semantics/LICENSE
+
+http-proxy-agent 7.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__http-proxy-agent/LICENSE
+
+http2-wrapper 1.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__http2-wrapper/LICENSE
+
+https-proxy-agent 7.0.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__https-proxy-agent/LICENSE
+
+husky 9.1.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__husky/LICENSE
+
+i18next 23.16.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__i18next/LICENSE
+
+indent-string 4.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__indent-string/license
+
+inflight 1.0.6 — ISC
+licenses/npm/vendor__openscreen__node_modules__inflight/LICENSE
+
+inherits 2.0.4 — ISC
+licenses/npm/vendor__openscreen__node_modules__inherits/LICENSE
+
+is-binary-path 2.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__is-binary-path/license
+
+is-core-module 2.16.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__is-core-module/LICENSE
+
+is-extglob 2.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__is-extglob/LICENSE
+
+is-fullwidth-code-point 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__is-fullwidth-code-point/license
+
+is-glob 4.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__is-glob/LICENSE
+
+is-network-error 1.3.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__is-network-error/license
+
+is-number 7.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__is-number/LICENSE
+
+is-potential-custom-element-name 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__is-potential-custom-element-name/LICENSE-MIT.txt
+
+isarray 1.0.0 — MIT
+
+
+isbinaryfile 5.0.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__isbinaryfile/LICENSE.txt
+
+isexe 3.1.5 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__isexe/LICENSE.md
+
+jake 10.9.4 — Apache-2.0
+
+
+jiti 2.6.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__jiti/LICENSE
+
+js-tiktoken 1.0.21 — MIT
+
+
+js-tokens 4.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__js-tokens/LICENSE
+
+js-yaml 4.3.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__js-yaml/LICENSE
+
+jsdom 29.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__jsdom/LICENSE.txt
+
+lru-cache 11.3.5 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__jsdom__node_modules__lru-cache/LICENSE.md
+
+jsesc 3.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__jsesc/LICENSE-MIT.txt
+
+json-buffer 3.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__json-buffer/LICENSE
+
+json-schema-to-ts 3.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__json-schema-to-ts/LICENSE
+
+json-schema-traverse 1.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__json-schema-traverse/LICENSE
+
+json-stringify-safe 5.0.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__json-stringify-safe/LICENSE
+
+json-with-bigint 3.5.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__json-with-bigint/LICENSE
+
+json5 2.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__json5/LICENSE.md
+
+jsonfile 4.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__jsonfile/LICENSE
+
+keyv 4.5.4 — MIT
+
+
+langchain 1.5.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__langchain/LICENSE
+
+langsmith 0.7.15 — MIT
+
+
+lazy-val 1.0.5 — MIT
+
+
+lilconfig 3.1.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__lilconfig/LICENSE
+
+lines-and-columns 1.2.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__lines-and-columns/LICENSE
+
+linkifyjs 4.3.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__linkifyjs/LICENSE
+
+lint-staged 16.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__lint-staged/LICENSE
+
+commander 14.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__lint-staged__node_modules__commander/LICENSE
+
+listr2 9.0.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__listr2/LICENSE
+
+ansi-styles 6.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__listr2__node_modules__ansi-styles/license
+
+cli-truncate 5.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__listr2__node_modules__cli-truncate/license
+
+eventemitter3 5.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__listr2__node_modules__eventemitter3/LICENSE
+
+is-fullwidth-code-point 5.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__listr2__node_modules__is-fullwidth-code-point/license
+
+slice-ansi 8.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__listr2__node_modules__slice-ansi/license
+
+string-width 8.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__listr2__node_modules__string-width/license
+
+lodash 4.18.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__lodash/LICENSE
+
+lodash.escaperegexp 4.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__lodash.escaperegexp/LICENSE
+
+lodash.isequal 4.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__lodash.isequal/LICENSE
+
+log-update 6.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__log-update/license
+
+ansi-styles 6.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__log-update__node_modules__ansi-styles/license
+
+is-fullwidth-code-point 5.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__log-update__node_modules__is-fullwidth-code-point/license
+
+slice-ansi 7.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__log-update__node_modules__slice-ansi/license
+
+loose-envify 1.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__loose-envify/LICENSE
+
+lowercase-keys 2.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__lowercase-keys/license
+
+lru-cache 5.1.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__lru-cache/LICENSE
+
+lucide-react 0.545.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__lucide-react/LICENSE
+
+lz-string 1.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__lz-string/LICENSE
+
+magic-string 0.30.21 — MIT
+licenses/npm/vendor__openscreen__node_modules__magic-string/LICENSE
+
+matcher 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__matcher/license
+
+math-intrinsics 1.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__math-intrinsics/LICENSE
+
+mdn-data 2.27.1 — CC0-1.0
+licenses/npm/vendor__openscreen__node_modules__mdn-data/LICENSE
+
+mediabunny 1.40.1 — MPL-2.0
+licenses/npm/vendor__openscreen__node_modules__mediabunny/LICENSE
+
+merge2 1.4.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__merge2/LICENSE
+
+micromatch 4.0.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__micromatch/LICENSE
+
+picomatch 2.3.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__micromatch__node_modules__picomatch/LICENSE
+
+mime 2.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__mime/LICENSE
+
+mime-db 1.52.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__mime-db/LICENSE
+
+mime-types 2.1.35 — MIT
+licenses/npm/vendor__openscreen__node_modules__mime-types/LICENSE
+
+mimic-function 5.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__mimic-function/license
+
+mimic-response 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__mimic-response/license
+
+min-indent 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__min-indent/license
+
+minimatch 10.2.6 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__minimatch/LICENSE.md
+
+minimist 1.2.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__minimist/LICENSE
+
+minipass 7.1.3 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__minipass/LICENSE.md
+
+minizlib 3.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__minizlib/LICENSE
+
+mkdirp 0.5.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__mkdirp/LICENSE
+
+motion 12.38.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__motion/LICENSE.md
+
+motion-dom 12.38.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__motion-dom/LICENSE.md
+
+motion-utils 12.36.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__motion-utils/LICENSE.md
+
+mp4box 2.3.0 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__mp4box/LICENSE
+
+ms 2.1.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__ms/license.md
+
+mustache 4.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__mustache/LICENSE
+
+mz 2.7.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__mz/LICENSE
+
+nanoid 3.3.17 — MIT
+licenses/npm/vendor__openscreen__node_modules__nanoid/LICENSE
+
+node-abi 4.28.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__node-abi/LICENSE
+
+semver 7.7.4 — ISC
+licenses/npm/vendor__openscreen__node_modules__node-abi__node_modules__semver/LICENSE
+
+node-api-version 0.2.1 — MIT
+
+
+semver 7.7.4 — ISC
+licenses/npm/vendor__openscreen__node_modules__node-api-version__node_modules__semver/LICENSE
+
+node-gyp 12.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__node-gyp/LICENSE
+
+isexe 4.0.0 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__node-gyp__node_modules__isexe/LICENSE.md
+
+semver 7.7.4 — ISC
+licenses/npm/vendor__openscreen__node_modules__node-gyp__node_modules__semver/LICENSE
+
+undici 6.25.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__node-gyp__node_modules__undici/LICENSE
+
+which 6.0.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__node-gyp__node_modules__which/LICENSE
+
+node-int64 0.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__node-int64/LICENSE
+
+node-releases 2.0.37 — MIT
+licenses/npm/vendor__openscreen__node_modules__node-releases/LICENSE
+
+nopt 9.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__nopt/LICENSE
+
+normalize-path 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__normalize-path/LICENSE
+
+normalize-url 6.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__normalize-url/license
+
+object-assign 4.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__object-assign/license
+
+object-hash 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__object-hash/LICENSE
+
+object-keys 1.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__object-keys/LICENSE
+
+obug 2.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__obug/LICENSE
+
+once 1.4.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__once/LICENSE
+
+onetime 7.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__onetime/license
+
+openai 6.45.0 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__openai/LICENSE
+
+orderedmap 2.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__orderedmap/LICENSE
+
+p-cancelable 2.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__p-cancelable/license
+
+p-finally 1.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__p-finally/license
+
+p-limit 3.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__p-limit/license
+
+p-queue 6.6.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__p-queue/license
+
+p-retry 7.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__p-retry/license
+
+p-timeout 3.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__p-timeout/license
+
+parse5 8.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__parse5/LICENSE
+
+path-is-absolute 1.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__path-is-absolute/license
+
+path-key 3.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__path-key/license
+
+path-parse 1.0.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__path-parse/LICENSE
+
+pathe 2.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__pathe/LICENSE
+
+pe-library 0.4.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__pe-library/LICENSE
+
+pend 1.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__pend/LICENSE
+
+picocolors 1.1.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__picocolors/LICENSE
+
+picomatch 4.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__picomatch/LICENSE
+
+pify 2.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__pify/license
+
+pirates 4.0.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__pirates/LICENSE
+
+pkijs 3.4.0 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__pkijs/LICENSE
+
+@noble/hashes 1.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__pkijs__node_modules__@noble__hashes/LICENSE
+
+playwright 1.59.1 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__playwright/LICENSE
+licenses/npm/vendor__openscreen__node_modules__playwright/NOTICE
+
+playwright-core 1.59.1 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__playwright-core/LICENSE
+licenses/npm/vendor__openscreen__node_modules__playwright-core/NOTICE
+
+plist 3.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__plist/LICENSE
+
+postcss 8.5.25 — MIT
+licenses/npm/vendor__openscreen__node_modules__postcss/LICENSE
+
+postcss-import 15.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__postcss-import/LICENSE
+
+postcss-js 4.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__postcss-js/LICENSE
+
+postcss-load-config 6.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__postcss-load-config/LICENSE
+
+postcss-nested 6.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__postcss-nested/LICENSE
+
+postcss-selector-parser 6.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__postcss-selector-parser/LICENSE-MIT
+
+postcss-value-parser 4.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__postcss-value-parser/LICENSE
+
+postject 1.0.0-alpha.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__postject/LICENSE
+
+commander 9.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__postject__node_modules__commander/LICENSE
+
+pretty-format 27.5.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__pretty-format/LICENSE
+
+ansi-styles 5.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__pretty-format__node_modules__ansi-styles/license
+
+proc-log 6.1.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__proc-log/LICENSE
+
+process-nextick-args 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__process-nextick-args/license.md
+
+progress 2.0.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__progress/LICENSE
+
+promise-retry 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__promise-retry/LICENSE
+
+prop-types 15.8.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__prop-types/LICENSE
+
+react-is 16.13.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__prop-types__node_modules__react-is/LICENSE
+
+proper-lockfile 4.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__proper-lockfile/LICENSE
+
+prosemirror-changeset 2.4.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-changeset/LICENSE
+
+prosemirror-commands 1.7.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-commands/LICENSE
+
+prosemirror-dropcursor 1.8.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-dropcursor/LICENSE
+
+prosemirror-gapcursor 1.4.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-gapcursor/LICENSE
+
+prosemirror-history 1.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-history/LICENSE
+
+prosemirror-inputrules 1.5.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-inputrules/LICENSE
+
+prosemirror-keymap 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-keymap/LICENSE
+
+prosemirror-model 1.25.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-model/LICENSE
+
+prosemirror-schema-list 1.5.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-schema-list/LICENSE
+
+prosemirror-state 1.4.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-state/LICENSE
+
+prosemirror-tables 1.8.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-tables/LICENSE
+
+prosemirror-transform 1.12.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-transform/LICENSE
+
+prosemirror-view 1.42.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__prosemirror-view/LICENSE
+
+pump 3.0.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__pump/LICENSE
+
+punycode 2.3.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__punycode/LICENSE-MIT.txt
+
+pure-rand 8.4.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__pure-rand/LICENSE
+
+pvtsutils 1.3.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__pvtsutils/LICENSE
+
+pvutils 1.1.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__pvutils/LICENSE
+
+queue-microtask 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__queue-microtask/LICENSE
+
+quick-lru 5.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__quick-lru/license
+
+re-resizable 6.11.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__re-resizable/LICENSE
+
+react 18.3.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__react/LICENSE
+
+react-dom 18.3.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__react-dom/LICENSE
+
+react-draggable 4.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__react-draggable/LICENSE
+
+react-icons 5.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__react-icons/LICENSE
+
+react-is 17.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__react-is/LICENSE
+
+react-refresh 0.18.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__react-refresh/LICENSE
+
+react-remove-scroll 2.7.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__react-remove-scroll/LICENSE
+
+react-remove-scroll-bar 2.3.8 — MIT
+
+
+react-resizable-panels 3.0.6 — MIT
+
+
+react-rnd 10.5.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__react-rnd/LICENSE
+
+tslib 2.6.2 — 0BSD
+licenses/npm/vendor__openscreen__node_modules__react-rnd__node_modules__tslib/LICENSE.txt
+
+react-style-singleton 2.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__react-style-singleton/LICENSE
+
+read-binary-file-arch 1.0.6 — MIT
+
+
+read-cache 1.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__read-cache/LICENSE
+
+readable-stream 2.3.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__readable-stream/LICENSE
+
+readdirp 3.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__readdirp/LICENSE
+
+picomatch 2.3.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__readdirp__node_modules__picomatch/LICENSE
+
+redent 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__redent/license
+
+require-directory 2.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__require-directory/LICENSE
+
+require-from-string 2.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__require-from-string/license
+
+resedit 1.7.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__resedit/LICENSE
+
+resolve 1.22.12 — MIT
+licenses/npm/vendor__openscreen__node_modules__resolve/LICENSE
+
+resolve-alpn 1.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__resolve-alpn/LICENSE
+
+responselike 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__responselike/LICENSE
+
+restore-cursor 5.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__restore-cursor/license
+
+signal-exit 4.1.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__restore-cursor__node_modules__signal-exit/LICENSE.txt
+
+retry 0.12.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__retry/License
+
+reusify 1.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__reusify/LICENSE
+
+rfdc 1.4.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__rfdc/LICENSE
+
+rimraf 2.6.3 — ISC
+licenses/npm/vendor__openscreen__node_modules__rimraf/LICENSE
+
+roarr 2.15.4 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__roarr/LICENSE
+
+rollup 4.60.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__rollup/LICENSE.md
+
+rope-sequence 1.3.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__rope-sequence/LICENSE
+
+run-parallel 1.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__run-parallel/LICENSE
+
+safe-buffer 5.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__safe-buffer/LICENSE
+
+sanitize-filename 1.6.4 — WTFPL OR ISC
+licenses/npm/vendor__openscreen__node_modules__sanitize-filename/LICENSE.md
+
+sax 1.6.1 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__sax/LICENSE.md
+
+saxes 6.0.0 — ISC
+
+
+scheduler 0.23.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__scheduler/LICENSE
+
+semver 6.3.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__semver/LICENSE
+
+semver-compare 1.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__semver-compare/LICENSE
+
+serialize-error 7.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__serialize-error/license
+
+shebang-command 2.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__shebang-command/license
+
+shebang-regex 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__shebang-regex/license
+
+siginfo 2.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__siginfo/LICENSE
+
+signal-exit 3.0.7 — ISC
+licenses/npm/vendor__openscreen__node_modules__signal-exit/LICENSE.txt
+
+simple-update-notifier 2.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__simple-update-notifier/LICENSE
+
+semver 7.7.4 — ISC
+licenses/npm/vendor__openscreen__node_modules__simple-update-notifier__node_modules__semver/LICENSE
+
+sonner 2.0.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__sonner/LICENSE.md
+
+source-map 0.6.1 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__source-map/LICENSE
+
+source-map-js 1.2.1 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__source-map-js/LICENSE
+
+source-map-support 0.5.21 — MIT
+licenses/npm/vendor__openscreen__node_modules__source-map-support/LICENSE.md
+
+sprintf-js 1.1.3 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__sprintf-js/LICENSE
+
+stackback 0.0.2 — MIT
+
+
+standardwebhooks 1.0.0 — MIT
+
+
+stat-mode 1.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__stat-mode/LICENSE
+
+std-env 4.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__std-env/LICENCE
+
+string_decoder 1.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__string_decoder/LICENSE
+
+string-argv 0.3.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__string-argv/LICENSE
+
+string-width 4.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__string-width/license
+
+strip-ansi 6.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__string-width__node_modules__strip-ansi/license
+
+strip-ansi 7.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__strip-ansi/license
+
+ansi-regex 6.2.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__strip-ansi__node_modules__ansi-regex/license
+
+strip-indent 3.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__strip-indent/license
+
+sucrase 3.35.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__sucrase/LICENSE
+
+commander 4.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__sucrase__node_modules__commander/LICENSE
+
+sumchecker 3.0.1 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__sumchecker/LICENSE
+
+supports-color 7.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__supports-color/license
+
+supports-preserve-symlinks-flag 1.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__supports-preserve-symlinks-flag/LICENSE
+
+symbol-tree 3.2.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__symbol-tree/LICENSE
+
+tailwind-merge 3.5.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__tailwind-merge/LICENSE.md
+
+tailwindcss 3.4.19 — MIT
+licenses/npm/vendor__openscreen__node_modules__tailwindcss/LICENSE
+
+tailwindcss-animate 1.0.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__tailwindcss-animate/LICENSE
+
+jiti 1.21.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__tailwindcss__node_modules__jiti/LICENSE
+
+tar 7.5.13 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__tar/LICENSE.md
+
+yallist 5.0.0 — BlueOak-1.0.0
+licenses/npm/vendor__openscreen__node_modules__tar__node_modules__yallist/LICENSE.md
+
+temp 0.9.4 — MIT
+licenses/npm/vendor__openscreen__node_modules__temp/LICENSE
+
+temp-file 3.4.0 — MIT
+
+
+fs-extra 10.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__temp-file__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__temp-file__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__temp-file__node_modules__universalify/LICENSE
+
+terser 5.46.1 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__terser/LICENSE
+
+commander 2.20.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__terser__node_modules__commander/LICENSE
+
+thenify 3.3.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__thenify/LICENSE
+
+thenify-all 1.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__thenify-all/LICENSE
+
+tiny-async-pool 1.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__tiny-async-pool/LICENSE-MIT
+
+semver 5.7.2 — ISC
+licenses/npm/vendor__openscreen__node_modules__tiny-async-pool__node_modules__semver/LICENSE
+
+tiny-typed-emitter 2.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__tiny-typed-emitter/LICENSE
+
+tinybench 2.9.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__tinybench/LICENSE
+
+tinyexec 1.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__tinyexec/LICENSE
+
+tinyglobby 0.2.16 — MIT
+licenses/npm/vendor__openscreen__node_modules__tinyglobby/LICENSE
+
+tinyrainbow 3.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__tinyrainbow/LICENCE
+
+tldts 7.0.28 — MIT
+licenses/npm/vendor__openscreen__node_modules__tldts/LICENSE
+
+tldts-core 7.0.28 — MIT
+licenses/npm/vendor__openscreen__node_modules__tldts-core/LICENSE
+
+tmp 0.2.7 — MIT
+licenses/npm/vendor__openscreen__node_modules__tmp/LICENSE
+
+tmp-promise 3.0.3 — MIT
+
+
+to-regex-range 5.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__to-regex-range/LICENSE
+
+tough-cookie 6.0.1 — BSD-3-Clause
+licenses/npm/vendor__openscreen__node_modules__tough-cookie/LICENSE
+
+tr46 6.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__tr46/LICENSE.md
+
+truncate-utf8-bytes 1.0.2 — WTFPL
+
+
+ts-algebra 2.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__ts-algebra/LICENSE
+
+ts-interface-checker 0.1.13 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__ts-interface-checker/LICENSE
+
+tslib 2.8.1 — 0BSD
+licenses/npm/vendor__openscreen__node_modules__tslib/LICENSE.txt
+
+tunnel 0.0.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__tunnel/LICENSE
+
+type-fest 0.13.1 — (MIT OR CC0-1.0)
+licenses/npm/vendor__openscreen__node_modules__type-fest/license
+
+typescript 5.9.3 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__typescript/LICENSE.txt
+
+undici 7.25.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__undici/LICENSE
+
+undici-types 6.21.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__undici-types/LICENSE
+
+universal-user-agent 7.0.3 — ISC
+licenses/npm/vendor__openscreen__node_modules__universal-user-agent/LICENSE.md
+
+universalify 0.1.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__universalify/LICENSE
+
+unzipper 0.12.5 — MIT
+licenses/npm/vendor__openscreen__node_modules__unzipper/LICENSE
+
+fs-extra 11.3.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__unzipper__node_modules__fs-extra/LICENSE
+
+jsonfile 6.2.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__unzipper__node_modules__jsonfile/LICENSE
+
+universalify 2.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__unzipper__node_modules__universalify/LICENSE
+
+update-browserslist-db 1.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__update-browserslist-db/LICENSE
+
+use-callback-ref 1.3.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__use-callback-ref/LICENSE
+
+use-sidecar 1.1.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__use-sidecar/LICENSE
+
+use-sync-external-store 1.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__use-sync-external-store/LICENSE
+
+utf8-byte-length 1.0.5 — (WTFPL OR MIT)
+licenses/npm/vendor__openscreen__node_modules__utf8-byte-length/LICENSE.MIT.txt
+licenses/npm/vendor__openscreen__node_modules__utf8-byte-length/LICENSE.WTFPL.txt
+
+util-deprecate 1.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__util-deprecate/LICENSE
+
+vite 7.3.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__vite/LICENSE.md
+
+vite-plugin-electron 0.29.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__vite-plugin-electron/LICENSE
+
+vite-plugin-electron-renderer 0.14.6 — MIT
+licenses/npm/vendor__openscreen__node_modules__vite-plugin-electron-renderer/LICENSE
+
+fsevents 2.3.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__vite__node_modules__fsevents/LICENSE
+
+vitest 4.1.10 — MIT
+licenses/npm/vendor__openscreen__node_modules__vitest/LICENSE.md
+
+w3c-keyname 2.2.8 — MIT
+licenses/npm/vendor__openscreen__node_modules__w3c-keyname/LICENSE
+
+w3c-xmlserializer 5.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__w3c-xmlserializer/LICENSE.md
+
+web-demuxer 4.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__web-demuxer/LICENSE
+
+webcrypto-core 1.9.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__webcrypto-core/LICENSE
+
+webidl-conversions 8.0.1 — BSD-2-Clause
+licenses/npm/vendor__openscreen__node_modules__webidl-conversions/LICENSE.md
+
+whatwg-mimetype 5.0.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__whatwg-mimetype/LICENSE.txt
+
+whatwg-url 16.0.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__whatwg-url/LICENSE.txt
+
+which 5.0.0 — ISC
+licenses/npm/vendor__openscreen__node_modules__which/LICENSE
+
+why-is-node-running 2.3.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__why-is-node-running/LICENSE
+
+wrap-ansi 9.0.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__wrap-ansi/license
+
+ansi-styles 6.2.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__wrap-ansi__node_modules__ansi-styles/license
+
+emoji-regex 10.6.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__wrap-ansi__node_modules__emoji-regex/LICENSE-MIT.txt
+
+string-width 7.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__wrap-ansi__node_modules__string-width/license
+
+wrappy 1.0.2 — ISC
+licenses/npm/vendor__openscreen__node_modules__wrappy/LICENSE
+
+ws 8.20.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__ws/LICENSE
+
+xml-name-validator 5.0.0 — Apache-2.0
+licenses/npm/vendor__openscreen__node_modules__xml-name-validator/LICENSE.txt
+
+xmlbuilder 15.1.1 — MIT
+licenses/npm/vendor__openscreen__node_modules__xmlbuilder/LICENSE
+
+xmlchars 2.2.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__xmlchars/LICENSE
+
+y18n 5.0.8 — ISC
+licenses/npm/vendor__openscreen__node_modules__y18n/LICENSE
+
+yallist 3.1.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__yallist/LICENSE
+
+yaml 2.8.3 — ISC
+licenses/npm/vendor__openscreen__node_modules__yaml/LICENSE
+
+yargs 17.7.2 — MIT
+licenses/npm/vendor__openscreen__node_modules__yargs/LICENSE
+
+yargs-parser 21.1.1 — ISC
+licenses/npm/vendor__openscreen__node_modules__yargs-parser/LICENSE.txt
+
+yauzl 2.10.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__yauzl/LICENSE
+
+yocto-queue 0.1.0 — MIT
+licenses/npm/vendor__openscreen__node_modules__yocto-queue/license
+
+zod 4.4.3 — MIT
+licenses/npm/vendor__openscreen__node_modules__zod/LICENSE
+
+zod-to-json-schema 3.25.2 — ISC
+licenses/npm/vendor__openscreen__node_modules__zod-to-json-schema/LICENSE
+
+zustand 5.0.14 — MIT
+licenses/npm/vendor__openscreen__node_modules__zustand/LICENSE

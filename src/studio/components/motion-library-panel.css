@@ -1,0 +1,320 @@
+/* Left column 素材 | 动效库 and the motion library inside it. Lives inside .media-panel, so each theme's panel
+   rules (button material, text colours, the panel's own --studio-* overrides) apply as they do to the media list.
+   Colours here come from --studio-* (contextual inside the panel) and --ed-* (theme tokens); no blur, no filters. */
+
+/* ---------- 素材 | 动效库 ---------- */
+.media-panel .left-library-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  margin: 0 0 10px;
+  padding: 3px;
+  border: 1px solid var(--studio-control-line);
+  border-radius: 9px;
+  background: var(--studio-input-bg);
+}
+html[data-ui-theme] .media-panel .left-library-tabs > button[role=tab] {
+  height: 30px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--studio-muted);
+  font-size: var(--ed-text);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+html[data-ui-theme] .media-panel .left-library-tabs > button[role=tab]:hover:not([aria-selected=true]) {
+  background: color-mix(in srgb, var(--studio-ink) 7%, transparent);
+  color: var(--studio-ink);
+}
+html[data-ui-theme] .media-panel .left-library-tabs > button[role=tab][aria-selected=true] {
+  background: var(--ed-raise-hi);
+  border-color: color-mix(in srgb, var(--ed-accent) 40%, transparent);
+  box-shadow: var(--ed-shadow-sm);
+  color: var(--ed-ink);
+  font-weight: 600;
+}
+/* 暖雾's panel is dark glass with light ink: the selected tab uses the theme's own selection pair */
+html[data-ui-theme=warm] .media-panel .left-library-tabs > button[role=tab][aria-selected=true] {
+  background: var(--ed-accent);
+  border-color: var(--studio-control-line);
+  color: var(--ed-accent-ink);
+}
+.media-panel .left-library-tabs svg { width: 15px; height: 15px; flex: none; color: var(--ed-icon, currentColor); }
+.media-panel .left-library-tabs span { font-size: var(--ed-text-xs); opacity: .7; font-variant-numeric: tabular-nums; }
+
+/* the two panes share the panel's column; [hidden] must win over the flex display */
+.media-panel :is(.media-library-pane, .motion-library-pane) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.media-panel :is(.media-library-pane, .motion-library-pane)[hidden] { display: none; }
+
+/* ---------- 动效库 ---------- */
+.motion-library-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+}
+.motion-library-panel__toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+/* 常规 [PPT Glass VOX] 高级 [瀑布 图解], compact enough for the narrow column */
+/* TierSwitch pins its widest width so 常规 never moves; here 常规 sits at the left edge and the star at the right,
+   so the row may shrink with the column (the star wraps below on a very narrow column). */
+html[data-ui-theme] .media-panel .motion-library-panel__tiers { min-width: 0 !important; }
+html[data-ui-theme] .media-panel .motion-library-panel__tiers button,
+html[data-ui-theme] .media-panel .motion-library-panel__favorites {
+  height: 26px;
+  min-height: 26px;
+  padding: 0 8px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  font-size: var(--ed-text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+html[data-ui-theme] .media-panel .motion-library-panel__tiers > .tier-switch__advanced { margin-left: 4px; }
+html[data-ui-theme] .media-panel .motion-library-panel__tiers .tier-switch__row > button { margin-left: 4px; }
+html[data-ui-theme] .media-panel div.motion-library-panel__tiers:not(.tier-switch) { display: flex; gap: 4px; }
+html[data-ui-theme] .media-panel .motion-library-panel__favorites { width: 28px; padding: 0; display: inline-grid; place-items: center; }
+.motion-library-panel__favorites svg { width: 14px; height: 14px; }
+@container (max-width: 215px) {
+  html[data-ui-theme] .media-panel .motion-library-panel__tiers button { padding: 0 5px; font-size: var(--ed-text-xs); }
+  html[data-ui-theme] .media-panel .motion-library-panel__tiers > .tier-switch__advanced,
+  html[data-ui-theme] .media-panel .motion-library-panel__tiers .tier-switch__row > button { margin-left: 3px; }
+}
+/* categories: the media library's tiles, 4 + 3 */
+html[data-ui-theme] .media-panel .motion-library-panel__categories > button:nth-child(n+5) { grid-column: span 4; }
+/* the widened column has room for every category on one row, which leaves more height for the cards */
+@container (min-width: 360px) {
+  html[data-ui-theme] .media-panel .motion-library-panel__categories { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
+  html[data-ui-theme] .media-panel .motion-library-panel__categories > button:nth-child(n) { grid-column: auto; padding: 0 4px; gap: 3px; }
+}
+.motion-library-panel .media-category-overlap { flex: none; }
+.motion-library-panel__hint {
+  flex: none;
+  margin: 8px 0 8px;
+  font-size: var(--ed-text-sm);
+  line-height: 1.4;
+  color: var(--studio-muted);
+}
+
+/* ---------- masonry: positions come from motion-library-masonry.ts ---------- */
+.motion-library-panel__list {
+  position: relative; /* offset parent for locating the current card */
+  flex: 1;
+  min-height: 72px;
+  overflow: auto;
+  padding: 2px 2px 12px 1px;
+  scrollbar-gutter: stable;
+}
+.motion-library-panel__masonry { position: relative; }
+.motion-library-panel__empty { padding: 14px 10px; }
+html[data-ui-theme] .media-panel .motion-library-panel__empty button { height: 26px; margin-top: 4px; padding: 0 10px; border-width: 1px; border-style: solid; border-radius: 7px; font-size: var(--ed-text-sm); }
+
+/* ---------- a card: the template cropped to the card itself, then its name ---------- */
+.motion-library-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--studio-control-line);
+  border-radius: 8px;
+  background: var(--studio-panel-2);
+  overflow: hidden;
+  transition: border-color var(--ed-fast) ease, box-shadow var(--ed-state) ease;
+}
+.motion-library-card:hover { border-color: color-mix(in srgb, var(--studio-accent) 55%, transparent); }
+.motion-library-card.is-current { border-color: var(--studio-accent); box-shadow: 0 0 0 1px var(--studio-accent); }
+html[data-ui-theme] .media-panel .motion-library-card > .motion-library-card__apply {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+  cursor: grab;
+  touch-action: none;
+}
+/* the card is a drag source: no press shrink, just the focus ring */
+html[data-ui-theme] .media-panel .motion-library-panel .motion-library-card > .motion-library-card__apply:active:not(:disabled) { scale: none; }
+.motion-library-card > .motion-library-card__apply:focus-visible { outline: 2px solid var(--studio-accent); outline-offset: -2px; border-radius: 8px; }
+/* 磨砂 puts glass on every panel button; a card is content, not a control chip */
+html[data-ui-theme=frost] .media-panel .motion-library-card > .motion-library-card__apply {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  color: inherit !important;
+}
+html[data-ui-theme=frost] .media-panel .motion-library-card > .motion-library-card__favorite { backdrop-filter: none !important; }
+
+/* the card sits on the neutral dark it is designed over (video); the frame is the editor's slot, cropped */
+.motion-library-card__media { position: relative; display: block; overflow: hidden; background: #16181d; }
+.motion-library-card__frame { position: absolute; display: block; pointer-events: auto; }
+.motion-library-card__frame > .preset-real-preview > span { display: none; }
+.motion-library-card :is(img, svg, a) { -webkit-user-drag: none; }
+html[data-ui-theme] .media-panel .motion-library-card__current {
+  position: absolute;
+  z-index: 7;
+  top: 6px;
+  right: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--ed-accent);
+  color: var(--ed-accent-ink);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 17px;
+}
+.motion-library-card__caption {
+  box-sizing: border-box;
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  padding: 0 30px 0 8px;
+}
+.motion-library-card__caption :is(strong, small) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.motion-library-card__caption strong { font-size: var(--ed-text); font-weight: 600; line-height: 16px; color: var(--studio-ink); }
+.motion-library-card__caption small { font-size: var(--ed-text-xs); line-height: 14px; color: var(--studio-muted); font-variant-numeric: tabular-nums; }
+html[data-ui-theme] .media-panel .motion-library-card > .motion-library-card__favorite {
+  position: absolute;
+  z-index: 8;
+  right: 6px;
+  bottom: 9px;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.motion-library-card__favorite svg { width: 13px; height: 13px; }
+
+/* ---------- open the full module ---------- */
+.media-panel a.motion-library-panel__open-lab {
+  border: 1px solid var(--studio-control-line);
+  background: color-mix(in srgb, var(--studio-panel-2) 70%, transparent);
+  color: var(--studio-ink);
+  text-decoration: none;
+}
+.media-panel a.motion-library-panel__open-lab:hover { border-color: var(--studio-accent); }
+.media-panel a.motion-library-panel__open-lab:focus-visible { outline: 2px solid var(--studio-accent); outline-offset: 2px; }
+
+/* ---------- dragging a card to the 卡片动效 lane ---------- */
+.motion-card-pointer-dragging,
+.motion-card-pointer-dragging * { cursor: grabbing !important; user-select: none !important; }
+.motion-card-pointer-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10000;
+  width: 168px;
+  display: grid;
+  gap: 3px;
+  padding: 6px 6px 7px;
+  border: 1px solid var(--ed-line-2, #ffffff1c);
+  border-radius: 9px;
+  background: var(--ed-menu-bg, #28292e);
+  color: var(--ed-ink, #f2f2f4);
+  box-shadow: inset 3px 0 0 var(--ed-accent, #ffb020), var(--ed-shadow-lg, 0 14px 30px #000c);
+  pointer-events: none;
+  will-change: transform;
+  animation: ed-ghost-in 160ms var(--ed-ease, ease-out);
+}
+.motion-card-pointer-ghost__thumb { position: relative; margin: 0 auto 2px; border-radius: 6px; overflow: hidden; }
+.motion-card-pointer-ghost__thumb > .motion-library-card__media { position: absolute; top: 0; left: 0; }
+.motion-card-pointer-ghost__thumb .preset-real-preview > span { display: none; }
+.motion-card-pointer-ghost b { padding: 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; }
+.motion-card-pointer-ghost small { padding: 0 2px; font-size: 10px; color: var(--ed-muted, #8b8e96); font-variant-numeric: tabular-nums; }
+.motion-card-pointer-ghost[data-state=valid] small { color: var(--ed-accent-text, #ffcf73); }
+.motion-card-pointer-ghost[data-state=blocked] { box-shadow: inset 3px 0 0 var(--ed-danger, #ff5a4f), var(--ed-shadow-lg, 0 14px 30px #000c); }
+.motion-card-pointer-ghost[data-state=blocked] small { color: var(--ed-danger, #ff5a4f); }
+/* on the lane: the landing box reuses the library drop preview; a refused spot is a red line with the reason */
+html[data-ui-theme] .track-drop-indicator.is-motion-card-blocked {
+  background: var(--ed-danger);
+  box-shadow: 0 0 0 1px var(--ed-playhead-halo);
+}
+html[data-ui-theme] .track-drop-indicator.is-motion-card-blocked b { background: var(--ed-danger); color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .motion-card-pointer-ghost { animation: none; }
+  .motion-library-card { transition: none; }
+}
+@media (forced-colors: active) {
+  .motion-library-card.is-current { outline: 2px solid Highlight; }
+}
+html[data-ui-theme=warm] .media-panel .left-library-tabs > button[role=tab][aria-selected=true] svg { color: currentColor; }
+
+/* ---------- inspector: 小卡预设模板 → 在动效库中更换 ---------- */
+.motion-mode-identity > span { min-width: 0; }
+html[data-ui-theme] .inspector-panel .motion-mode-identity > .motion-mode-identity__library {
+  flex: none;
+  margin-left: auto;
+  height: 26px;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 0 9px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--studio-accent) 55%, transparent);
+  border-radius: 7px;
+  color: var(--studio-accent);
+  font-size: var(--ed-text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.motion-mode-identity__library svg { width: 13px; height: 13px; }
+/* the inspector's empty 画面效果 page points at the library instead of a second template grid */
+.inspector-motion-library-hint svg { width: 22px; height: 22px; margin: 0 auto; color: var(--studio-muted); }
+.inspector-motion-library-hint span { font-size: var(--ed-text-sm); line-height: 1.5; }
+.inspector-motion-library-hint .all-presets { justify-content: center; margin: 6px auto 0; color: var(--studio-ink); text-decoration: none; }
+
+/* ---------- the left column (素材 and 动效库 alike) is 1.5× the old media column, so switching tabs never resizes it ---------- */
+/* old media column: clamp(180px, 19vw, 280px) → here clamp(270px, 28.5vw, 420px), ~410px at 1440px wide. When the window
+   is narrow the preview keeps priority: the column gives way (never below the old media column) before the preview
+   drops under ~460px. */
+.studio-editor .editor-top.editor-top--library {
+  grid-template-columns: clamp(clamp(180px, 19vw, 280px), min(28.5vw, calc(77vw - 460px)), 420px) minmax(0, 1fr) clamp(220px, 23vw, 340px);
+}
+@media (max-width: 1250px) {
+  /* media column 180px → 270px */
+  .studio-editor .editor-top.editor-top--library { grid-template-columns: clamp(180px, calc(100vw - 680px), 270px) minmax(0, 1fr) 220px; }
+}
+@media (max-width: 800px) {
+  /* media column 145px → 218px */
+  .studio-editor .editor-top.editor-top--library { grid-template-columns: clamp(145px, calc(100vw - 600px), 218px) minmax(0, 1fr) 180px; }
+}

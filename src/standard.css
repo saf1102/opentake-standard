@@ -1,0 +1,37 @@
+.standard-timeline{color:var(--studio-ink,#e8e8e8);background:var(--studio-panel,#232323);border-top:1px solid #8884;min-height:180px;overflow:hidden}.standard-tl-toolbar{display:flex;gap:10px;align-items:center;padding:8px;font-size:11px}.standard-tl-toolbar button{border:1px solid #8885;border-radius:4px;padding:4px}.standard-tl-scroll{overflow:auto;max-height:350px}.standard-tl-ruler{height:24px;position:relative;border-bottom:1px solid #8883}.standard-tl-ruler span{position:absolute;font-size:9px}.standard-tl-row{display:flex;height:44px;border-bottom:1px solid #8882}.standard-tl-label{position:sticky;left:0;z-index:4;width:150px;background:var(--studio-panel,#232323);display:flex;align-items:center;gap:4px;padding:4px;flex-wrap:wrap;font-size:10px}.standard-tl-label input{width:70px;height:10px}.standard-tl-lane{position:relative;background:var(--studio-bg,#1e1e1e)}.standard-tl-clip{color:#182e31;position:absolute;top:3px;bottom:3px;display:flex;justify-content:space-between;background:#8bacb0;border:1px solid #6e969b;border-radius:5px;overflow:hidden;font-size:10px;touch-action:none}.standard-tl-clip[data-selected=true]{outline:2px solid #edbd67;outline-offset:-2px}.standard-tl-clip i{width:5px;min-width:5px;cursor:ew-resize;background:#fff3}.standard-tl-clip span{overflow:hidden;white-space:nowrap}.standard-playhead{position:absolute;top:0;bottom:0;width:1px;background:#d45b56;pointer-events:none;z-index:5}
+.standard-screen-preview{width:100%;max-height:65vh;overflow:hidden;background:#121820;border-radius:16px}.standard-screen-preview video{width:100%;height:100%;transform-origin:0 0}.standard-page fieldset{border:1px solid #8884;border-radius:12px;padding:16px}.standard-page input[type=number]{width:80px;border:1px solid #8884;padding:5px;border-radius:5px}
+
+.standard-page{max-width:1250px;margin:auto;padding:40px 36px;color:var(--ui-ink)}
+.standard-tabs{display:flex;align-items:center;gap:10px;margin:20px 0;flex-wrap:wrap}
+.standard-projects{display:grid;gap:8px}
+.standard-pro-page{display:flex;align-items:center;min-height:calc(100vh - 64px)}
+.standard-pro-intro{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr);gap:48px;align-items:center;width:100%;padding:32px}
+.standard-pro-media{aspect-ratio:16/9;overflow:hidden;border-radius:var(--radius);background:var(--ui-field)}
+.standard-pro-media>img,.standard-pro-media>video{width:100%;height:100%;object-fit:cover}
+.standard-pro-title{display:flex;align-items:center;gap:14px}.standard-pro-title h1{font-size:28px;font-weight:600}
+.standard-pro-copy p{font-size:14px;line-height:1.8;margin:24px 0 32px}.standard-pro-actions{display:flex;gap:24px;align-items:center}
+.home-entry[data-pro] .home-media,.home-module[data-pro] .home-module__media{filter:brightness(.45) saturate(.55)}
+.standard-pro-badge{border:1px solid var(--pro-amber,#ffb020);color:var(--pro-amber,#ffb020);border-radius:4px;padding:1px 6px;font-size:11px}
+.home-module>.standard-pro-badge{position:absolute;top:12px;right:12px}.home-entry h2>.standard-pro-badge{position:absolute;right:16px;top:16px}
+@media(max-width:800px){.standard-pro-intro{grid-template-columns:1fr}}
+
+.standard-screen-shell{height:calc(100dvh - 72px)}.standard-screen-controls{width:100%;height:auto;flex:1;overflow:auto;padding:24px 28px;display:block;background:var(--studio-bg);color:var(--studio-text)}
+
+.home-entry[data-pro],.home-module[data-pro]{position:relative}
+
+.sl-thumb>.standard-pro-badge{position:absolute;right:12px;top:12px;z-index:2}
+
+/* Match the homepage primary action; home-soon's general button rule otherwise wins. */
+.standard-pro-actions button.home-entry__button{background:var(--home-koubo);color:var(--home-koubo-ink)}
+.standard-pro-title>.standard-pro-badge{position:static;display:inline-flex;opacity:1;background:transparent;font-size:11px;line-height:1.5;color:var(--home-koubo);border:1px solid currentColor;width:auto;height:auto}
+.ge-en-cat[data-pro] .ge-en-chip{opacity:.6}.ge-en-pc[data-pro]>img,.sl-card[data-soon] .sl-thumb>img{filter:brightness(.55) saturate(.35)}
+.ge-en-pc>.standard-pro-badge{position:absolute;right:12px;top:12px;z-index:3}.standard-style-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.standard-pro-overlay{position:fixed;inset:0;background:#0008;z-index:200}.standard-style-dialog{position:fixed;inset:50% auto auto 50%;transform:translate(-50%,-50%);width:min(1100px,94vw);z-index:201;color:var(--ui-ink)}
+
+/* Scope the override to the intro: theme-wide generic button rules use !important. */
+.standard-pro-page .standard-pro-actions button.home-entry__button{background:var(--home-koubo,#ffb020)!important;color:var(--home-koubo-ink,#16171a)!important}
+.standard-pro-page .standard-pro-title>.standard-pro-badge{color:#ffb020!important;border-color:currentColor!important;opacity:1!important;background:transparent!important}
+html[data-ui-theme=warm] .standard-pro-page .standard-pro-title>.standard-pro-badge{color:#8b5700!important}
+
+/* Share the editor theme tokens; Standard has no --standard-panel token. */
+.standard-tl-toolbar button,.standard-tl-label button{background:var(--studio-panel-2,#2b2b2b);color:var(--studio-ink,#e8e8e8);border-color:var(--studio-line,#141414)}

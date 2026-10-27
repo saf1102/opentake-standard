@@ -1,0 +1,51 @@
+{
+  "presets": {
+    "画室题名": {
+      "font": "Cormorant Garamond",
+      "fontFile": "CormorantGaramond-VF.ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "weight": 600,
+      "size": 0.078,
+      "color": "#F1E5CA",
+      "accent": "#E6BB78",
+      "lineHeight": 1.3,
+      "roles": [
+        "title"
+      ]
+    },
+    "绘画旁白": {
+      "font": "Cormorant Garamond",
+      "fontFile": "CormorantGaramond-VF.ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "weight": 500,
+      "size": 0.042,
+      "color": "#392E2A",
+      "accent": "#392E2A",
+      "lineHeight": 1.3,
+      "roles": [
+        "caption"
+      ],
+      "box": true,
+      "boxColor": "#F1E5CA"
+    },
+    "画作题签": {
+      "font": "Noto Serif SC",
+      "fontFile": "NotoSerifSC[wght].ttf",
+      "fallback": "Songti SC",
+      "layout": "content",
+      "weight": 500,
+      "size": 0.03,
+      "color": "#392E2A",
+      "accent": "#392E2A",
+      "lineHeight": 1.3,
+      "roles": [
+        "label"
+      ]
+    }
+  },
+  "finishes": [
+    "none"
+  ]
+}

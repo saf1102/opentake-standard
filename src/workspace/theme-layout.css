@@ -1,0 +1,20 @@
+/* Shared warm/frost geometry. Material themes must not move the workspace. */
+html:is([data-ui-theme=warm],[data-ui-theme=frost]) .editor-top {
+  gap:var(--studio-grid-gap);padding:var(--studio-grid-gap);
+}
+html:is([data-ui-theme=warm],[data-ui-theme=frost]) :is(.media-panel,.inspector-panel) {
+  margin:0;border-width:1px;border-style:solid;border-radius:18px;
+}
+html:is([data-ui-theme=warm],[data-ui-theme=frost]) .preview-panel {
+  grid-template-rows:minmax(0,1fr) auto;gap:var(--studio-grid-gap);overflow:visible;
+}
+html:is([data-ui-theme=warm],[data-ui-theme=frost]) .preview-stage-viewport {
+  padding:0 0 calc(var(--studio-space-y) - var(--studio-grid-gap));border-radius:18px;
+}
+html:is([data-ui-theme=warm],[data-ui-theme=frost]) .preview-panel:not(:fullscreen) .preview-stage-viewport {overflow:visible}
+html:is([data-ui-theme=warm],[data-ui-theme=frost]) .preview-controls {
+  min-height:46px;margin:0 calc(var(--studio-space-x) - var(--studio-grid-gap));border-width:1px;border-style:solid;border-radius:18px;
+}
+html:is([data-ui-theme=warm],[data-ui-theme=frost]) .workspace-switch>button {
+  position:relative;isolation:isolate;overflow:hidden;padding:9px 15px;border-width:1px;border-style:solid;border-radius:14px;
+}

@@ -1,0 +1,92 @@
+/* Keep the preview usable at laptop logical resolutions. Sidebar overflow is local. */
+.workspace-content .studio-editor { --timeline-min-height:clamp(340px,43dvh,430px);width:100%; }
+.studio-editor .editor-top { grid-template-columns:clamp(180px,19vw,280px) minmax(0,1fr) clamp(220px,23vw,340px);min-width:0; }
+.studio-editor .editor-top > * { min-width:0;max-width:100%; }
+.studio-editor .preview-panel { min-width:0;grid-template-rows:minmax(0,1fr) auto;position:relative; }
+.studio-editor .preview-project-name { top:8px;left:8px;right:auto;width:auto;max-width:65%;padding:0;border-radius:8px; }
+.studio-editor .preview-project-name__capsule { padding:5px 8px;gap:2px;border-radius:8px; }
+.studio-editor .preview-project-name b,.studio-editor .preview-project-name span { font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.studio-editor .preview-controls { flex-wrap:wrap;gap:5px;padding:6px;justify-content:center; }
+.studio-editor .preview-controls > span { font-size:10px; }
+.studio-editor .preview-controls .preview-quality-switch { margin-left:0; }
+.studio-editor .preview-controls .preview-progress-wrap { min-width:60px;flex:1; }
+.studio-editor .preview-controls .preview-fullscreen { position:absolute;right:8px;bottom:calc(100% + 8px);z-index:10;background:var(--studio-panel)!important; }
+.studio-editor .timeline-toolbar { overflow-x:auto;min-width:0;gap:4px; }
+.studio-editor .timeline-toolbar > * { flex-shrink:0; }
+.studio-editor .timeline-toolbar button { white-space:nowrap;font-size:11px;padding-left:7px;padding-right:7px; }
+.studio-editor .timeline-toolbar input { width:90px; }
+.topic-screening { display:grid;gap:12px; }
+.topic-screening > label { display:grid;gap:6px; }
+.topic-screening .content-actions { align-items:center; }
+.topic-screening label { min-width:0; }
+.topic-screening input[type=checkbox] { width:auto; }
+.content-workspace { min-width:0;max-width:100%; }
+.content-workspace header > div { min-width:0; }
+.content-workspace h1,.content-workspace h2,.content-workspace p { overflow-wrap:anywhere; }
+@media(max-width:1600px){
+ .workspace-nav { gap:10px;padding:0 12px; }
+ .workspace-preview-island-slot { position:static;transform:none;min-width:0; }
+ .workspace-preview-island { gap:3px; }
+ .workspace-preview-island button { min-width:32px;padding:0 6px; }
+ .workspace-preview-island .preview-accent-presets button { min-width:24px;width:24px; }
+ .workspace-home span { max-width:145px;overflow:hidden;text-overflow:ellipsis; }
+}
+@media(max-width:1250px){
+ .workspace-home span { display:none; }
+ .studio-editor .editor-top { grid-template-columns:180px minmax(0,1fr) 220px; }
+ .workspace-nav { gap:6px; }
+ .workspace-preview-island .preview-accent-presets { gap:0;padding-left:3px; }
+ .studio-editor .media-panel,.studio-editor .inspector-panel { font-size:11px; }
+}
+@media(max-width:800px){
+ .studio-editor .editor-top { grid-template-columns:145px minmax(0,1fr) 180px; }
+ .workspace-nav { overflow-x:auto; }
+ .workspace-nav > * { flex-shrink:0; }
+}
+.studio-editor .media-library-toolbar { flex-wrap:wrap;gap:5px; }
+.studio-editor .media-library-toolbar .upload-button { min-width:100px;white-space:nowrap;flex:1;padding:7px; }
+.studio-editor .media-view-toggle { flex-shrink:0; }
+.studio-editor .inspector-tabs button { padding:8px 5px;white-space:nowrap;font-size:11px;gap:4px; }
+.studio-editor .inspector-tabs button svg { width:13px;flex-shrink:0; }
+@media(max-width:1250px){
+ .workspace-nav .workspace-brand span, .workspace-nav .workspace-brand .workspace-brand-wordmark { display:none; }
+ .workspace-nav .workspace-editor-slot { flex:1;min-width:210px; }
+ .studio-editor .media-type-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .agent-settings-dialog .agent-module-head,.agent-settings-dialog .agent-module-row { grid-template-columns:minmax(150px,1.2fr) minmax(150px,1fr) minmax(100px,.65fr);gap:10px;padding:12px; }
+}
+@media(max-width:850px){
+ .agent-settings-dialog .agent-cli-controls { flex-wrap:wrap; }
+ .agent-settings-dialog .agent-cli-controls input { flex-basis:100%; }
+ .agent-settings-dialog .agent-module-head { display:none; }
+ .agent-settings-dialog .agent-module-row { grid-template-columns:1fr 1fr; }
+ .agent-settings-dialog .agent-module-description { grid-column:1/-1; }
+}
+@media(max-width:1250px){
+ .studio-editor .media-library-toolbar { display:flex;flex-wrap:wrap; }
+ .studio-editor .media-library-toolbar .upload-button { flex:1 0 100%;min-width:0;box-sizing:border-box; }
+ .studio-editor .media-view-toggle { margin-left:auto; }
+}
+
+.studio-editor .timeline-shell { grid-template-rows:40px minmax(0,1fr); }
+.studio-editor .timeline-body { min-width:0;grid-template-columns:164px minmax(0,1fr); }
+.studio-editor .timeline-scroll { min-width:0;min-height:0; }
+.studio-editor .track-heads { overflow:hidden; }
+.studio-editor .timeline-content { min-height:100%;height:100%; }
+.studio-editor .track-lane--overlay .timeline-clip,
+.studio-editor .track-lane--subtitle .timeline-clip { top:2px;bottom:2px;padding-top:0;padding-bottom:0;display:flex;align-items:center; }
+.studio-editor .track-lane--overlay .timeline-clip > b,
+.studio-editor .track-lane--subtitle .timeline-clip b { line-height:16px;white-space:nowrap; }
+.studio-editor .motion-card-size-badge { height:18px;min-height:0;top:50%;transform:translateY(-50%);font-size:10px; }
+/* Portal controls must participate in layout even when route CSS loads later. */
+@media(max-width:1600px){
+ .workspace-nav .workspace-preview-island-slot{position:static;transform:none;left:auto;top:auto;min-width:0;flex-shrink:0}
+}
+@media(max-width:1600px){
+ .workspace-nav .workspace-preview-island-slot{display:flex;overflow-x:auto;flex:1 1 0}
+ .workspace-nav .workspace-preview-island{flex-shrink:0}
+ .workspace-nav .workspace-editor-slot{flex:0 0 auto;min-width:0}
+ .workspace-nav .workspace-global-actions,.workspace-nav .workspace-launcher{flex-shrink:0}
+}
+
+/* Match the neighboring F/S/M badge without shifting the inline status label. */
+.studio-editor .timeline-card-state-icon {height:18px;min-height:0;font-size:10px;}

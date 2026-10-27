@@ -1,0 +1,8 @@
+/* 首页第三个入口「文案发布」（效果图 docs/界面改版/文案发布）。概念动图是 Blender 渲染的循环视频（public/home/publish-loop.mp4，
+   脚本 docs/界面改版/概念动图/blender/concept_loops.py publish）：钢笔写出琥珀 T，按下亮紫的发布按钮，纸飞出去。 */
+.home-entries:has(.home-entry[data-kind=publish]) { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.home-dot[data-kind=publish] { background:#9869dc; }
+/* 模块色：App 规定的亮紫（S先生 10-26），两套主题一样 */
+.home-entry[data-kind=publish] .home-entry__button { background:#9869dc;color:#fff; }
+.home-entry[data-kind=publish] .home-entry__button:hover { filter:brightness(1.06); }
+@media (max-width:1180px) { .home-entries:has(.home-entry[data-kind=publish]) { grid-template-columns:1fr; } }
