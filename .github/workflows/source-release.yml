@@ -7,6 +7,11 @@ on:
         required: true
         default: main
         type: string
+      resume_draft:
+        description: 'Resume an existing matching draft without replacing its assets'
+        required: true
+        default: false
+        type: boolean
 permissions:
   contents: write
 concurrency:
@@ -24,7 +29,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Verify archive and statistics safeguards
-        run: node --test scripts/prepare-source-release.test.mjs scripts/repository-stats.test.mjs
+        run: node --test scripts/prepare-source-release.test.mjs scripts/publish-source-release.test.mjs scripts/repository-stats.test.mjs
       - name: Prepare tracked main source and SHA-256
         env:
           SOURCE_REF: ${{ inputs.source_ref }}
@@ -32,4 +37,12 @@ jobs:
       - name: Upload a new source-only release (never replace existing assets)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/publish-source-release.mjs --bundle "$RUNNER_TEMP/source-release"
+          RESUME_DRAFT: ${{ inputs.resume_draft }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          options=()
+          if [ "$RESUME_DRAFT" = "true" ]; then
+            options+=(--resume-draft)
+          fi
+          node scripts/publish-source-release.mjs --bundle "$RUNNER_TEMP/source-release" "${options[@]}"

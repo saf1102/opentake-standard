@@ -39,14 +39,14 @@ OpenTake Standard 不向我们上传安装、启动或使用遥测。维护工�
 
 工作流先验证来源必须是公开 Standard 仓库，再用 `git archive` 导出指定提交的已跟踪源码。不会将本机脏文件、未跟踪文件、依赖缓存或用户工程装进去。非 main 提交和私有/生成路径会被拒绝。它不是安装包构建，不打包 Electron、FFmpeg 或私有 Pro 代码。
 
-每个提交使用独立的 `source-<完整提交SHA>` tag；附件名固定为 `OpenTake-Standard-source.zip`，另附 `.sha256`。创建草稿并上传后检查文件大小及 GitHub 返回的 SHA-256（若提供），通过才公开并设为 Latest。**已有 tag 或 Release 一律拒绝覆盖**，避免重置附件 ID 和下载计数。中途失败保留草稿供检查，不自动删除或覆盖。新版本选择新的 main commit；不会借用 Pro 的版本号。
+每个提交使用独立的 `source-<完整提交SHA>` tag；附件名固定为 `OpenTake-Standard-source.zip`，另附 `.sha256`。创建草稿并上传后检查文件大小及 GitHub 返回的 SHA-256（若提供），通过才公开并设为 Latest。**已有已发布 Release 一律拒绝覆盖**，避免重置附件 ID 和下载计数。中途失败保留草稿供检查，不自动删除或覆盖。仅恢复同一次失败草稿时，重新选择原来的完整 source_ref，并勾选 `resume_draft`；脚本通过分页 releases 列表匹配 tag_name，以数字 release ID 读取和发布（草稿的 untagged URL 不影响）。仅 commit、ZIP 和校验附件的名称/大小/SHA-256 全部相同且无额外资产时才继续；未提供 API digest 时按 asset ID 下载核对哈希。不会重传、删除或重建附件，原 asset ID 和下载计数保持。新版本选择新的 main commit；不会借用 Pro 的版本号。
 
 发布后，README 的 `releases/latest/download/OpenTake-Standard-source.zip` 指向最新快照。首次发布前此链接尚不可用；部署者必须手动运行并确认附件可下载后，才可声称 ZIP 入口交付。Latest 的更新是手动发布行为，日常统计不创建 Release。
 
 ## 本机验证
 
 ```sh
-node --test scripts/repository-stats.test.mjs scripts/prepare-source-release.test.mjs
+node --test scripts/repository-stats.test.mjs scripts/prepare-source-release.test.mjs scripts/publish-source-release.test.mjs
 # 公开 ZIP API，无需任何登录令牌：
 node scripts/repository-stats.mjs --repo saf1102/opentake-standard --out ./stats-result
 # 后续保留历史：
