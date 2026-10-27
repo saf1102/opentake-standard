@@ -1,0 +1,46 @@
+name: Repository clone statistics
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * *'
+# Disabled until the owner explicitly opts into public aggregate statistics.
+# The app does not send analytics. This only reads GitHub repository metrics.
+permissions:
+  contents: write
+concurrency:
+  group: repository-clone-statistics
+  cancel-in-progress: false
+jobs:
+  collect:
+    if: github.repository == 'saf1102/opentake-standard' && vars.ENABLE_REPOSITORY_STATS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Test aggregation
+        run: node --test scripts/repository-stats.test.mjs
+      - name: Restore saved days (fail closed on permission errors)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-repository-stats.mjs --restore .traffic-history
+      - name: Collect GitHub clone window
+        env:
+          GH_TOKEN: ${{ secrets.REPOSITORY_TRAFFIC_READ_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo 'Owner setup required: REPOSITORY_TRAFFIC_READ_TOKEN with Administration read for this repository.'
+            exit 1
+          fi
+          history=()
+          if [ -f .traffic-history/history.json ]; then
+            history=(--history .traffic-history/history.json)
+          fi
+          node scripts/repository-stats.mjs --repo "$GITHUB_REPOSITORY" --out .traffic-next "${history[@]}"
+      - name: Save aggregate statistics to dedicated branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-repository-stats.mjs --publish .traffic-next
