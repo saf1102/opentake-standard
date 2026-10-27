@@ -72,6 +72,8 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   for (const [name, body] of Object.entries(wrappers)) {
     const file = path.join(bin, name);
     if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== body) fs.writeFileSync(file, body, { mode: 0o755 });
+    // ZIP/project transfers can strip executable bits even when wrapper text is current.
+    fs.chmodSync(file, 0o755);
   }
   // Codex runs commands in a login zsh: /etc/zprofile (path_helper) puts system folders first and the person's own
   // ~/.zprofile may put an old ffmpeg or python ahead of ours. A private ZDOTDIR puts .opentake/bin back in front.

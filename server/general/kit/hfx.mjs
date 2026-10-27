@@ -1,6 +1,7 @@
 // hfx — OpenTake's tools for a HyperFrames film, usable inside the agent's sandbox (offline, nothing to install, no port).
 //   hfx check        HyperFrames' own lint, plus OpenTake's rules: every visual change is its own clip, sound has a role
 //   hfx look [n]     n frames (default 12), drawn exactly as OpenTake's export draws them, tiled into look/sheet.jpg
+import {sampleBrowser, sampleResponse} from './hfx-support.mjs';
 import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url'; import { createRequire } from 'node:module'; import { execFileSync } from 'node:child_process';
 const NM = process.env.CW_NODE_MODULES, BIN = process.env.LINKREADER_BIN_DIR, CHROME = process.env.CW_CHROME;
 const root = process.env.CW_WORK || process.cwd(), [cmd, arg] = process.argv.slice(2);
@@ -57,10 +58,16 @@ if (cmd === 'check') {
     const pts = execFileSync(tool('ffprobe'), ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'csv=p=0', file], { maxBuffer: 64 << 20 }).toString().trim().split('\n').map(l => parseFloat(l)).filter(Number.isFinite);
     videos[page] = { key, count: fs.readdirSync(dir).length, pts: pts.map(x => Math.round((x - pts[0]) * 1e6) / 1e6) };
   }
-  const browser = await chromium.launch({ executablePath: CHROME, args: ['--single-process', '--no-zygote', '--font-render-hinting=none', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio', '--enable-unsafe-swiftshader'] });
+  // Full Chrome needs macOS application services unavailable inside the offline
+  // agent sandbox. Without an override Playwright selects its headless shell.
+  const sampleChrome = sampleBrowser(process.env);
+  const browser = await chromium.launch({ executablePath: sampleChrome, args: ['--single-process', '--no-zygote', '--font-render-hinting=none', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio', '--enable-unsafe-swiftshader'] });
   try {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    let resourceFailure;
+    const compressedAssets = new Map();
     await page.route('**/*', async route => {
+      try {
       const url = new URL(route.request().url());
       if (url.pathname.startsWith('/__ot_frames/')) return route.fulfill({ body: fs.readFileSync(path.join(tmp, url.pathname.slice(13))), contentType: 'image/jpeg' });
       if (url.origin !== 'http://hf.localhost') return route.abort();
@@ -68,10 +75,15 @@ if (cmd === 'check') {
       const r = await globalThis.__hfFetch(new Request(url.href, { headers: route.request().headers() }));
       let body = Buffer.from(await r.arrayBuffer());
       if (url.pathname === '/' || url.pathname === '/index.html') body = Buffer.from(String(body).replace(/<\/body>/i, `<script>window.__otFps=30;window.__otVideos=${JSON.stringify(videos)}</script><script>${shim}</script></body>`));
-      return route.fulfill({ status: r.status, body, headers: Object.fromEntries(r.headers) });
+      if (r.status >= 400) throw Error(`样张资源读取失败（${r.status}）：${url.pathname}`);
+      const response = sampleResponse(body, Object.fromEntries(r.headers), url.href, compressedAssets);
+      return await route.fulfill({ status: r.status, ...response });
+      } catch(error) { resourceFailure = error; await route.abort().catch(() => {}); }
+
     });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto('http://hf.localhost/index.html');
+    if (resourceFailure) throw resourceFailure;
     await page.waitForFunction(() => window.__otRender, null, { timeout: 30000 });
     const comp = await page.evaluate(() => window.__otRender.select('main'));
     for (let i = 0; i < n; i++) {
@@ -79,9 +91,11 @@ if (cmd === 'check') {
       await page.evaluate(f => window.__otRender.seek(f), frame);
       await page.screenshot({ path: path.join(tmp, `f${String(i).padStart(2, '0')}.jpg`), type: 'jpeg', quality: 80 });
     }
+    if (resourceFailure) throw resourceFailure;
+    if (errors.length) throw Error('样张页面报错：'+errors.slice(0,5).join('；'));
     fs.mkdirSync(path.join(root, 'look'), { recursive: true });
     const cols = 4, rows = Math.ceil(n / cols);
     execFileSync(tool('ffmpeg'), ['-v', 'error', '-y', '-framerate', '1', '-i', path.join(tmp, 'f%02d.jpg'), '-vf', `scale=480:-2,tile=${cols}x${rows}`, '-frames:v', '1', path.join(root, 'look', 'sheet.jpg')]);
-    say(`接触表：look/sheet.jpg（${n} 帧，从左到右、从上到下，每 ${(comp.durationInFrames / 30 / n).toFixed(2)} 秒一帧）`, ...(errors.length ? ['页面报错：', ...errors.slice(0, 5)] : []), '用 view_image 打开看一遍。');
+    say(`接触表：look/sheet.jpg（${n} 帧，从左到右、从上到下，每 ${(comp.durationInFrames / 30 / n).toFixed(2)} 秒一帧）`, '用 view_image 打开看一遍。');
   } finally { await browser.close(); }
 } else say('用法：hfx check | hfx look [帧数]');
