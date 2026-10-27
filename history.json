@@ -6,11 +6,11 @@
     "status": "unavailable",
     "lastSuccessAt": null,
     "history": null,
-    "attemptedAt": "2026-10-27T15:20:35.453Z"
+    "attemptedAt": "2026-10-27T15:23:16.575Z"
   },
   "sourceZip": {
     "status": "ok",
-    "lastSuccessAt": "2026-10-27T15:20:35.453Z",
+    "lastSuccessAt": "2026-10-27T15:23:16.575Z",
     "assets": [
       {
         "id": 681972658,
@@ -19,7 +19,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-10-27T15:18:36.452Z",
         "firstObservedCount": 0,
-        "lastObservedAt": "2026-10-27T15:20:35.453Z",
+        "lastObservedAt": "2026-10-27T15:23:16.575Z",
         "lastCount": 0,
         "active": true,
         "absentSince": null
@@ -73,11 +73,30 @@
             "correction": 0
           }
         ]
+      },
+      {
+        "from": "2026-10-27T15:20:35.453Z",
+        "to": "2026-10-27T15:23:16.575Z",
+        "increase": 0,
+        "firstSeenBaseline": 0,
+        "correction": 0,
+        "kind": "within-utc-day",
+        "utcDate": "2026-10-27",
+        "changes": [
+          {
+            "assetId": 681972658,
+            "from": "2026-10-27T15:20:35.453Z",
+            "to": "2026-10-27T15:23:16.575Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          }
+        ]
       }
     ],
-    "attemptedAt": "2026-10-27T15:20:35.453Z",
+    "attemptedAt": "2026-10-27T15:23:16.575Z",
     "lastSnapshot": "[{\"id\":681972658,\"releaseId\":425627379,\"tag\":\"source-0a414ba6be7d62ddfe065186479353af8e779c71\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":0}]"
   },
-  "lastCollectedAt": "2026-10-27T15:20:35.453Z",
+  "lastCollectedAt": "2026-10-27T15:23:16.575Z",
   "automaticSourceArchiveDownloads": null
 }
