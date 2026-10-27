@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {screenPreviewRect,previewRadius} from '../shared/openscreen-preview-geometry.ts';
+test('zoom expands the recording frame instead of cropping inside a stationary rounded mask',()=>{const base={x:192,y:108,width:1536,height:864},canvas={width:1920,height:1080};const zoomed=screenPreviewRect(base,canvas,{scale:1.8,translateXPercent:-40,translateYPercent:-40});assert.ok(Math.abs(zoomed.x+422.4)<1e-9);assert.ok(Math.abs(zoomed.width-2764.8)<1e-9);assert.deepEqual(screenPreviewRect(base,canvas,{scale:1,translateXPercent:0,translateYPercent:0}),base);});
+test('preview roundness scales with viewport and uses the output geometry',()=>{assert.equal(previewRadius(40,{width:960,height:540},{width:1920,height:1080}),20);assert.equal(previewRadius(40,{width:1920,height:1080},{width:1920,height:1080}),40);assert.equal(previewRadius(40,{width:540,height:960},{width:1080,height:1920}),20);});

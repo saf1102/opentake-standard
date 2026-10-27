@@ -1,3 +1,4 @@
+import {compatibleOpenScreenDocument} from '../../../../shared/openscreen-compat';
 import { getEditorSettings, patchEditorSettings } from "../lib/ai-edition/store/editorSettings";
 import {
 	type AxcutTimelineOperation,
@@ -149,15 +150,6 @@ const clientId = query.get("linkreaderClientId") || "";
 const writable = query.get("linkreaderWritable") === "1";
 const revisions = new Map<string, number>();
 let activeDocumentId = "";
-let activeSttAbort: AbortController | null = null;
-const sttStatusListeners = new Set<
-	(event: {
-		phase: "model" | "transcribe";
-		completedSec?: number;
-		totalSec?: number;
-		backend?: string;
-	}) => void
->();
 const nativeExportProgressListeners = new Set<(frames: number) => void>();
 
 function bridgeMessage(type: string, payload: JsonObject = {}) {
@@ -226,7 +218,7 @@ function rebaseLinkReaderMediaUrls(value: unknown, key = ""): unknown {
 }
 
 function normalizeDocument(value: unknown): AxcutDocument {
-	return documentSchema.parse(rebaseLinkReaderMediaUrls(value));
+	return documentSchema.parse(compatibleOpenScreenDocument(rebaseLinkReaderMediaUrls(value)));
 }
 
 function assetIdFromMediaPath(value?: string) {
@@ -772,7 +764,9 @@ export async function installLinkReaderBridge() {
 		try {
 			return { success: true, document: (await readDocument(id)).document };
 		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : String(error) };
+			const message = error instanceof Error ? error.message : String(error);
+			bridgeMessage("error", { message: `录屏工程无法打开：${message}。原始文件已保留。` });
+			return { success: false, error: message };
 		}
 	};
 	ai.create = async (title?: string) => {
@@ -1126,94 +1120,9 @@ export async function installLinkReaderBridge() {
 			meta: nativeMeta(request.requestId),
 		};
 	};
-	electron.stt = {
-		transcribe: async (request: { samples: Float32Array; language?: string }) => {
-			if (!activeDocumentId) throw new Error("请先打开一个 OpenScreen 工程");
-			activeSttAbort?.abort();
-			const controller = new AbortController();
-			activeSttAbort = controller;
-			const totalSec = request.samples.length / 16_000;
-			for (const listener of sttStatusListeners)
-				listener({ phase: "model", totalSec, backend: "linkreader-unified-asr" });
-			bridgeMessage("task-state", {
-				task: "transcription",
-				label: "正在使用 LinkReader 统一 ASR 生成 OpenScreen 字幕…",
-				documentId: activeDocumentId,
-			});
-			try {
-				for (const listener of sttStatusListeners)
-					listener({
-						phase: "transcribe",
-						completedSec: 0,
-						totalSec,
-						backend: "linkreader-unified-asr",
-					});
-				// Float32Array may be backed by SharedArrayBuffer. Fetch's BodyInit typing
-				// only accepts a regular ArrayBuffer, so take an owned byte copy before
-				// handing the samples to the LinkReader ASR endpoint.
-				const sampleBytes = new Uint8Array(request.samples.byteLength);
-				sampleBytes.set(
-					new Uint8Array(
-						request.samples.buffer,
-						request.samples.byteOffset,
-						request.samples.byteLength,
-					),
-				);
-				const result = await api<{
-					segments: Array<{ startSec: number; endSec: number; text: string }>;
-					wordSegments: Array<{
-						word: string;
-						startSec: number;
-						endSec: number;
-						confidence?: number;
-					}>;
-					detectedLanguage: string;
-					backend: string;
-				}>(
-					`/api/editor/projects/${encodeURIComponent(projectId)}/openscreen/documents/${encodeURIComponent(activeDocumentId)}/stt`,
-					{
-						method: "POST",
-						headers: {
-							"Content-Type": "application/octet-stream",
-							"X-OpenScreen-Language": request.language || "auto",
-						},
-						body: sampleBytes.buffer as ArrayBuffer,
-						signal: controller.signal,
-					},
-				);
-				for (const listener of sttStatusListeners)
-					listener({
-						phase: "transcribe",
-						completedSec: totalSec,
-						totalSec,
-						backend: result.backend,
-					});
-				bridgeMessage("task-state", {
-					task: "transcription",
-					label: `字幕识别完成，共 ${result.wordSegments.length || result.segments.length} 个时间单元`,
-					documentId: activeDocumentId,
-				});
-				return result;
-			} finally {
-				if (activeSttAbort === controller) activeSttAbort = null;
-			}
-		},
-		cancel: async () => {
-			activeSttAbort?.abort();
-			activeSttAbort = null;
-		},
-		onStatus: (
-			callback: (event: {
-				phase: "model" | "transcribe";
-				completedSec?: number;
-				totalSec?: number;
-				backend?: string;
-			}) => void,
-		) => {
-			sttStatusListeners.add(callback);
-			return () => sttStatusListeners.delete(callback);
-		},
-	};
+	// Standard has no local ASR endpoint. Do not advertise a transcription engine:
+	// the upstream store then skips automatic transcription on import and reopen.
+	delete electron.stt;
 	electron.getAppInfo = async () => ({ version: "1.10.0-linkreader", canCheckForUpdates: false });
 	electron.getSources = async () => {
 		const sources = await api<

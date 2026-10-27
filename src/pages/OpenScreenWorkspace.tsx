@@ -166,7 +166,7 @@ export default function OpenScreenWorkspace() {
       <div className="openscreen-hostbar__actions">
         {!writable && <button type="button" onClick={() => void refreshLock(true)}>接管编辑</button>}
         <button type="button" onClick={() => iframeRef.current?.contentWindow?.location.reload()}><RefreshCw size={15} />重新载入</button>
-        <button type="button" onClick={() => void launchHud()} disabled={!writable}><MonitorUp size={15} />导入录制视频</button>
+        <button type="button" onClick={() => void launchHud()} disabled={!writable}><MonitorUp size={15} />开始录屏</button>
 
       </div>
     </header>

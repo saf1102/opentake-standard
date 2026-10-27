@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { EditProject, OpenScreenExportJob } from "../../src/types/editor.ts";
 import { OpenScreenExportJobSchema } from "../../src/types/editor.ts";
-import { findOpenScreenExecutable } from "./openscreen.ts";
+import { findOpenScreenExecutable, openScreenProfileArgs } from "./openscreen.ts";
 import { readOpenScreenDocument } from "./openscreen-documents.ts";
 import { atomicJson, findProject } from "./store.ts";
 
@@ -25,7 +25,7 @@ export function resolveOpenScreenExportRunner(_document: unknown, lookup?: impor
   // propagate that mode to the independently installed GUI/export application.
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.OPENSCREEN_COMPOSITOR_VIEW_NODE;
-  return {executable, argsPrefix: ["export"], env, cwd: path.dirname(executable), kind: "installed-native" as const};
+  return {executable, argsPrefix: [...openScreenProfileArgs(lookup?.env), "export"], env, cwd: path.dirname(executable), kind: "installed-native" as const};
 }
 
 function safeId(value: unknown, label: string) {

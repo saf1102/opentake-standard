@@ -1,3 +1,4 @@
+import {compatibleOpenScreenDocument} from '../../shared/openscreen-compat.ts';
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -21,7 +22,7 @@ function asObject(value: unknown, message: string): JsonObject {
 }
 
 function validateDocument(value: unknown): JsonObject {
-  const document = asObject(value, "OpenScreen 文档必须是对象");
+  const document = compatibleOpenScreenDocument(value);
   const schemaVersion = Number(document.schemaVersion);
   if (!Number.isInteger(schemaVersion) || schemaVersion < 1)
     throw new Error("OpenScreen 文档缺少有效 schemaVersion");

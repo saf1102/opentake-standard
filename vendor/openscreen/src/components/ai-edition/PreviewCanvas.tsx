@@ -1,3 +1,6 @@
+import {screenPreviewRect, previewRadius} from '../../../../../shared/openscreen-preview-geometry';
+import {computeZoomPreviewTransform} from '@/lib/ai-edition/timeline/zoom-preview';
+import {findActiveSpeedRegion} from '@/lib/ai-edition/timeline/speed';
 // Hosts the native D3D preview canvas (the sole pixel source) plus the
 // interactive-only DOM overlays (zoom gimbal, annotations, webcam drag) that
 // still need real hitboxes. The shared source of truth is `useEditorSettings`,
@@ -31,7 +34,7 @@ import {
 	type ZoomFocus,
 } from "@/components/video-editor/types";
 import { useScopedT } from "@/contexts/I18nContext";
-import { resolveAspectRatioValue } from "@/lib/ai-edition/document/outputFormat";
+import { pickOutputDims, resolveAspectRatioValue } from "@/lib/ai-edition/document/outputFormat";
 import type {
 	AxcutAnnotationRegion,
 	AxcutClip,
@@ -316,10 +319,16 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 
 	const frameStyle = useMemo(() => buildFrameStyle(settings), [settings]);
 	const [isPlaying, setIsPlaying] = useState(false);
-	const screenStyle = useMemo(
-		() => buildScreenStyle(layout, settings, frameSize, isLinkReaderBrowser, isPlaying),
-		[layout, settings, frameSize, isLinkReaderBrowser, isPlaying],
-	);
+	const screenStyle = useMemo(() => {
+		if (!isLinkReaderBrowser || !layout?.screenRect) return buildScreenStyle(layout, settings, frameSize, isLinkReaderBrowser, isPlaying);
+		const rate=findActiveSpeedRegion(props.speedRegions ?? [], Math.round(props.currentTimeSec*1000))?.speed ?? 1;
+		const zoom=computeZoomPreviewTransform(props.zoomRegions ?? [], props.currentTimeSec*1000, undefined, rate);
+		const transformed={...layout,screenRect:screenPreviewRect(layout.screenRect,frameSize,zoom)};
+		const style=buildScreenStyle(transformed,settings,frameSize,true,isPlaying);
+		const output=document ? pickOutputDims(document,settings.aspectRatio) : SCREEN_SOURCE_SIZE;
+		style.borderRadius=`${previewRadius(layout.screenBorderRadius ?? settings.borderRadius,frameSize,output)}px`;
+		return style;
+	}, [layout, settings, frameSize, isLinkReaderBrowser, isPlaying, props.speedRegions, props.zoomRegions, props.currentTimeSec, document]);
 	const webcamStyle = useMemo(
 		() => buildWebcamStyle(effectiveLayout, settings, frameSize),
 		[effectiveLayout, settings, frameSize],
@@ -438,9 +447,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 							<VirtualPreview
 								{...relayProps}
 								renderBrowserCursor={isLinkReaderBrowser}
+								disableZoomTransform={isLinkReaderBrowser}
 								videoStyle={{
 									...videoBorderRadiusStyle(layout, settings),
-									...(isLinkReaderBrowser ? { visibility: "visible" as const } : {}),
+									...(isLinkReaderBrowser ? { visibility: "visible" as const, borderRadius: 0 } : {}),
 								}}
 							/>
 						);

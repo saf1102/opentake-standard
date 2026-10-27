@@ -55,6 +55,19 @@ export function findOpenScreenExecutable(lookup?: OpenScreenLookup) {
   return openScreenExecutableCandidates(lookup).find(executableFile);
 }
 
+/** An explicit test profile controls both the native app and the import scanner. */
+export function openScreenProfile(env: NodeJS.ProcessEnv = process.env) {
+  const value = env.OPENSCREEN_USER_DATA_DIR?.trim();
+  if (!value) return undefined;
+  if (!path.isAbsolute(value)) throw new Error("OPENSCREEN_USER_DATA_DIR 必须是绝对路径");
+  return path.normalize(value);
+}
+
+export function openScreenProfileArgs(env: NodeJS.ProcessEnv = process.env) {
+  const profile = openScreenProfile(env);
+  return profile ? [`--user-data-dir=${profile}`] : [];
+}
+
 export function appBundleForExecutable(executable: string) {
   const resolved = fs.realpathSync(executable);
   const marker = ".app/Contents/MacOS/";

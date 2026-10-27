@@ -112,6 +112,7 @@ function findNextClipByTimelineOrder(
 }
 
 interface VirtualPreviewProps {
+	disableZoomTransform?: boolean;
 	videoSources: VideoSource[];
 	clips: AxcutClip[];
 	zoomRegions?: AxcutZoomRegion[];
@@ -159,6 +160,7 @@ interface VirtualPreviewProps {
 }
 
 export function VirtualPreview({
+	disableZoomTransform = false,
 	videoSources,
 	clips,
 	zoomRegions = [],
@@ -699,11 +701,11 @@ export function VirtualPreview({
 		);
 		const playbackRate = activeSpeedRegion?.speed ?? 1;
 		const transform =
-			zoomRegions.length === 0
+			disableZoomTransform || zoomRegions.length === 0
 				? IDENTITY_ZOOM_TRANSFORM
 				: computeZoomPreviewTransform(zoomRegions, virtualTimeSec * 1000, undefined, playbackRate);
 		frame.style.transform = `translate(${transform.translateXPercent}%, ${transform.translateYPercent}%) scale(${transform.scale})`;
-	}, [zoomRegions, virtualTimeSec]);
+	}, [zoomRegions, virtualTimeSec, disableZoomTransform]);
 
 	/**
 	 * Write a source position onto the element with AT MOST ONE demuxer seek in

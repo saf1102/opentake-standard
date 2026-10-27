@@ -377,7 +377,7 @@ function readPlan(id: string, work: string): GeneralProject['plan'] | undefined 
 }
 
 /** One Codex turn: prompt, live steps from events and progress.json, the final message. */
-async function turn(id: string, dir: string, phase: Phase, runId: string): Promise<TurnOutcome> {
+async function turn(id: string, dir: string, phase: Phase, runId: string, recoveredMissingThread = false): Promise<TurnOutcome> {
   const entry = live.get(id)!;
   const stopped = () => entry.stopRun === runId;
   const { project } = findGeneral(id);
@@ -453,6 +453,14 @@ async function turn(id: string, dir: string, phase: Phase, runId: string): Promi
   finishAgentRecord(agentRecord, stopped() ? 'failed' : result.code === 0 && !failure ? 'completed' : 'failed', stopped() ? '已停止' : failure || (result.code !== 0 ? stderrTail(result.stderr) : undefined));
 
   if (stopped()) { if (queued.length) editSession(dir, s => { s.queue = [...queued, ...s.queue]; }); return 'stopped'; }
+  if ((result.code !== 0 || failure) && session.threadId && !recoveredMissingThread
+      && missingCodexRollout(`${failure || ''} ${result.stderr}`)) {
+    // A portable project keeps its media and work, but a Codex rollout is local
+    // to its original computer. Retry once with a fresh brief, not a fresh project.
+    editSession(dir, s => { s.threadId = undefined; s.resumed = true; s.queue = [...queued, ...s.queue]; });
+    updateGeneral(id, p => { p.messages.push(message('system', '原来的 Codex 会话在本机不存在，已保留工程内容并用新会话继续。')); });
+    return turn(id, dir, phase, runId, true);
+  }
   if (result.code !== 0 || failure) throw new Error(`Codex 这一轮没有完成：${failure || stderrTail(result.stderr) || `退出码 ${result.code}`}`);
   const request = readNetworkRequest(work, dir);
   if (request) {
@@ -464,6 +472,9 @@ async function turn(id: string, dir: string, phase: Phase, runId: string): Promi
     return 'network';
   }
   return 'ok';
+}
+export function missingCodexRollout(error: string) {
+  return /thread\/resume[\s\S]*no rollout found for thread id/i.test(error);
 }
 const stderrTail = (stderr: string) => stderr.trim().split('\n').filter(l => !/^\s*$/.test(l)).slice(-3).join(' ').slice(0, 400);
 
@@ -488,6 +499,15 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
   const style = runtime.style(project.styleId)!;
   const n = (project.versions.at(-1)?.n ?? 0) + 1;
   const reviewDir = path.join(dir, 'review', `v${n}-r${round}`);
+  // Advancing an agent phase is not evidence that its visual self-check succeeded.
+  // A missing contact sheet must never appear as a completed self-check.
+  const sheet = path.join(dir, 'work', 'look', 'sheet.jpg');
+  if (!fs.existsSync(sheet) || fs.statSync(sheet).size === 0) {
+    patchRun(id, r => { r.steps = setStep(r.steps, 'self-check', {
+      state: 'skipped', endedAt: now(), detail: '未生成自查样张；继续执行成片检查', thumbs: undefined,
+    }); });
+  }
+
   patchRun(id, r => { r.steps = setStep(r.steps, 'review', { state: 'running', startedAt: now(), endedAt: undefined, detail: round > 1 ? '复审改过的版本' : '抽帧、机检' }); });
   const video = path.join(dir, 'work', 'out.mp4');
   if (isHyperframesWork(path.join(dir, 'work'))) {

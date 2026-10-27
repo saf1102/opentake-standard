@@ -45,3 +45,23 @@ test('external export freezes preview defaults and wallpaper without mutating so
  }
  finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+
+test('recording candidates deduplicate filesystem aliases without collapsing distinct files',async()=>{
+ const {uniqueRecordingFiles}=await import('./editor/openscreen-host.ts');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'standard-recording-alias-'));
+ try {
+  const source=path.join(root,'source.openscreen'),alias=path.join(root,'alias.openscreen'),link=path.join(root,'link.openscreen'),other=path.join(root,'other.openscreen');
+  fs.writeFileSync(source,'same content');fs.linkSync(source,alias);fs.symlinkSync(source,link);fs.writeFileSync(other,'same content');
+  assert.deepEqual(uniqueRecordingFiles([source,alias,link,source,other,path.join(root,'missing')]),[source,other]);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+
+test('isolated OpenScreen profile requires an absolute path and passes it to native launches', async()=>{
+ const {openScreenProfile,openScreenProfileArgs}=await import('./editor/openscreen.ts');
+ assert.equal(openScreenProfile({}),undefined);
+ assert.deepEqual(openScreenProfileArgs({}),[]);
+ assert.throws(()=>openScreenProfile({OPENSCREEN_USER_DATA_DIR:'relative'}),/绝对路径/);
+ assert.deepEqual(openScreenProfileArgs({OPENSCREEN_USER_DATA_DIR:'/tmp/isolated screen'}),['--user-data-dir=/tmp/isolated screen']);
+});

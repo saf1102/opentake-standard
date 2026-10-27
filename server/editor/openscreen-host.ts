@@ -13,14 +13,15 @@ import {
   OpenScreenHostCandidateSchema,
   OpenScreenHostSessionSchema,
 } from "../../src/types/editor.ts";
-import { findOpenScreenExecutable, appBundleForExecutable } from "./openscreen.ts";
+import { findOpenScreenExecutable, appBundleForExecutable, openScreenProfile, openScreenProfileArgs } from "./openscreen.ts";
 import { processMedia } from "./media.ts";
 import { createOpenScreenDocument } from "./openscreen-documents.ts";
 import { atomicJson, findProject, save } from "./store.ts";
 
 type JsonObject = Record<string, unknown>;
 
-const OPENSCREEN_SUPPORT_ROOTS = [
+const profile = openScreenProfile();
+const OPENSCREEN_SUPPORT_ROOTS = profile ? [profile] : [
   path.join(os.homedir(), "Library", "Application Support", "openscreen"),
   path.join(os.homedir(), "Library", "Application Support", "OpenScreen"),
   path.join(os.homedir(), "Library", "Application Support", "Openscreen"),
@@ -68,18 +69,29 @@ function collectFiles(
   return output;
 }
 
-function projectFiles() {
-  return [...new Set(PROJECT_ROOTS.flatMap((root) => collectFiles(
-    root,
-    (_file, entry) => entry.name.toLowerCase().endsWith(".openscreen"),
-  )))];
+/** Case aliases, symlinks and hard links can name one recording on macOS.
+ * Keep the original path for display, but deduplicate by filesystem identity. */
+export function uniqueRecordingFiles(files: string[]) {
+  const seen = new Set<string>();
+  return files.filter(file => {
+    try {
+      const stat = fs.statSync(file);
+      if (!stat.isFile()) return false;
+      const key = stat.ino ? `${stat.dev}:${stat.ino}` : fs.realpathSync(file);
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    } catch { return false; }
+  });
 }
-
+function projectFiles() {
+  return uniqueRecordingFiles(PROJECT_ROOTS.flatMap(root => collectFiles(
+    root, (_file, entry) => entry.name.toLowerCase().endsWith(".openscreen"),
+  )));
+}
 function recordingFiles() {
-  return [...new Set(RECORDING_ROOTS.flatMap((root) => collectFiles(
-    root,
-    (_file, entry) => /\.(?:mp4|mov|m4v|webm|mkv|json)$/i.test(entry.name),
-  )))];
+  return uniqueRecordingFiles(RECORDING_ROOTS.flatMap(root => collectFiles(
+    root, (_file, entry) => /\.(?:mp4|mov|m4v|webm|mkv|json)$/i.test(entry.name),
+  )));
 }
 
 function fingerprint(file: string) {
@@ -200,7 +212,7 @@ export function launchOpenScreenHud(projectId: string): OpenScreenHostSession {
   persist(session);
   const app = process.platform === "darwin" ? appBundleForExecutable(executable) : undefined;
   const env = {...process.env}; delete env.ELECTRON_RUN_AS_NODE;
-  const child = spawn(app ? "/usr/bin/open" : executable, app ? ["-a", app] : [], { env, detached: true, stdio: "ignore" });
+  const child = spawn(app ? "/usr/bin/open" : executable, app ? [...(profile ? ["-n"] : []), "-a", app, ... (profile ? ["--args", ...openScreenProfileArgs()] : [])] : openScreenProfileArgs(), { env, detached: true, stdio: "ignore" });
   child.once("close", (code) => {if(code && !["completed","cancelled"].includes(session.status)){session.status="failed";session.error=`OpenScreen 启动失败（${code}），请检查本机安装。`;persist(session)}});
   child.once("error", (error) => {
     session.status = "failed";

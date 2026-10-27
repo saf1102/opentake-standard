@@ -73,3 +73,10 @@ test('Codex arguments: sandboxed to work/, offline by default, user skills and c
   assert.ok(r.includes('sandbox_mode="read-only"') && r.includes('--ephemeral') && r.includes('--output-schema /s.json'));
   assert.deepEqual(review.slice(-5), ['-', '-i', '/a.jpg', '-i', '/b.jpg']);
 });
+
+
+test('portable project recovers only the explicit missing-rollout resume failure', async()=>{
+ const {missingCodexRollout}=await import('./general/runner.ts');
+ assert.equal(missingCodexRollout('Error: thread/resume: thread/resume failed: no rollout found for thread id test'),true);
+ for(const text of ['rate limit','authentication failed','thread/resume: network error','no rollout found for thread id test']) assert.equal(missingCodexRollout(text),false);
+});

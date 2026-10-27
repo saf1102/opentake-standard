@@ -6,7 +6,7 @@
 
 对你的智能体说：**按这个仓库的 AGENTS.md 帮我装好 OpenTake Standard。**
 
-先安装 Node.js 24（含 npm）、Python 3 和 numpy、FFmpeg 与 ffprobe；生成视频还需要已安装并登录的 Codex CLI。录屏运镜的录制和导出需要另外安装官方 OpenScreen 2.1.2 或兼容版本，见下节。不要用 sudo，也不要关闭系统安全保护。
+先安装 Node.js 24.15.0 或更新的 24.x（含 npm）、Python 3 和 numpy、FFmpeg 与 ffprobe；生成视频还需要已安装并登录的 Codex CLI。录屏运镜的录制和导出需要另外安装官方 OpenScreen 2.1.2 或兼容版本，见下节。不要用 sudo，也不要关闭系统安全保护。
 
 ```sh
 git clone https://github.com/saf1102/opentake-standard.git
@@ -30,7 +30,7 @@ npm start
 
 ### 缺少工具时
 
-- Node.js：从 [Node.js 官方站点](https://nodejs.org/) 安装 24，重新开终端确认 `node --version`。
+- Node.js：从 [Node.js 官方站点](https://nodejs.org/) 安装 24.15.0 或更新的 24.x，重新开终端确认 `node --version`。
 - FFmpeg：确认 `ffmpeg -version` 和 `ffprobe -version` 都成功。Standard 不分发 FFmpeg 二进制；请使用合适许可的构建。需要手动指定时，把含这两个程序的目录设为 `LINKREADER_BIN_DIR`。
 - Python：确认 `python3 -c "import numpy"` 成功。缺 numpy 时可建立项目自己的虚拟环境：`python3 -m venv .venv`，再运行 `.venv/bin/python -m pip install numpy`；启动前将 `LINKREADER_PYTHON` 设为该解释器的绝对路径，不改系统 Python。
 - Chromium：再次运行上面的 Playwright 安装命令；不要使用另一版本的缓存替代。
@@ -48,3 +48,5 @@ Grant screen/audio recording permission to OpenScreen when macOS requests it. Yo
 ## Upgrade privacy
 
 Standard editing requires no account. Upgrade checks fetch public configuration when opening the upgrade dialog and once daily by default; disable daily checks in Settings. The public configuration request carries no account information. Upgrade sign-in stores a session only in the user data directory, never in projects or logs; passwords are not stored. The fallback is `https://raw.githubusercontent.com/saf1102/opentake-standard/main/upgrade.json`; if both sources are unavailable, the app falls back to built-in beta mode.
+
+本机隔离验收可设置绝对路径 `OPENSCREEN_USER_DATA_DIR`。Standard 会用这个目录启动 OpenScreen，并且只扫描该目录内的 projects 和 recordings，避免导入日常录屏档案。未设置时保持 OpenScreen 的默认目录。
