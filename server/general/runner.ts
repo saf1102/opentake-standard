@@ -204,6 +204,40 @@ export function resumeRun(id: string): GeneralProject {
   return out;
 }
 
+/** A copied project may have saved versions without this machine's Codex session.
+ * Recover only a missing/empty work directory. A nonempty incomplete work may
+ * contain unsaved edits: never merge an old snapshot into it or start over.
+ */
+function ensureRevisionWork(dir: string, version: number) {
+  const error = (detail: string) => Object.assign(new Error(`无法继续修改第 ${version} 版：${detail}。已保留工程和现有文件，没有重新生成。`), { status: 409 });
+  if (!Number.isSafeInteger(version) || version < 1) throw error('版本号无效');
+  const work = path.join(dir, 'work');
+  const entry = (folder: string) => ['index.html', 'film.json', 'out.mp4'].some(name => {
+    try { return fs.lstatSync(path.join(folder, name)).isFile(); } catch { return false; }
+  });
+  if (entry(work)) return;
+  if (fs.existsSync(work) && (!fs.lstatSync(work).isDirectory() || fs.readdirSync(work).length))
+    throw error('工作目录缺少片子入口，需先恢复工作文件');
+  const snapshot = path.join(dir, 'versions', `v${version}`, 'work');
+  if (!fs.existsSync(snapshot) || !entry(snapshot)) throw error('工作目录和该版本的源码快照均不可用');
+  if (!fs.realpathSync(snapshot).startsWith(fs.realpathSync(dir) + path.sep)) throw error('版本快照不在工程内');
+  const validate = (folder: string) => {
+    for (const item of fs.readdirSync(folder, {withFileTypes: true})) {
+      if (item.isDirectory()) validate(path.join(folder, item.name));
+      else if (!item.isFile()) throw error('版本快照包含非普通文件，无法安全恢复');
+    }
+  };
+  validate(snapshot);
+  const staging = path.join(dir, `.revision-work-${crypto.randomUUID()}`);
+  try {
+    fs.cpSync(snapshot, staging, {recursive: true, errorOnExist: true, force: false});
+    // Rename replaces only an absent or empty directory; never an existing tree.
+    fs.renameSync(staging, work);
+  } finally {
+    if (fs.existsSync(staging)) fs.rmSync(staging, {recursive: true, force: true});
+  }
+}
+
 /** POST messages: queued while a run works; otherwise the next version (or the first, if none exists yet). */
 export function postMessage(id: string, body: { text?: unknown; reference?: unknown }): GeneralProject {
   const text = typeof body.text === 'string' ? body.text.trim() : '';
@@ -221,7 +255,8 @@ export function postMessage(id: string, body: { text?: unknown; reference?: unkn
   assertReady(project);
   const session = readSession(dir);
   const current = project.current ?? project.versions.at(-1)?.n;
-  if (current && session.threadId) {
+  if (current !== undefined) {
+    ensureRevisionWork(dir, current);
     editSession(dir, s => Object.assign(s, { pending: 'revise', resumed: false, reviewRounds: 0, polished: false, extraTurns: 0, review: undefined, networkAnswer: undefined, revision: { version: current, text, reference: note.reference } }));
     const out = updateGeneral(id, p => { p.messages.push(msg); p.run = { ...newRun('revision', p), queued: readSession(dir).queue.length }; });
     void drive(id);

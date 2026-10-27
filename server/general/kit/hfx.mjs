@@ -1,7 +1,7 @@
 // hfx — OpenTake's tools for a HyperFrames film, usable inside the agent's sandbox (offline, nothing to install, no port).
 //   hfx check        HyperFrames' own lint, plus OpenTake's rules: every visual change is its own clip, sound has a role
 //   hfx look [n]     n frames (default 12), drawn exactly as OpenTake's export draws them, tiled into look/sheet.jpg
-import {sampleBrowser, sampleResponse} from './hfx-support.mjs';
+import {sampleBrowser, sampleResponse, sampleFontStatus} from './hfx-support.mjs';
 import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url'; import { createRequire } from 'node:module'; import { execFileSync } from 'node:child_process';
 const NM = process.env.CW_NODE_MODULES, BIN = process.env.LINKREADER_BIN_DIR, CHROME = process.env.CW_CHROME;
 const root = process.env.CW_WORK || process.cwd(), [cmd, arg] = process.argv.slice(2);
@@ -86,14 +86,17 @@ if (cmd === 'check') {
     if (resourceFailure) throw resourceFailure;
     await page.waitForFunction(() => window.__otRender, null, { timeout: 30000 });
     const comp = await page.evaluate(() => window.__otRender.select('main'));
+    const fontAudit = [{frame: 0, fonts: await page.evaluate(sampleFontStatus)}];
     for (let i = 0; i < n; i++) {
       const frame = Math.min(comp.durationInFrames - 1, Math.round((i + 0.5) / n * comp.durationInFrames));
       await page.evaluate(f => window.__otRender.seek(f), frame);
+      fontAudit.push({frame, fonts: await page.evaluate(sampleFontStatus)});
       await page.screenshot({ path: path.join(tmp, `f${String(i).padStart(2, '0')}.jpg`), type: 'jpeg', quality: 80 });
     }
     if (resourceFailure) throw resourceFailure;
     if (errors.length) throw Error('样张页面报错：'+errors.slice(0,5).join('；'));
     fs.mkdirSync(path.join(root, 'look'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'look', 'font-audit.json'), JSON.stringify(fontAudit, null, 2) + '\n');
     const cols = 4, rows = Math.ceil(n / cols);
     execFileSync(tool('ffmpeg'), ['-v', 'error', '-y', '-framerate', '1', '-i', path.join(tmp, 'f%02d.jpg'), '-vf', `scale=480:-2,tile=${cols}x${rows}`, '-frames:v', '1', path.join(root, 'look', 'sheet.jpg')]);
     say(`接触表：look/sheet.jpg（${n} 帧，从左到右、从上到下，每 ${(comp.durationInFrames / 30 / n).toFixed(2)} 秒一帧）`, '用 view_image 打开看一遍。');
