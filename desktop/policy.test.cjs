@@ -4,3 +4,5 @@ test('unsigned local directory build has distinct app id and explicit source bou
 test('preload exposes only two screen permission helpers',()=>{const s=fs.readFileSync(path.join(__dirname,'preload.cjs'),'utf8');assert.equal((s.match(/ipcRenderer.invoke/g)||[]).length,2);assert.ok(!s.includes('send:'));assert.ok(!s.includes('require(\'node:fs\')'));});
 
 test('remember only a valid loopback port so browser preferences survive normal App restarts',()=>{const {rememberedPort}=require('./policy.cjs');assert.equal(rememberedPort({url:'http://127.0.0.1:54322'}),54322);for(const state of [undefined,{}, {url:'https://example.com:54322'},{url:'http://127.0.0.1:80'}])assert.equal(rememberedPort(state),3119)});
+
+test("isolated acceptance profile and packaged upgrade dependencies",()=>{assert.equal(userDataPath("/tmp/appdata","/tmp/standard-test"),"/tmp/standard-test");assert.throws(()=>userDataPath("/tmp/appdata","relative"));const c=require("./builder.config.cjs");assert.ok(c.files.includes("upgrade.json"));assert.ok(c.files.includes("shared/**"));});

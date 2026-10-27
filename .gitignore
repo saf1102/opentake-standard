@@ -4,3 +4,5 @@ dist/
 .env*
 .DS_Store
 ._*
+release/
+.venv/
