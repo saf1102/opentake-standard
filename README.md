@@ -2,6 +2,10 @@
 
 免费的本地视频工具：通用剪辑与录屏运镜。编辑不需要 OpenTake 账号；生成视频使用你自己的 Codex CLI。Pro 功能不包含在本仓库。
 
+**[下载最新官方源码 ZIP](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip)** · [核对 SHA-256](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip.sha256) · [查看每日下载统计](https://github.com/saf1102/opentake-standard/tree/repository-stats)
+
+这是源码，需要在自己的电脑安装依赖并构建，不是预编译安装包。推荐使用上面的官方 Release 附件；GitHub 的绿色 Code → Download ZIP 也能取源码，但那个入口没有可用下载计数。统计显示请求次数，不是用户人数或安装成功数，App 不上报使用遥测。[统计口径](DOWNLOAD-STATS.md)
+
 ## 安装（macOS / Apple 芯片）
 
 对你的智能体说：**按这个仓库的 AGENTS.md 帮我装好 OpenTake Standard。**
@@ -9,7 +13,7 @@
 先安装 Node.js 24.15.0 或更新的 24.x（含 npm）、Python 3 和 numpy、FFmpeg 与 ffprobe；生成视频还需要已安装并登录的 Codex CLI。录屏运镜的录制和导出需要另外安装官方 OpenScreen 2.1.2 或兼容版本，见下节。不要用 sudo，也不要关闭系统安全保护。
 
 ```sh
-git clone https://github.com/saf1102/opentake-standard.git
+# 将官方源码 ZIP 解压后，进入源码目录
 cd opentake-standard
 npm ci
 npm --prefix vendor/openscreen ci --ignore-scripts
@@ -19,6 +23,8 @@ npm test
 npm run build
 npm start
 ```
+
+也可以用 Git 获取源码：`git clone https://github.com/saf1102/opentake-standard.git`，然后进入目录执行上面的安装步骤。已有 Git 工作目录可继续按 Git 更新；ZIP 快照不会包含 Git 历史。
 
 两个 `npm ci` 都是必要步骤。第二个只安装内嵌编辑器的前端构建依赖，不编译 OpenScreen 原生合成器。`npm run build` 生成录屏编辑器资源；不能只装根目录依赖就直接启动。浏览器由锁定版本的 Playwright 从官方源安装。
 

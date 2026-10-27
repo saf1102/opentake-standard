@@ -1,46 +1,64 @@
-# 仓库下载统计（维护者）
+# 下载统计与官方源码 ZIP
 
-OpenTake Standard 不向我们上传安装、启动或使用遥测。这里的统计工具仅查询 GitHub 的仓库指标，不进入 App 或安装脚本。
+**[官方下载源码 ZIP](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip)** · [SHA-256](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip.sha256) · [每日统计](https://github.com/saf1102/opentake-standard/tree/repository-stats) · [工作流状态](https://github.com/saf1102/opentake-standard/actions/workflows/repository-stats.yml)
 
-## 能记录什么
+OpenTake Standard 不向我们上传安装、启动或使用遥测。维护工具只读取 GitHub 仓库聚合指标，不进入 App 或安装脚本。**下载次数不是人数、安装成功数或活跃用户数。**
+
+## 三种入口分别计算
 
 | 方式 | 可用指标 | 边界 |
 |---|---|---|
-| `git clone` | GitHub 最近 14 天完整克隆次数、窗口独立克隆者、UTC 每日分解 | 不含 fetch/pull；重复克隆、维护者、自动化也可能计入，不能称为用户数或安装量 |
-| GitHub “Download ZIP” / 自动生成的 source archives | 本工具没有可用计数 | 显示未知，不能填 0，也不能用 clone 数代替 |
-| 人工上传到 Releases 的附件 | GitHub Release Asset `download_count` | 是附件下载次数，单独统计；不能覆盖源码 ZIP、clone，也不能代表安装成功 |
+| 官方 Release 附件 `OpenTake-Standard-source.zip` | 每个 GitHub asset ID 的累计 `download_count`；定期取差值 | 包括重复下载和自动化。没有独立下载人数。只统计这个明确命名的源码附件，不混入其他资源 |
+| `git clone` | 最近 14 天完整克隆次数、窗口独立克隆者、UTC 每日分解 | 不含 fetch/pull；需额外 Traffic 读取权限。未配置时显示未知，ZIP 统计继续 |
+| 绿色 Code → Download ZIP / GitHub 自动 Source code archives | GitHub API 没有这里需要的下载计数 | 显示未知，不能填 0，也不能拿 clone 数代替 |
 
-脚本按 UTC 日期替换重叠窗口的数据，不累加重复的 14 天窗口。跨日独立克隆者不相加。首次启用最多取得 GitHub 当前保留的窗口，更早的数据无法恢复；中断过久会留下缺口，缺失日期不补零。最近一天仍会变化。工作流本身的 checkout 可能计入 clone 数，因此不能按下载次数估计“外部真实用户”。
+两类可观测请求各自列出，不相加当作用户数。开发者、验收、工作流自身 checkout 等也可能计入克隆次数。
 
-## 启用前：仓库所有者操作
+## 每日查看与长期留存
 
-工作流默认不执行。只有完成以下配置后才会每天运行；定时任务依赖 GitHub Actions，不能保证零延迟，应至少每周检查一次成功记录。
+`Repository download statistics` 工作流在官方仓库每小时 UTC 的 17 分采集，也可手动运行。fork 默认不执行。聚合结果保存到独立 `repository-stats` 分支，只包含 `history.json` 和中文 `README.md`，不修改 main 源码。GitHub 调度可能延迟，应检查报告的最近成功采集时间。
 
-1. 阅读本说明，确认允许在公开仓库的 `repository-stats` 分支公开聚合次数及按日记录。该分支只含 `history.json` 和 `README.md`，不包含 App 数据或个人信息。
-2. 所有者自行创建仅选定 `saf1102/opentake-standard` 的 fine-grained PAT，Repository permissions 只需 **Administration: Read-only**（及 GitHub 默认 Metadata read）。不要添加 Administration write。不要把令牌发给智能体、聊天或提交到代码。
-3. 在仓库 Settings → Secrets and variables → Actions 添加 repository secret `REPOSITORY_TRAFFIC_READ_TOKEN`，由所有者直接粘贴。到期需要所有者更新。普通 `GITHUB_TOKEN` 不提供此 Traffic Administration 权限。
-4. 在同一页面的 Variables 中设 `ENABLE_REPOSITORY_STATS=true`。这是公开聚合统计的显式开关。
-5. 在 Actions → Repository clone statistics 手动 Run workflow 一次。成功后打开 `repository-stats` 分支的 README。以后每天采集；`main` 不写统计提交。
+- README 展示最近 30 天的“同一 UTC 日内已确认 ZIP 新增”及计数修正、跨日/漏采覆盖状态；它不是精确的完整自然日下载总量。
+- 上次采集和本次采集跨午夜时，增量保留为“跨 UTC 日区间”，不硬塞给任意一天；相隔超过 36 小时标为漏采。最近 72 个区间可直接查看，完整历史保存在 JSON。
+- 新资产首次读到的非零数值是**首次基线**，不会记成当天新增。每个 asset ID 独立跟踪；删除附件后保留最后观测累计值。附件重建产生新 ID，另起基线，不覆盖旧 ID。若已消失的 ID 重新出现，增量起点是它真正的最近观测时刻，不能误算成最近一次采集内的增量。
+- GitHub 计数向下修正会单独列为修正，不偷偷丢弃，也不当作负下载请求。日报要结合新增和修正看。
+- 同一快照重复执行不重复累计。API 不可用保留旧数据并明确显示不是实时值，不写假零。任何分页失败不生成“所有后续附件被删除”的假快照。Release 和每个 Release 的 assets 都完整分页。
+- clone 的重叠 14 天窗口按 UTC 日期替换，不重复相加；跨日独立克隆者不能相加。首次采集前超过窗口的 clone 历史无法补回。
 
-读 Traffic 的专用 secret 仅用于采集步骤；写统计分支使用 GitHub 的临时 `GITHUB_TOKEN`，不把 PAT 扩大为写权限。工作流不打印凭据或错误响应正文。若 API 失败则失败退出，保留历史，不生成虚假的零次记录。不启用开关、不配置 secret 时，没有统计数据是正常状态，不能标作已上线。
+公开 Release ZIP 采集和统计分支保存只需工作流自带的 `GITHUB_TOKEN`，**不需要你创建 PAT**。ZIP API 失败时，工作流先保存带有“不可用”的真实状态和旧数据，再将本次运行标为失败；可修复后重跑。
 
-## 本机采集和测试
+## 可选：同时启用 clone 记录
 
-已由所有者登录且具有上述权限的 GitHub CLI 可以运行（脚本不读取凭据文件）：
+仅当所有者希望统计 clone 时，由所有者自行创建只选定这个仓库、Repository permissions **Administration: Read-only** 的 fine-grained PAT（另含 GitHub 默认 Metadata read），直接放到 Actions secret `REPOSITORY_TRAFFIC_READ_TOKEN`。不要把它发给智能体、聊天或提交到代码。无需 Administration write。
+
+该只读 secret 只用于 clone 查询；公开 ZIP 和统计写入仍用 GitHub 临时令牌。secret 缺失、过期或被拒绝时，clone 标为未知并保留旧历史，ZIP 仍正常采集。不能把“能 push Git”当作“已获得 Traffic API 权限”。停止定时采集可在 Actions 中 Disable workflow，历史不删除。
+
+## 发布新的官方源码快照（维护者手动）
+
+在 Actions 选择 **Publish source ZIP snapshot**，分支使用 main，`source_ref` 输入 `main` 或一个完整的 40 位、main 可达的提交 SHA。
+
+工作流先验证来源必须是公开 Standard 仓库，再用 `git archive` 导出指定提交的已跟踪源码。不会将本机脏文件、未跟踪文件、依赖缓存或用户工程装进去。非 main 提交和私有/生成路径会被拒绝。它不是安装包构建，不打包 Electron、FFmpeg 或私有 Pro 代码。
+
+每个提交使用独立的 `source-<完整提交SHA>` tag；附件名固定为 `OpenTake-Standard-source.zip`，另附 `.sha256`。创建草稿并上传后检查文件大小及 GitHub 返回的 SHA-256（若提供），通过才公开并设为 Latest。**已有 tag 或 Release 一律拒绝覆盖**，避免重置附件 ID 和下载计数。中途失败保留草稿供检查，不自动删除或覆盖。新版本选择新的 main commit；不会借用 Pro 的版本号。
+
+发布后，README 的 `releases/latest/download/OpenTake-Standard-source.zip` 指向最新快照。首次发布前此链接尚不可用；部署者必须手动运行并确认附件可下载后，才可声称 ZIP 入口交付。Latest 的更新是手动发布行为，日常统计不创建 Release。
+
+## 本机验证
 
 ```sh
-node --test scripts/repository-stats.test.mjs
+node --test scripts/repository-stats.test.mjs scripts/prepare-source-release.test.mjs
+# 公开 ZIP API，无需任何登录令牌：
 node scripts/repository-stats.mjs --repo saf1102/opentake-standard --out ./stats-result
-# 后续采集必须给已有历史，避免丢失窗口之外的数据：
+# 后续保留历史：
 node scripts/repository-stats.mjs --repo saf1102/opentake-standard --history ./stats-result/history.json --out ./stats-result
 ```
 
-离线验证可增加 `--snapshot clones.json`，输入为 GitHub clones API 的响应形状。测试数据不是真实下载量。不要提交真实访问令牌，不要运行打印令牌的诊断命令。停止自动采集只需将变量改为 `false`；已有历史仍保留。
+`--api github-cli` 使用 GitHub CLI 已管理的认证（工作流使用这种方式），不读取凭据文件。`--clone-snapshot clones.json` 可提供成功的 clones API 响应，`--release-snapshot assets.json` 提供离线标准化附件数组用于测试。测试数据不是实际下载量。不要运行打印令牌的诊断命令。
 
 ## GitHub 官方依据
 
-- [Repository traffic API：最近 14 天、UTC、Administration read](https://docs.github.com/en/rest/metrics/traffic)
+- [Repository traffic API：14 天、UTC、Administration read](https://docs.github.com/en/rest/metrics/traffic)
 - [Traffic 图表：full clones，不含 fetch](https://docs.github.com/en/repositories/viewing-activity-and-data-for-your-repository/viewing-traffic-to-a-repository)
 - [Release assets API：附件 download_count](https://docs.github.com/en/rest/releases/assets)
 
-没有把 referrers、IP、用户名或 App 使用数据纳入统计。统计脚本、工作流与权限配置需要先通过维护者审核；新增流程不自动授权发布安装包或启用第三方分析服务。
+统计不包含 IP、来源网站、用户名或 App 使用行为。

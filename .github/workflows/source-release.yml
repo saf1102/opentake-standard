@@ -1,0 +1,35 @@
+name: Publish source ZIP snapshot
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: 'main or full 40-character commit SHA reachable from main'
+        required: true
+        default: main
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: publish-source-snapshot
+  cancel-in-progress: false
+jobs:
+  source:
+    if: github.repository == 'saf1102/opentake-standard' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify archive and statistics safeguards
+        run: node --test scripts/prepare-source-release.test.mjs scripts/repository-stats.test.mjs
+      - name: Prepare tracked main source and SHA-256
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: node scripts/prepare-source-release.mjs --ref "$SOURCE_REF" --out "$RUNNER_TEMP/source-release"
+      - name: Upload a new source-only release (never replace existing assets)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-source-release.mjs --bundle "$RUNNER_TEMP/source-release"

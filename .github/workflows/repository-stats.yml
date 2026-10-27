@@ -1,46 +1,62 @@
-name: Repository clone statistics
+name: Repository download statistics
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 5 * * *'
-# Disabled until the owner explicitly opts into public aggregate statistics.
-# The app does not send analytics. This only reads GitHub repository metrics.
+    - cron: '17 * * * *'
+# GitHub aggregate counters only. No App telemetry. Forks do not run this job.
 permissions:
   contents: write
 concurrency:
-  group: repository-clone-statistics
+  group: repository-download-statistics
   cancel-in-progress: false
 jobs:
   collect:
-    if: github.repository == 'saf1102/opentake-standard' && vars.ENABLE_REPOSITORY_STATS == 'true'
+    if: github.repository == 'saf1102/opentake-standard'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - name: Test aggregation
         run: node --test scripts/repository-stats.test.mjs
-      - name: Restore saved days (fail closed on permission errors)
+      - name: Restore history (fail closed on permission errors)
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/publish-repository-stats.mjs --restore .traffic-history
-      - name: Collect GitHub clone window
+      - name: Optional clone traffic (ZIP collection does not require this secret)
         env:
           GH_TOKEN: ${{ secrets.REPOSITORY_TRAFFIC_READ_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo 'Owner setup required: REPOSITORY_TRAFFIC_READ_TOKEN with Administration read for this repository.'
-            exit 1
+          mkdir -p .traffic-input
+          if [ -n "${GH_TOKEN:-}" ]; then
+            if gh api "repos/$GITHUB_REPOSITORY/traffic/clones?per=day" > .traffic-input/clones.tmp 2>/dev/null; then
+              mv .traffic-input/clones.tmp .traffic-input/clones.json
+            else
+              echo 'Clone metric unavailable; prior history retained. ZIP collection continues.'
+            fi
+          else
+            echo 'Clone metric unknown: optional read secret not configured. ZIP collection continues.'
           fi
-          history=()
+      - name: Collect public Release ZIP counters
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          options=()
           if [ -f .traffic-history/history.json ]; then
-            history=(--history .traffic-history/history.json)
+            options+=(--history .traffic-history/history.json)
           fi
-          node scripts/repository-stats.mjs --repo "$GITHUB_REPOSITORY" --out .traffic-next "${history[@]}"
-      - name: Save aggregate statistics to dedicated branch
+          if [ -f .traffic-input/clones.json ]; then
+            options+=(--clone-snapshot .traffic-input/clones.json)
+          fi
+          node scripts/repository-stats.mjs --repo "$GITHUB_REPOSITORY" --out .traffic-next --api github-cli "${options[@]}"
+      - name: Save statistics and truthful availability to dedicated branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/publish-repository-stats.mjs --publish .traffic-next
+      - name: Check ZIP collection health
+        run: node -e 'const fs=require("node:fs");const h=JSON.parse(fs.readFileSync(".traffic-next/history.json"));if(h.sourceZip.status!=="ok"){console.error("ZIP collection failed; prior counters retained and report marked unavailable.");process.exit(1)}'
