@@ -1,17 +1,18 @@
+import platform from './platform.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { SystemPreferencesSchema, type SystemPreferences, type SettingsView } from '../src/settings/schema.ts';
-export const settingsFile = () => process.env.LINKREADER_SYSTEM_SETTINGS_FILE || path.join(os.homedir(),'Library/Application Support/OpenTake Standard/system-settings.json');
-export const legacyProjectsRoot = () => process.env.LINK_READER_PROJECTS_DIR || path.join(os.homedir(),'Movies/LinkReader Projects');
-export function defaultPreferences():SystemPreferences { return {paths:{projects:legacyProjectsRoot(),cache:'',exports:'',backups:process.env.LINKREADER_SYSTEM_SETTINGS_FILE?path.join(path.dirname(settingsFile()),'project-snapshots'):process.env.LINK_READER_PROJECTS_DIR?path.join(process.env.LINK_READER_PROJECTS_DIR,'.project-snapshots'):path.join(os.homedir(),'Library/Application Support/OpenTake Standard/project-snapshots')},export:{preset:'quick',container:'mp4',quality:'fast',resolution:'original',revealWhenDone:false},backup:{automatic:true,intervalMinutes:15,keep:20},reserveGB:5}; }
+export const settingsFile = () => process.env.LINKREADER_SYSTEM_SETTINGS_FILE || path.join(platform.standardDataRoot(),'system-settings.json');
+export const legacyProjectsRoot = () => process.env.LINK_READER_PROJECTS_DIR || platform.projectsRoot();
+export function defaultPreferences():SystemPreferences { return {paths:{projects:legacyProjectsRoot(),cache:'',exports:'',backups:process.env.LINKREADER_SYSTEM_SETTINGS_FILE?path.join(path.dirname(settingsFile()),'project-snapshots'):process.env.LINK_READER_PROJECTS_DIR?path.join(process.env.LINK_READER_PROJECTS_DIR,'.project-snapshots'):path.join(platform.standardDataRoot(),'project-snapshots')},export:{preset:'quick',container:'mp4',quality:'fast',resolution:'original',revealWhenDone:false},backup:{automatic:true,intervalMinutes:15,keep:20},reserveGB:5}; }
 type Stored={version:1;revision:number;preferences:SystemPreferences;libraries:string[];cacheRoots:string[];backupRoots:string[]};
 export function readSystemSettings():Stored {
  if(!fs.existsSync(settingsFile()))return {version:1,revision:0,preferences:defaultPreferences(),libraries:[legacyProjectsRoot()],cacheRoots:[],backupRoots:[]};
  try{const raw=JSON.parse(fs.readFileSync(settingsFile(),'utf8'));return {...raw,preferences:SystemPreferencesSchema.parse(raw.preferences)};}catch{throw Error('系统设置文件无法读取，请先恢复配置；未改用其他存储位置');}
 }
-const forcedRoot=()=>process.env.LINK_READER_PROJECTS_DIR&&process.env.LINK_READER_PROJECTS_DIR!==path.join(os.homedir(),'Movies/LinkReader Projects')&&!process.env.LINKREADER_SYSTEM_SETTINGS_FILE?process.env.LINK_READER_PROJECTS_DIR:undefined;
+const forcedRoot=()=>process.env.LINK_READER_PROJECTS_DIR&&process.env.LINK_READER_PROJECTS_DIR!==platform.projectsRoot()&&!process.env.LINKREADER_SYSTEM_SETTINGS_FILE?process.env.LINK_READER_PROJECTS_DIR:undefined;
 export const projectPathOverridden=()=>!!forcedRoot();
 export function projectRoots(){const forced=forcedRoot();if(forced)return [forced];const s=readSystemSettings();return [...new Set([s.preferences.paths.projects,...s.libraries])];}
 export function defaultProjectRoot(){return forcedRoot()||readSystemSettings().preferences.paths.projects;}

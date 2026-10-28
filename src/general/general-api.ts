@@ -1,3 +1,4 @@
+import type {EnvironmentCheck} from '../../shared/creation-tools'
 /**
  * 通用剪辑: the pages' side of src/general/general-contract.ts. Every call goes to /api/general as the contract lists.
  * In the development server only, a demo switch (localStorage 'opentake-general-demo' = '1', or ?demo=1 once) swaps
@@ -29,14 +30,15 @@ export type GeneralClient = {
 /** A failed call, with the HTTP status when there was one (404 = no such project, 0 = no answer). */
 export class GeneralApiError extends Error {
   readonly status: number
-  constructor(message: string, status: number) { super(message); this.name = 'GeneralApiError'; this.status = status }
+  readonly environment?: EnvironmentCheck
+  constructor(message: string, status: number, environment?:EnvironmentCheck) { super(message); this.name = 'GeneralApiError'; this.status = status; this.environment=environment }
 }
 
 /** The other API routes answer {ok, result, error}; the contract names the payload. Accept both. */
 function unwrap<T>(data: unknown, status: number, ok: boolean): T {
   if (data && typeof data === 'object' && 'ok' in data) {
-    const envelope = data as { ok: boolean; result?: T; error?: string }
-    if (!ok || !envelope.ok) throw new GeneralApiError(envelope.error || `请求失败（${status}）`, status)
+    const envelope = data as { ok: boolean; result?: T; error?: string; environment?: EnvironmentCheck }
+    if (!ok || !envelope.ok) throw new GeneralApiError(envelope.error || `请求失败（${status}）`, status, envelope.environment)
     return envelope.result as T
   }
   if (!ok) {

@@ -1,3 +1,4 @@
+import {resolvePython} from './python-runtime.ts';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 /**
@@ -55,10 +56,11 @@ function savedVersionArchive(work: string, rel: string) {
   // This host-owned snapshot is outside the agent's writable work directory.
   // An archive name alone never grants an exception: every byte must match.
   const snapshot = path.join(project, 'versions', `v${n}`, 'work');
-  const result = spawnSync(process.env.LINKREADER_PYTHON || 'python3', [
+  const result = spawnSync(resolvePython(), [
     fileURLToPath(new URL('./version-archive.py', import.meta.url)), path.join(work, rel), snapshot,
     path.join(project, 'versions', `v${n}.mp4`),
   ], {timeout: 30000, stdio: 'ignore'});
+  if(result.error||result.signal||result.status===null||![0,1].includes(result.status))throw Error('版本 ZIP 校验工具未正常运行；原文件保留，请检查 Python 配置后重试。');
   return result.status === 0;
 }
 

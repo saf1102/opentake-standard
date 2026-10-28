@@ -1,5 +1,6 @@
 const {app, BrowserWindow, Menu, dialog, desktopCapturer, ipcMain, session, shell, systemPreferences} = require('electron');
 const {spawn} = require('node:child_process');
+const {killTree,buildTarget} = require('./platform.cjs');
 const path = require('node:path');
 const fs = require('node:fs');
 const {APP_NAME, APP_ID, sameOrigin, userDataPath, rememberedPort} = require('./policy.cjs');
@@ -12,7 +13,8 @@ const trusted = event => Boolean(win && event.sender === win.webContents && even
 function stopService() {
  if (!child?.pid) return;
  // The service owns a separate process group, including media workers. Never kill unrelated tools.
- try { process.kill(-child.pid, 'SIGTERM'); } catch {}
+ if(child.connected)child.disconnect();
+ const owned=child;const timer=setTimeout(()=>{if(owned.exitCode===null)killTree(owned.pid);},2000);timer.unref();
 }
 function permissions() {
  const ses = session.defaultSession;
@@ -29,6 +31,7 @@ function permissions() {
  }, {useSystemPicker:false});
  ipcMain.handle('standard:screen-help', async event => {
   if (!trusted(event)) throw Error('无效窗口');
+  if(process.platform==='win32'){await dialog.showMessageBox(win,{type:'info',title:'屏幕录制',message:'请在录制窗口中选择要共享的屏幕或窗口。',detail:'如果被系统或组织策略阻止，请检查 Windows 的屏幕捕获权限。'});return;}
   const result = await dialog.showMessageBox(win,{type:'info',title:'开启屏幕录制权限',message:'请允许 OpenTake Standard 录制屏幕',detail:'打开「系统设置 → 隐私与安全性 → 屏幕与系统音频录制」，允许 OpenTake Standard，然后退出并重新打开。开发模式下名称可能显示为 Electron。',buttons:['打开系统设置','稍后'],cancelId:1});
   if (result.response === 0) await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
  });
@@ -38,9 +41,11 @@ function permissions() {
  });
 }
 async function start() {
+ if(process.platform==='win32')buildTarget();
  const profile = app.getPath('userData');
  fs.mkdirSync(profile,{recursive:true});
  const env = {...process.env,ELECTRON_RUN_AS_NODE:'1',
+  OPENTAKE_STANDARD_USER_DATA:profile,
   LINKREADER_SYSTEM_SETTINGS_FILE:process.env.LINKREADER_SYSTEM_SETTINGS_FILE || path.join(profile,'system-settings.json'),
   LINKREADER_AGENT_SETTINGS_FILE:process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(profile,'agent-settings.json')};
  let previous;try{previous=JSON.parse(fs.readFileSync(path.join(profile,'startup.json'),'utf8'))}catch{}
@@ -54,10 +59,12 @@ async function start() {
  win = new BrowserWindow({title:APP_NAME,width:1320,height:900,minWidth:640,minHeight:620,backgroundColor:'#202827',icon:path.join(root,'public/opentake-icon-512.png'),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
  if(process.platform==='darwin')app.dock.setIcon(path.join(root,'public/opentake-icon-512.png'));
  permissions();
+ require('./client-update.cjs').installUpdateIPC({app,ipcMain,trusted,root,getOrigin:()=>origin});
  win.webContents.on('will-navigate',(event,url)=>{if(!sameOrigin(url,origin))event.preventDefault()});
  win.webContents.setWindowOpenHandler(({url})=>{if(sameOrigin(url,origin))void win.loadURL(url);return {action:'deny'}});
  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:APP_NAME,submenu:[{role:'about'},{type:'separator'},{role:'quit'}]},{role:'editMenu'},{role:'viewMenu'},{role:'windowMenu'}]));
  await win.loadURL(origin);
+ if(process.env.OPENTAKE_UPDATE_READY){const file=process.env.OPENTAKE_UPDATE_READY;setTimeout(async()=>{try{const r=await fetch(origin+'/api/upgrade/preferences');if(!r.ok||win.isDestroyed()||child.exitCode!==null)return;if(!await win.webContents.executeJavaScript('Boolean(document.getElementById("root")?.children.length)'))return;fs.writeFileSync(file,JSON.stringify({pid:process.pid,version:app.getVersion()}));}catch{}},10000);}
  // Local diagnostic state contains no credentials; used to identify this exact runtime.
  fs.writeFileSync(path.join(profile,'startup.json'),JSON.stringify({pid:process.pid,servicePid:child.pid,url:origin,packaged:app.isPackaged,appId:APP_ID}));
 }

@@ -161,6 +161,6 @@ export async function mixTracks(film, out) {
   if (!finals.length) return undefined;
   filters.push(`${finals.map(f => `[${f}]`).join('')}amix=inputs=${finals.length}:normalize=0:dropout_transition=0,${tail.join(',')}[mix]`);
   fs.mkdirSync(path.dirname(out), { recursive: true });
-  await ffmpeg([...inputs.flatMap(f => ['-i', f]), '-filter_complex', filters.join(';'), '-map', '[mix]', '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', out]);
+  await ffmpeg([...inputs.flatMap(f => ['-i', f]), '-filter_complex', filters.join(';'), '-map', '[mix]', '-ar', '48000', '-ac', '2', '-c:a', 'pcm_f32le', out]);
   return out;
 }

@@ -1,3 +1,5 @@
+import type {CreationTools} from '../../shared/creation-tools.ts';
+import {requireCreationTools} from '../standard/creation-tools.ts';
 import standardStyles from '../../src/standard/styles.json' with {type:'json'};
 /**
  * 通用剪辑的一次运行：一轮做片（读需求、设计、写、自己看一遍、渲染）→ OpenTake 机检（不过才改一轮）→ 交付第 N 版。
@@ -26,7 +28,7 @@ import installations from '../agent-installation.ts';
 import { agentSettingsFile, atomicAgentJson } from '../agent-settings.ts';
 import { buildBrief, turnPrompt, type Phase, type QueuedNote, type StyleInfo } from './brief.ts';
 import { filmTurnArgs, reviewArgs, startCodex, type CodexProcess } from './codex.ts';
-import { AGENT_STEPS, applyCodexEvent, applyProgress, initialSteps, setStep, type Progress, type Usage } from './events.ts';
+import { beginRepair, finishAgentSteps, applyCodexEvent, applyProgress, initialSteps, setStep, type Progress, type Usage } from './events.ts';
 import { KIT_DIR, ffmpegPath, ffprobePath, prepareWork } from './kit-env.ts';
 import { REVIEW_SCHEMA, extractFrames, machineChecks, parseVerdict, reviewPrompt, verdictText, type Verdict } from './review.ts';
 import { fileUrl, findGeneral, updateGeneral, type GeneralLocation } from './store.ts';
@@ -35,7 +37,7 @@ const exec = promisify(execFile);
 const now = () => new Date().toISOString();
 
 // ——— what the runner needs from outside (replaced in tests) ———
-export type ResolvedCodex = { executable: string; model: string; effort: string };
+export type ResolvedCodex = { executable: string; model: string; effort: string; requested?: GeneralAgentChoice };
 export type GeneralRuntime = {
   /** the project's own choice, or the settings' 通用剪辑出片 when it has none (系统默认) */
   resolveCodex: (choice?: GeneralAgentChoice) => Promise<ResolvedCodex>;
@@ -52,7 +54,7 @@ let runtime: GeneralRuntime = {
     const settings = readAgentSettings();
     // checked against the CLI's own model list, like the settings' choice
     const agent = await resolveAgent('generalEditing', choice ? { ...settings, modules: { ...settings.modules, generalEditing: choice } } : settings);
-    return { executable: agent.executable, model: agent.model, effort: agent.effort };
+    return { executable: agent.executable, model: agent.model, effort: agent.effort, ...(agent.requested ? {requested: agent.requested} : {}) };
   },
   style: id => styleLibrary().find(s => s.id === id),
   baseEnv: () => installations.sanitizeAgentEnv(installations.loginEnvironment()),
@@ -129,6 +131,7 @@ function message(role: GeneralMessage['role'], text: string, extra: Partial<Gene
   return { id: crypto.randomUUID(), role, text, at: now(), ...extra };
 }
 
+const checkedTools = new Map<string, CreationTools>();
 // ——— starting runs ———
 function newRun(purpose: GeneralRun['purpose'], project: GeneralProject, steps?: GeneralStep[]): GeneralRun {
   return { id: crypto.randomUUID(), state: 'running', agent: 'codex', purpose, steps: steps ?? initialSteps(project.inputs.kind, purpose), startedAt: now(), queued: 0 };
@@ -151,10 +154,11 @@ export function requestText(project: GeneralProject): string {
 }
 
 /** POST generate: a fresh first cut (a new Codex session). An earlier work folder is kept under agent/. */
-export function startFirst(id: string, options: { request?: boolean } = {}): GeneralProject {
+export function startFirst(id: string, options: { request?: boolean; tools?: CreationTools } = {}): GeneralProject {
   const { dir, project } = findGeneral(id);
   assertIdle(project);
   assertReady(project);
+  if(options.tools) checkedTools.set(id,options.tools); else checkedTools.delete(id);
   const work = path.join(dir, 'work');
   if (fs.existsSync(work) && fs.readdirSync(work).some(f => !f.startsWith('.') || f === '.opentake')) {
     fs.renameSync(work, path.join(dir, 'agent', `work-${Date.now()}`));
@@ -231,8 +235,11 @@ function ensureRevisionWork(dir: string, version: number) {
   const staging = path.join(dir, `.revision-work-${crypto.randomUUID()}`);
   try {
     fs.cpSync(snapshot, staging, {recursive: true, errorOnExist: true, force: false});
-    // Rename replaces only an absent or empty directory; never an existing tree.
-    fs.renameSync(staging, work);
+    // Windows cannot rename onto an existing directory, even an empty one.
+    // rmdir is deliberately non-recursive: concurrent/unsaved files must survive.
+    let removedEmpty=false;
+    if(fs.existsSync(work)){fs.rmdirSync(work);removedEmpty=true;}
+    try{fs.renameSync(staging,work);}catch(error){if(removedEmpty&&!fs.existsSync(work))fs.mkdirSync(work);throw error;}
   } finally {
     if (fs.existsSync(staging)) fs.rmSync(staging, {recursive: true, force: true});
   }
@@ -365,7 +372,7 @@ async function drive(id: string) {
   } finally {
     entry.driving = false;
     if (entry.again) { entry.again = false; void drive(id); }
-    else if (live.get(id) === entry && !entry.proc) live.delete(id);
+    else if (live.get(id) === entry && !entry.proc) { live.delete(id); checkedTools.delete(id); }
   }
 }
 
@@ -386,7 +393,7 @@ function afterTurn(id: string, dir: string, phase: Phase) {
     if (phase === 'plan' && session.lastAgentMessage) p.messages.push(message('agent', session.lastAgentMessage));
     if (p.run) {
       if (phase === 'plan') p.run.steps = p.run.steps.map(s => ['read-style', 'read-input', 'plan'].includes(s.id) && s.state !== 'skipped' ? { ...s, state: 'done', startedAt: s.startedAt ?? now(), endedAt: s.endedAt ?? now() } : s);
-      else p.run.steps = p.run.steps.map(s => AGENT_STEPS.includes(s.id) && (s.state === 'running' || (s.id === 'render' && s.state === 'waiting')) ? { ...s, state: 'done', startedAt: s.startedAt ?? now(), endedAt: now() } : s);
+      else p.run.steps = finishAgentSteps(p.run.steps, now());
     }
   });
   editSession(dir, s => {
@@ -426,12 +433,16 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   updateGeneral(id, p => {
     if (!p.run) return;
     p.run.model = codex.model; p.run.effort = codex.effort; p.run.queued = 0;
-    if (phase === 'polish' || phase === 'revise') p.run.steps = p.run.steps.map(s => ['code', 'self-check', 'render', 'review', 'deliver'].includes(s.id) && s.state !== 'skipped' ? { ...s, state: 'waiting', progress: undefined, startedAt: undefined, endedAt: undefined } : s);
+    if (phase === 'polish' && session.review) beginRepair(p.run, session.review, now());
+    else if (phase === 'polish' || phase === 'revise') p.run.steps = p.run.steps.map(s => ['code', 'self-check', 'render', 'review', 'deliver'].includes(s.id) && s.state !== 'skipped' ? { ...s, state: 'waiting', progress: undefined, startedAt: undefined, endedAt: undefined } : s);
   });
   editSession(dir, s => { s.queue = []; });
   // 联网: the project's switch; projects from before it follow the agent's request answered in this session
   const network = project.network ?? session.networkAllowed;
-  const env = prepareWork(dir, runtime.baseEnv(), network);
+  const tools = process.platform==='darwin' ? (checkedTools.get(id) ?? await requireCreationTools()) : undefined;
+  if (stopped()) return 'stopped';
+  if(tools) { checkedTools.set(id,tools); codex.executable=tools.codex; }
+  const env = prepareWork(dir, runtime.baseEnv(), network, tools);
   let brief: string | undefined;
   if (!session.threadId) {
     const media = project.inputs.media.map(m => ({ ...m, file: mediaFile(dir, m.id) })).filter(m => m.file) as (GeneralProject['inputs']['media'][number] & { file: string })[];
@@ -543,18 +554,22 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
     }); });
   }
 
-  patchRun(id, r => { r.steps = setStep(r.steps, 'review', { state: 'running', startedAt: now(), endedAt: undefined, detail: round > 1 ? '复审改过的版本' : '抽帧、机检' }); });
+
   const video = path.join(dir, 'work', 'out.mp4');
   if (isHyperframesWork(path.join(dir, 'work'))) {
     // export B: OpenTake's own frame renderer draws the HyperFrames page, then mixes the sound
     patchRun(id, r => { r.steps = setStep(r.steps, 'render', { state: 'running', startedAt: now(), endedAt: undefined, detail: '逐帧渲染', progress: undefined }); });
     fs.rmSync(video, { force: true });
     let last = 0;
-    await renderHyperframes(path.join(dir, 'work'), video, { onProgress: p => { const pct = Math.round(p * 100); if (pct - last >= 5) { last = pct; patchRun(id, r => { r.steps = setStep(r.steps, 'render', { progress: { done: pct, total: 100 } }); }); } } });
+    await renderHyperframes(path.join(dir, 'work'), video, { browserExecutable:checkedTools.get(id)?.chromium, onProgress: p => { const pct = Math.round(p * 100); if (pct - last >= 5) { last = pct; patchRun(id, r => { r.steps = setStep(r.steps, 'render', { progress: { done: pct, total: 100 } }); }); } } });
     patchRun(id, r => { r.steps = setStep(r.steps, 'render', { state: 'done', endedAt: now(), detail: '渲染成片', progress: { done: 100, total: 100 } }); });
   }
+  patchRun(id, r => { r.steps = setStep(r.steps, 'review', { state: 'running', startedAt: now(), endedAt: undefined, detail: round > 1 ? '复审改过的版本' : '抽帧、机检' }); });
   const frames = await extractFrames(ffmpegPath(), ffprobePath(), video, reviewDir, runtime.agentReview ? 20 : 12); // denser than one a second for short films, so rhythm and repetition show
+  patchRun(id, r => { r.steps = setStep(r.steps, 'review', { detail: '正在检查时长、画幅和声音' }); });
   const checks = await machineChecks(ffmpegPath(), ffprobePath(), video, project.settings);
+  fs.writeFileSync(path.join(reviewDir, 'checks.json'), JSON.stringify(checks, null, 2));
+  if (fs.existsSync(`${video}.audio.json`)) fs.copyFileSync(`${video}.audio.json`, path.join(reviewDir, 'audio.json'));
   const thumbs = frames.frames.map(f => fileUrl(id, path.relative(dir, f.file)));
   patchRun(id, r => { r.steps = setStep(r.steps, 'review', { thumbs, detail: `看图审片（${checks.filter(c => !c.ok).length ? `机检有 ${checks.filter(c => !c.ok).length} 项不合格` : '机检通过'}）` }); });
   let verdict: Verdict | undefined, problem: string | undefined;
@@ -648,7 +663,7 @@ async function deliver(id: string, dir: string) {
     p.current = n;
     p.messages.push(message('agent', note || `第 ${n} 版做好了。`, { version: n }));
     if (carried) p.messages.push(message('system', carried, { version: n }));
-    if (p.run) { p.run.state = 'done'; p.run.endedAt = now(); p.run.steps = setStep(p.run.steps, 'deliver', { state: 'done', endedAt: now(), detail: `第 ${n} 版` }); }
+    if (p.run) { p.run.state = 'done'; p.run.endedAt = now(); p.run.steps = setStep(p.run.steps.map(s => s.state === 'waiting' ? { ...s, state: 'skipped', detail: '未单独执行' } : s.state === 'running' && s.id !== 'deliver' ? { ...s, state: 'done', endedAt: now() } : s), 'deliver', { state: 'done', endedAt: now(), detail: `第 ${n} 版` }); }
   });
 }
 
@@ -700,7 +715,7 @@ export function mediaFile(dir: string, mediaId: string): string | undefined {
 
 // ——— the agent-runs log the settings page lists ———
 function agentRunRecord(codex: ResolvedCodex, startedAt: string): AgentRun {
-  const record: AgentRun = { id: crypto.randomUUID(), module: 'generalEditing', executable: codex.executable, model: codex.model, effort: codex.effort, startedAt, status: 'running' };
+  const record: AgentRun = { id: crypto.randomUUID(), module: 'generalEditing', executable: codex.executable, model: codex.model, effort: codex.effort, ...(codex.requested ? {requested: codex.requested} : {}), startedAt, status: 'running' };
   persistAgentRun(record);
   return record;
 }

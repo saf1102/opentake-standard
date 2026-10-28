@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -345,6 +346,8 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   }
 
   const child = spawn(runner.executable, args, {
+    detached: process.platform === "win32",
+    windowsHide: true,
     cwd: runner.cwd,
     env: runner.env,
     stdio: ["ignore", "pipe", "pipe"],
@@ -427,7 +430,8 @@ export function cancelOpenScreenExport(projectId: string, documentId: string, jo
   if (job.status !== "running" && job.status !== "queued") return job;
   job.status = "cancelled";
   job.completedAt = Date.now();
-  live.get(job.id)?.child.kill("SIGTERM");
+  const worker=live.get(job.id)?.child;
+  if(process.platform==="win32"&&worker?.pid)platform.killTree(worker.pid);else worker?.kill("SIGTERM");
   persist(job);
   return job;
 }
@@ -436,7 +440,8 @@ export function revealOpenScreenExport(projectId: string, value: unknown) {
   const { dir } = findProject(projectId, true);
   const target = assertWithinExports(dir, value);
   if (!fs.existsSync(target)) throw new Error("导出文件不存在");
-  const child = spawn("/usr/bin/open", ["-R", target], { detached: true, stdio: "ignore" });
+  const reveal=platform.revealCommand(target);
+  const child = spawn(reveal.command, reveal.args, { detached: true, stdio: "ignore" });
   child.unref();
   return { path: target };
 }

@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { getAgentSettings } from '@/studio/api'
-import { EFFORT_LABELS, type AgentModel } from '@/studio/agent-settings'
+import { EFFORT_LABELS, FOLLOW_DEFAULT, effectiveChoice, type AgentModel } from '@/studio/agent-settings'
 import type { GeneralAgentChoice } from './general-contract'
 
 type Catalog = { models: AgentModel[]; standard: GeneralAgentChoice }
@@ -56,11 +56,13 @@ export function AgentPicker({ value, onChange, compact, up, disabled }: {
   }, [open])
   const models = catalog?.models ?? [], standard = catalog?.standard
   const shown = value ?? standard
-  const nameOf = (id?: string) => models.find(m => m.id === id)?.name ?? id ?? ''
-  const model = models.find(m => m.id === shown?.model)
+  // 'default' and models this Codex lacks show what will really run (its default model).
+  const real = (c?: GeneralAgentChoice) => c && models.length ? effectiveChoice(c, models) : c
+  const nameOf = (id?: string) => id === FOLLOW_DEFAULT ? (models.find(m => m.isDefault) || models[0])?.name ?? 'Codex 默认' : models.find(m => m.id === id)?.name ?? id ?? ''
+  const model = models.find(m => m.id === real(shown)?.model)
   const pickModel = (next: AgentModel) => onChange({ model: next.id, effort: next.efforts.includes(shown?.effort ?? '') ? shown!.effort : next.defaultEffort })
   const label = compact || value ? nameOf(shown?.model) : '系统默认'
-  const sub = compact || value ? effortName(shown?.effort ?? '') : `${nameOf(standard?.model)} · ${effortName(standard?.effort ?? '')}`
+  const sub = compact || value ? effortName(real(shown)?.effort ?? '') : `${nameOf(real(standard)?.model)} · ${effortName(real(standard)?.effort ?? '')}`
   return <span ref={box} className="ge ge-model">
     <button type="button" className="ge-model-pick" data-custom={value ? '' : undefined} aria-expanded={open} aria-haspopup="dialog" disabled={disabled || !catalog}
       title={value ? '这个工程自己选的模型' : '系统默认：跟设置里的「通用剪辑出片」一致'} onClick={() => setOpen(o => !o)}>
@@ -68,7 +70,7 @@ export function AgentPicker({ value, onChange, compact, up, disabled }: {
     </button>
     {open && catalog && place && createPortal(<div className="ge"><div ref={pop} className="ge-model-pop" style={place} role="dialog" aria-label="选择模型和推理强度">
       <button type="button" className="ge-model-opt" data-on={!value || undefined} onClick={() => { onChange(undefined); setOpen(false) }}>
-        <span><b>系统默认</b><small>跟设置一致 · {nameOf(standard?.model)} · {effortName(standard?.effort ?? '')}</small></span><Check size={15} aria-hidden="true" />
+        <span><b>系统默认</b><small>跟设置一致 · {nameOf(real(standard)?.model)} · {effortName(real(standard)?.effort ?? '')}</small></span><Check size={15} aria-hidden="true" />
       </button>
       <div className="ge-model-sep" />
       <div className="ge-model-grp">模型</div>
@@ -77,7 +79,7 @@ export function AgentPicker({ value, onChange, compact, up, disabled }: {
       </button>)}
       <div className="ge-model-grp">推理强度</div>
       <div className="ge-model-eff">{(model?.efforts ?? []).map(effort => <button key={effort} type="button" data-on={(value && value.effort === effort) || undefined}
-        onClick={() => shown && onChange({ model: shown.model, effort })}>{effortName(effort)}</button>)}</div>
+        onClick={() => shown && onChange({ model: real(shown)!.model, effort })}>{effortName(effort)}</button>)}</div>
     </div></div>, document.body)}
   </span>
 }

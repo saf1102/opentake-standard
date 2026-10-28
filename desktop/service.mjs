@@ -1,3 +1,4 @@
+import platform from './platform.cjs';
 import childProcess from 'node:child_process';
 import {syncBuiltinESMExports} from 'node:module';
 import path from 'node:path';
@@ -17,5 +18,5 @@ if(!production)await server.listen();
 const address=server.httpServer.address();
 process.send?.({ready:`http://127.0.0.1:${address.port}`});
 let stopping=false;
-async function stop(){if(stopping)return;stopping=true;for(const pid of groups){try{process.kill(-pid,'SIGTERM')}catch{}}if(production)server.httpServer.close();else await server.close();setTimeout(()=>{for(const pid of groups){try{process.kill(-pid,'SIGKILL')}catch{}}process.exit(0)},1000).unref()}
+async function stop(){if(stopping)return;stopping=true;for(const pid of groups){try{platform.killTree(pid,'SIGTERM')}catch{}}if(production)server.httpServer.close();else await server.close();setTimeout(()=>{for(const pid of groups){try{platform.killTree(pid,'SIGKILL')}catch{}}process.exit(0)},1000).unref()}
 process.on('disconnect',stop);process.on('SIGTERM',stop);process.on('SIGINT',stop);

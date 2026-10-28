@@ -9,6 +9,7 @@
  * files themselves (a sounding <video> would keep the frame waiting on its stream).
  */
 import fs from 'node:fs';
+import { muxNormalizedAudio } from './audio.ts';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -26,7 +27,7 @@ const TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf',
 };
 
-export type HfRenderOptions = { fps?: number; concurrency?: number; cancelSignal?: AbortSignal; onProgress?: (progress: number) => void; cacheDir?: string; edits?: HfPageEdits };
+export type HfRenderOptions = { browserExecutable?: string; fps?: number; concurrency?: number; cancelSignal?: AbortSignal; onProgress?: (progress: number) => void; onActivity?: (detail: string) => void; cacheDir?: string; edits?: HfPageEdits };
 
 /** Every video the film uses, once, on its own frame grid: JPEG frames on disk and their timestamps. */
 async function extractVideos(work: string, srcs: string[], cacheDir: string) {
@@ -57,7 +58,7 @@ async function mixSound(work: string, clips: Awaited<ReturnType<typeof readHyper
     chains.push(`[${i}:a]atrim=start=${c.mediaStart}:duration=${c.duration * (c.rate || 1)},asetpts=PTS-STARTPTS${tempo},volume=${c.volume},adelay=${delay}|${delay},aresample=48000[a${i}]`);
   });
   const filter = `${chains.join(';')};${sounding.map((_, i) => `[a${i}]`).join('')}amix=inputs=${sounding.length}:normalize=0:duration=longest,apad,atrim=duration=${duration}[mix]`;
-  await exec(ffmpegPath(), [...args, '-filter_complex', filter, '-map', '[mix]', '-ac', '2', '-ar', '48000', out], { maxBuffer: 8 << 20 });
+  await exec(ffmpegPath(), [...args, '-filter_complex', filter, '-map', '[mix]', '-ac', '2', '-ar', '48000', '-c:a', 'pcm_f32le', out], { maxBuffer: 8 << 20 });
   return true;
 }
 
@@ -89,12 +90,13 @@ export async function renderHyperframes(work: string, output: string, options: H
     };
     const total = Math.round(film.duration * fps);
     await renderVideo({
-      serveUrl: work, entryPath: `/${HF_ENTRY}`, assetResolver, concurrency: options.concurrency ?? 4, imageFormat: 'jpeg', jpegQuality: 92, outputLocation: silent,
+      browserExecutable: options.browserExecutable, serveUrl: work, entryPath: `/${HF_ENTRY}`, assetResolver, concurrency: options.concurrency ?? 4, imageFormat: 'jpeg', jpegQuality: 92, outputLocation: silent,
       composition: { id: 'main', width: film.width, height: film.height, fps, durationInFrames: total },
       ...(options.cancelSignal ? { cancelSignal: options.cancelSignal } : {}), onProgress: ({ progress }) => options.onProgress?.(progress),
     });
+    options.onActivity?.('正在混音并统一响度');
     if (await mixSound(work, film.clips, film.duration, sound)) {
-      await exec(ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-y', '-i', silent, '-i', sound, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', output]);
+      await muxNormalizedAudio(ffmpegPath(), silent, sound, output);
     } else fs.renameSync(silent, output);
   } finally {
     server.close();

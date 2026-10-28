@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 /**
  * 通用剪辑怎样调用 Codex：非交互的 `codex exec --json`。
  * - 出片：workspace-write 沙盒，只能写本工程的 work/；默认不联网；不加载用户的 config.toml、规则、技能目录；
@@ -59,7 +60,7 @@ export function startCodex(executable: string, args: string[], options: { cwd: s
     child.on('error', error => { stderr += `\n${error.message}`; finish(-1, null); });
     child.on('close', finish);
   });
-  const group = (signal: NodeJS.Signals) => { try { if (child.pid) process.kill(-child.pid, signal); } catch { try { child.kill(signal); } catch { /* already gone */ } } };
+  const group = (signal: NodeJS.Signals) => { try { if (child.pid) platform.killTree(child.pid, signal); } catch { try { child.kill(signal); } catch { /* already gone */ } } };
   // Commands run in a terminal get their own session, outside the group: note every descendant before Codex goes.
   const stop = () => {
     const tree = child.pid ? descendants(child.pid) : [];

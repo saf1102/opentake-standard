@@ -6,18 +6,18 @@ import type { AgentModule, AgentSettings, AgentRun } from '../src/studio/agent-s
 import { agentSettingsFile, atomicAgentJson, getAgentCatalog, readAgentSettings, validateAgentChoice } from './agent-settings.ts';
 import { runWithClosedStdin, type ClosedStdinProcessOptions } from './proc.ts';
 
-export type ResolvedAgent = Readonly<{ module: AgentModule; executable: string; cliVersion: string; model: string; effort: string }>;
+export type ResolvedAgent = Readonly<{ module: AgentModule; executable: string; cliVersion: string; model: string; effort: string; requested?: {model: string; effort: string} }>;
 export async function resolveAgent(module: AgentModule, settings: AgentSettings = readAgentSettings()): Promise<ResolvedAgent> {
   const catalog = await getAgentCatalog(settings.cliPath);
-  validateAgentChoice(module, settings, catalog);
-  return Object.freeze({ module, executable: catalog.executable, cliVersion: catalog.cliVersion, ...settings.modules[module] });
+  const choice = validateAgentChoice(module, settings, catalog);
+  return Object.freeze({ module, executable: catalog.executable, cliVersion: catalog.cliVersion, ...choice });
 }
 export function agentFingerprint(agent: ResolvedAgent) { return crypto.createHash('sha256').update(JSON.stringify(agent)).digest('hex'); }
 export function agentExecArgs(agent: ResolvedAgent, args: string[]) {
   if (args[0] !== 'exec' || args.slice(0, -1).some(a => a === '-m' || a === '--model' || a.startsWith('--model=') || a.includes('model_reasoning_effort='))) throw new Error('Agent 执行参数必须由模块配置统一提供');
   return ['exec', '-m', agent.model, '-c', `model_reasoning_effort="${agent.effort}"`, ...args.slice(1)];
 }
-/** One immutable choice per job. CLI failure is surfaced; no silent model downgrade. */
+/** One immutable choice per job. CLI failure is surfaced; requested preserves any model/effort fallback. */
 export async function runAgent(agent: ResolvedAgent, args: string[], options: ClosedStdinProcessOptions = {}, purpose?: 'connectivity') {
   const argv = agentExecArgs(agent, args);
   const id = crypto.randomUUID(), started = Date.now();

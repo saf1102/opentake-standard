@@ -101,9 +101,11 @@ let encoderChoice;
 export async function videoEncoder(fps) {
   // CW_ENCODER=vp9 forces the sandbox path (tests)
   if (process.env.CW_ENCODER === 'vp9') encoderChoice ??= Promise.resolve('vp9');
+  if(process.platform==='win32')encoderChoice ??= ffmpeg(['-f','lavfi','-i','color=c=gray:s=64x64:d=0.1','-frames:v','2','-c:v','h264_mf','-b:v','1M','-f','null','-']).then(()=>'mf',()=> 'vp9');
   encoderChoice ??= ffmpeg(['-f', 'lavfi', '-i', 'color=c=gray:s=64x64:d=0.1', '-frames:v', '2', '-c:v', 'h264_videotoolbox', '-q:v', '70', '-f', 'null', '-'])
     .then(() => 'videotoolbox', () => 'vp9');
   const g = String(Math.round(fps * 2));
+  if((await encoderChoice)==='mf')return ['-c:v','h264_mf','-b:v','12M','-g',g,'-pix_fmt','nv12','-r',String(fps)];
   return (await encoderChoice) === 'videotoolbox'
     ? ['-c:v', 'h264_videotoolbox', '-q:v', '70', '-g', g, '-pix_fmt', 'yuv420p', '-r', String(fps)]
     : ['-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-cpu-used', '8', '-row-mt', '1', '-crf', '30', '-b:v', '0', '-g', g, '-pix_fmt', 'yuv420p', '-r', String(fps)];

@@ -1,3 +1,4 @@
+import platform from './platform.ts';
 import installations from './agent-installation.ts';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -6,10 +7,10 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { z } from 'zod';
-import { AGENT_MODULES, defaultAgentSettings, type AgentCatalog, type AgentModule, type AgentSettings, type AgentRun, type AgentSettingsView } from '../src/studio/agent-settings.ts';
+import { AGENT_MODULES, defaultAgentSettings, effectiveChoice, type AgentCatalog, type AgentModule, type AgentSettings, type AgentRun, type AgentSettingsView } from '../src/studio/agent-settings.ts';
 import { execFileAsync } from './proc.ts';
 
-export const agentSettingsFile = () => process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(os.homedir(), 'Library', 'Application Support', 'OpenTake Standard', 'agent-settings.json');
+export const agentSettingsFile = () => process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(platform.standardDataRoot(),'agent-settings.json');
 export function atomicAgentJson(file: string, value: unknown) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${crypto.randomUUID()}.tmp`;
@@ -46,7 +47,7 @@ export async function checkCliPath(configured: string) {
   if (!/codex/i.test(stdout)) throw new Error('所选文件没有返回 Codex CLI 版本');
   return { executable, cliVersion: stdout.trim() };
 }
-const ModelPage = z.object({ data: z.array(z.object({ model: z.string(), displayName: z.string(), hidden: z.boolean().optional(), supportedReasoningEfforts: z.array(z.object({ reasoningEffort: z.string() })), defaultReasoningEffort: z.string() })), nextCursor: z.string().nullable().optional() });
+const ModelPage = z.object({ data: z.array(z.object({ model: z.string(), displayName: z.string(), hidden: z.boolean().optional(), supportedReasoningEfforts: z.array(z.object({ reasoningEffort: z.string() })), defaultReasoningEffort: z.string(), isDefault: z.boolean().optional() })), nextCursor: z.string().nullable().optional() });
 const catalogs = new Map<string, AgentCatalog>();
 const pending = new Map<string, Promise<AgentCatalog>>();
 /** Read the selected binary's real account model catalog, not a hardcoded UI list. */
@@ -82,7 +83,7 @@ export async function getAgentCatalog(configured: string, refresh = false): Prom
           if (result.id === 1) { send({ method: 'initialized' }); send({ id: 2, method: 'model/list', params: { includeHidden: false, limit: 100 } }); }
           if (result.id === 2) {
             const page = ModelPage.parse(result.result);
-            all.push(...page.data.filter(m => !m.hidden).map(m => ({ id: m.model, name: m.displayName, efforts: m.supportedReasoningEfforts.map(e => e.reasoningEffort), defaultEffort: m.defaultReasoningEffort })));
+            all.push(...page.data.filter(m => !m.hidden).map(m => ({ id: m.model, name: m.displayName, efforts: m.supportedReasoningEfforts.map(e => e.reasoningEffort), defaultEffort: m.defaultReasoningEffort, ...(m.isDefault ? { isDefault: true } : {}) })));
             if (page.nextCursor) send({ id: 2, method: 'model/list', params: { includeHidden: false, limit: 100, cursor: page.nextCursor } });
             else if (!all.length) finish(new Error('Codex 没有返回可选模型'));
             else finish();
@@ -99,16 +100,19 @@ export async function getAgentCatalog(configured: string, refresh = false): Prom
   try { return await request; } finally { pending.delete(key); }
 }
 export function validateAgentChoice(module: AgentModule, settings: AgentSettings, catalog: AgentCatalog) {
-  const choice = settings.modules[module];
-  const model = catalog.models.find(m => m.id === choice.model);
   const name = AGENT_MODULES.find(m => m.id === module)!.name;
-  if (!model) throw new Error(`${name}：当前 CLI 未提供模型 ${choice.model}，请重新选择`);
-  if (!model.efforts.includes(choice.effort)) throw new Error(`${name}：${choice.model} 不支持推理强度 ${choice.effort}`);
+  if (!catalog.models.length) throw new Error(`${name}：Codex 没有返回可选模型`);
+  return effectiveChoice(settings.modules[module], catalog.models);
 }
 export async function saveAgentSettings(value: unknown) {
   const settings = settingsSchema.parse(value);
   const catalog = await getAgentCatalog(settings.cliPath, true);
-  for (const module of AGENT_MODULES) validateAgentChoice(module.id, settings, catalog);
+  for (const module of AGENT_MODULES) {
+    // A model this Codex lacks is kept (it runs on the default); an effort the chosen model rejects is a mistake to fix now.
+    validateAgentChoice(module.id, settings, catalog);
+    const choice = settings.modules[module.id], model = catalog.models.find(m => m.id === choice.model);
+    if (model && !model.efforts.includes(choice.effort)) throw new Error(`${module.name}：${choice.model} 不支持推理强度 ${choice.effort}`);
+  }
   // Empty path keeps automatic detection enabled.
   atomicAgentJson(agentSettingsFile(), settings);
   return { settings, catalog, runs: recentAgentRuns() };

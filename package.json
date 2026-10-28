@@ -1,6 +1,6 @@
 {
   "name": "opentake-standard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
@@ -16,7 +16,9 @@
     "build:app": "npm run build && node desktop/build-app.mjs",
     "test:desktop": "node --test desktop/*.test.cjs",
     "build:openscreen": "npm --prefix vendor/openscreen run build:linkreader",
-    "test:openscreen": "npm --prefix vendor/openscreen run test:standard"
+    "test:openscreen": "npm --prefix vendor/openscreen run test:standard",
+    "doctor": "node scripts/doctor.cjs",
+    "build:live": "npm run build:openscreen && vite build --emptyOutDir false"
   },
   "dependencies": {
     "@hyperframes/core": "0.8.198",

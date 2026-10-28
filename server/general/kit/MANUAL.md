@@ -50,11 +50,20 @@
 
 ## 环境
 
-- `film`、`node`、`python3`、`ffmpeg`、`ffprobe` 都是 OpenTake 自带的，不要用别处的 ffmpeg；编码只用 `film` 命令（沙盒里出 VP9 是正常的，交付时会转 H.264，不用提）。
-- Python 只有 numpy、scipy、numba；WAV 读写用 `from wav import write, read`，合成音效用 `sfx.py`（都在 PYTHONPATH）。
+- 工具已经备好，不要自己去找 Python、numpy、FFmpeg 或浏览器，不要扫描系统缓存、临时目录或其他 App。直接使用 `.opentake/bin/` 里的 `film`、`node`、`python3`、`ffmpeg`、`ffprobe`；实际路径在 `.opentake/tools.json`，浏览器由 `CW_CHROME` / `CW_HFX_CHROME` 固定传入。若固定工具意外失败，停止并报告，不要自行换工具。编码只用 `film` 命令（沙盒里出 VP9 是正常的，交付时会转 H.264，不用提）。
+- Python 已确认有 numpy；不要假定 scipy、numba 或其他第三方库可用。WAV 读写用 Python 标准库 `wave`，配乐和音效用 numpy 合成。不要导入依赖 scipy 的旧 `wav.py` 或 `sfx.py`。
 - 临时文件放 `.tmp/`。不能安装、下载、开端口；需要联网就 `film need-network --reason … --host …` 然后结束这一轮。
 - WebGL 只有 CPU，3D 要克制。
 
 ## 交付
 
 `out.mp4`、`poster.jpg`、`film.json`、一段话的 `REPORT.md`。片中不能出现 LemoLab、Claude、Opus 等字样。风格说明和导演、技法手册（`$CW_KIT/styles/…`、`$CW_KIT/guides/…`）只在需要时查，不用通读。
+
+## 一次切对、一次处理声音
+
+先定总时长和每段起止，再写画面。HyperFrames 工程先运行 `hfx plan <总秒数>`，工具会列出完整切段规则和时间骨架，不需要先写 index.html。
+- 画面子页面至少 `max(2, floor(总秒数 / 5))` 个；每段不超过 `max(8, 总秒数 / 2)` 秒。重叠片段也按自身完整时长计算，不能靠增加字幕或公式叠层绕过长片段限制。
+- 15 秒至少 3 段，每段最多 8 秒；通常先按 0–5、5–10、10–15 秒安排三个讲述步骤，再按内容调整。每个画面变化对应根节点下独立的 `compositions/*.html`，动画按片段局部时间编写。
+- 配乐、音效保持分轨，负责内容、音色和相对比例即可。程序用浮点混音，统一到 −14 LUFS，AAC 成片真峰值不超过 −1 dBTP，并写声音处理记录。**不用自己测响度、放大单轨、写响度修复脚本或为音量再做一轮**。真正静音或缺音轨需要补声音内容；处理工具失败由程序报错。
+- 开始准备素材和写子页面即 `film progress code 正在准备素材和写画面`；检查用 `film progress self-check 正在检查样张`。只打点实际工作，不增加审核或精修轮。
+- 工具已提供路径和能力，只在出错时查相关的一小段；不通读渲染源码、不反复输出完整 HTML。联网下载优先用 curl，失败只重试缺失文件；字体优先用 `film fonts` 的本地文件。

@@ -11,7 +11,7 @@ test('commands are classified by what they do', () => {
   assert.equal(classifyCommand(`/bin/zsh -lc 'export PATH="$CW_BIN:$PATH"; film render --workers 3'`)?.step, 'render');
   assert.equal(classifyCommand('/bin/zsh -lc "film look 0-8"')?.step, 'self-check');
   assert.equal(classifyCommand('/bin/zsh -lc "film probe clip.mp4"')?.step, 'read-input');
-  assert.equal(classifyCommand('/bin/zsh -lc "film progress plan 写方案"'), undefined);
+  assert.equal(classifyCommand('/bin/zsh -lc "film progress plan 写方案"')?.step, 'plan');
   assert.equal(classifyCommand(`/bin/zsh -lc "cat '/kit/styles/dark-keynote/STYLE.md'"`)?.step, 'read-style');
   assert.equal(classifyCommand("/bin/zsh -lc 'cat /example/.agents/skills/hyperframes/SKILL.md'"), undefined);
   assert.equal(classifyCommand("/bin/zsh -lc 'ls -la'"), undefined);

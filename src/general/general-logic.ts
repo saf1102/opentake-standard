@@ -144,7 +144,7 @@ export function runStatus(project: Pick<GeneralProject, 'run' | 'versions'>, now
   const started = time(run.startedAt) ?? now
   const spent = elapsedLabel((time(run.endedAt) ?? now) - started)
   switch (run.state) {
-    case 'running': return { tone: 'running', text: `${run.purpose === 'revision' ? `正在做${versionName(nextVersionNumber(versions))}` : '正在做片'} · 已用 ${spent}` }
+    case 'running': return { tone: 'running', text: `${run.repairReason ? `第 ${run.round ?? 2} 轮：修正 ${run.repairReason}` : run.purpose === 'revision' ? `正在做${versionName(nextVersionNumber(versions))}` : '正在做片'} · 已用 ${spent}` }
     case 'needs-network': return { tone: 'wait', text: `等你决定 · 已用 ${spent}` }
     case 'stopping': return { tone: 'wait', text: '正在停止…' }
     case 'stopped': return { tone: 'idle', text: '已停止 · 方案和样张都留着' }

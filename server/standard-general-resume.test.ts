@@ -82,3 +82,9 @@ test('empty work restores a snapshot atomically, but non-file snapshot entries a
   assert.equal(fs.readFileSync(path.join(dir,'work/index.html'),'utf8'),'saved source');
   assert.equal(fs.readdirSync(dir).some(name=>name.startsWith('.revision-work-')),false);
 }));
+
+test('empty work restoration does not rename onto a directory (Windows semantics)',()=>fixture((dir,id)=>{
+ const snapshot=path.join(dir,'versions/v1/work');fs.mkdirSync(snapshot,{recursive:true});fs.writeFileSync(path.join(snapshot,'index.html'),'saved');
+ const original=fs.renameSync;fs.renameSync=((from,to)=>{if(String(to)===path.join(dir,'work')&&fs.existsSync(to))throw Object.assign(Error('Windows rename destination exists'),{code:'EPERM'});return original(from,to);}) as typeof fs.renameSync;
+ try{postMessage(id,{text:'继续'});assert.equal(fs.readFileSync(path.join(dir,'work/index.html'),'utf8'),'saved');}finally{fs.renameSync=original;}
+}));

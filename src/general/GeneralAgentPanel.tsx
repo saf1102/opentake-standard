@@ -3,7 +3,7 @@ import { ArrowUp, ChevronDown, ChevronRight, CircleCheck, CirclePause, CircleX, 
 import type { GeneralAgentChoice, GeneralPlan, GeneralProject, GeneralRun, GeneralVersion } from './general-contract'
 import { AgentControls } from './AgentPicker'
 import {
-  clockTime, feedItems, networkCopy, revisionNote, runActive, runStatus, secondsLabel, stepRows, stepsSummary, versionCardTime, versionName,
+  clockTime, elapsedLabel, feedItems, networkCopy, revisionNote, runActive, runStatus, secondsLabel, stepRows, stepsSummary, versionCardTime, versionName,
   type FeedItem, type StepRow,
 } from './general-logic'
 import { AgentText, CodexMark, Spinner, StopGlyph, TodoDot } from './GeneralBits'
@@ -52,6 +52,11 @@ function PlanCard({ plan }: { plan: GeneralPlan }) {
 }
 
 function StepList({ run, project }: { run: GeneralRun; project: GeneralProject }) {
+  const now = useNow(runActive(run))
+  const elapsed = (id: string) => {
+    const step = run.steps.find(s => s.id === id)
+    return step?.startedAt ? ` · 已用 ${elapsedLabel(now - Date.parse(step.startedAt))}` : ''
+  }
   const rows = stepRows(run, { kind: project.inputs.kind, hasPlan: !!project.plan })
   return <ol className="ge-steplist" aria-label="做片步骤">
     {rows.map(row => <li key={row.id} className="ge-step" data-tone={row.tone} aria-current={row.tone === 'now' || row.tone === 'wait' ? 'step' : undefined}>
@@ -60,7 +65,7 @@ function StepList({ run, project }: { run: GeneralRun; project: GeneralProject }
         <div className="t"><b>{row.title}</b>{row.aside && <small>{row.aside}</small>}</div>
         {row.progress !== undefined && <div className="ge-prog" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(row.progress * 100)}>
           <i style={{ '--f': row.progress } as CSSProperties} /></div>}
-        {row.detail && <p>{row.detail}</p>}
+        {(row.detail || row.tone === 'now') && <p>{row.detail || row.title}{row.tone === 'now' ? elapsed(row.id) : ''}</p>}
         {row.plan && project.plan && <PlanCard plan={project.plan} />}
         {row.thumbs.length > 0 && row.id !== 'render' && <div className="ge-thumbs">{row.thumbs.slice(-4).map(src => <img key={src} src={src} alt="" loading="lazy" draggable={false} />)}</div>}
       </div>

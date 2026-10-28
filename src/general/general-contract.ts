@@ -41,6 +41,8 @@ export type GeneralRun = {
   networkRequest?: { reason: string; hosts: string[] };
   /** messages the person sent while the run worked; the agent sees them when its current step ends */
   queued: number;
+  round?: number; repairReason?: string;
+  rounds?: { round: number; steps: GeneralStep[] }[];
 };
 
 export type GeneralVersion = {

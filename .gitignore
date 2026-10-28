@@ -6,3 +6,6 @@ dist/
 ._*
 release/
 .venv/
+
+# Generated source provenance; never commit local receipts.
+/release-source.json

@@ -44,30 +44,31 @@ export function runningStep(steps: GeneralStep[]) { return steps.find(s => s.sta
 /** Which step a shell command belongs to (undefined: it tells nothing about the step). */
 export function classifyCommand(command: string): { step: GeneralStepId; detail?: string } | undefined {
   const c = command;
-  const film = /\bfilm(?:\.mjs)?["']?\s+(render|mux|poster|look|still|check|probe|frames|progress|need-network)\b/.exec(c)?.[1];
-  if (film === 'progress' || film === 'need-network') return undefined;
-  if (film === 'render') return { step: 'render', detail: '逐帧渲染' };
-  if (film === 'mux') return { step: 'render', detail: '混流成片' };
-  if (film === 'poster') return { step: 'render', detail: '生成封面' };
-  if (film === 'look') return { step: 'self-check', detail: '抽帧看接触表' };
-  if (film === 'still') return { step: 'self-check', detail: '渲染样张' };
-  if (film === 'check') return { step: 'self-check', detail: '检查页面' };
-  if (film === 'probe' || film === 'frames') return { step: 'read-input', detail: film === 'probe' ? '读取素材信息' : '素材拆帧' };
-  // a command that writes files is judged by what it writes, not by the commands quoted inside them
-  if (/write_text|\bcat\s+>|\btee\s|>\s*["']?[\w./-]+\.(?:html|m?js|py|css|sh|md|json)\b/.test(c)) {
-    if (/TREATMENT\.md|plan\.json/.test(c)) return { step: 'plan', detail: '写方案' };
-    if (/\.(?:html|m?js|py|css|sh)\b|film\.json/.test(c)) return { step: 'code', detail: '写画面代码' };
-    return undefined;
+  // File bodies can mention check/render: classify the write before inspecting quoted commands.
+  if (/write_text|writeFileSync|writeFile|\bcat\s*(?:<<[^\n]*|)\s*>|\btee\s|apply_patch|\bmkdir\s+[^;\n]*compositions/.test(c)) {
+    if (/compositions\b|index\.html|film\.json|\.(?:html|m?js|py|css|sh)\b/.test(c)) return { step: 'code', detail: '正在写画面和声音' };
+    if (/TREATMENT\.md|plan\.json/.test(c)) return { step: 'plan', detail: '正在写方案' };
   }
+  const progress = /\bfilm(?:\.mjs)?["']?\s+progress\s+(read-style|read-input|plan|code|self-check|render)\b/.exec(c);
+  if (progress) return { step: progress[1] as GeneralStepId, detail: `正在${stepLabel(progress[1] as GeneralStepId)}` };
+  const film = /\b(?:film|hfx)(?:\.mjs)?["']?\s+(render|mux|poster|look|still|check|probe|frames|progress|need-network)\b/.exec(c)?.[1];
+  if (film === 'progress' || film === 'need-network') return undefined;
+  if (film === 'render') return { step: 'render', detail: '正在逐帧渲染' };
+  if (film === 'mux') return { step: 'render', detail: '正在混音并统一响度' };
+  if (film === 'poster') return { step: 'render', detail: '正在生成封面' };
+  if (film === 'look' || film === 'still') return { step: 'self-check', detail: '正在检查样张' };
+  if (film === 'check') return { step: 'self-check', detail: '正在检查片段和页面' };
+  if (film === 'probe' || film === 'frames') return { step: 'read-input', detail: film === 'probe' ? '正在读取素材信息' : '正在素材拆帧' };
   if (/\bnode\s+[^\s;|&]*video\.mjs|\bsh\s+[^\s;|&]*mux\.sh|\bsh\s+(?:\.\/)?build\.sh|(?:^|[\s;'"])\.\/build\.sh/.test(c)) return { step: 'render', detail: '渲染成片' };
   if (/\bnode\s+[^\s;|&]*(?:still|readcheck)\.mjs|--stills|blackdetect|ebur128|\bqc\.py|contact[-_ ]?sheet|sheet\.py/.test(c)) return { step: 'self-check', detail: '自查' };
-  if (/STYLE\.md|DIRECTOR\.md|TECHNIQUE\.md|MANUAL\.md|core\/README\.md/.test(c)) return { step: 'read-style', detail: '阅读风格说明' };
+  if (/HF\.md|STYLE\.md|DIRECTOR\.md|TECHNIQUE\.md|MANUAL\.md|core\/README\.md/.test(c)) return { step: 'read-style', detail: '阅读风格说明' };
   if (/\bffprobe\b|CW_MEDIA|(?:^|[\s'"/])input\/|BRIEF\.md|gt\(scene/.test(c)) return { step: 'read-input', detail: '查看素材和文案' };
   if (/\bcp\s+-R\b|apply_patch/.test(c)) return { step: 'code', detail: '写画面代码' };
   return undefined;
 }
 export function classifyFiles(paths: string[]): { step: GeneralStepId; detail?: string } | undefined {
   const names = paths.map(p => p.split('/').pop() || p);
+  if (paths.some(p => /(?:^|\/)compositions\//.test(p))) return { step: 'code', detail: '正在写画面代码' };
   if (names.some(n => n === 'TREATMENT.md' || n === 'plan.json')) return { step: 'plan', detail: '写方案' };
   if (names.some(n => /\.(html|m?js|py|css|glsl|frag|vert|sh)$/.test(n) || n === 'film.json')) return { step: 'code', detail: '写画面代码' };
   return undefined;
@@ -94,13 +95,12 @@ export function applyCodexEvent(steps: GeneralStep[], event: Record<string, unkn
     return { steps: run && text ? setStep(steps, run.id, { detail: clip(text) }) : steps, message: text || undefined };
   }
   const hit = item.type === 'command_execution' && type === 'item.started' ? classifyCommand(String(item.command || ''))
-    : item.type === 'file_change' && type === 'item.completed' ? classifyFiles(((item.changes || []) as { path: string }[]).map(c => c.path)) : undefined;
+    : item.type === 'file_change' && (type === 'item.started' || type === 'item.completed') ? classifyFiles(((item.changes || []) as { path: string }[]).map(c => c.path)) : undefined;
   if (!hit) return { steps };
   // scripts written before the plan exists are tools for reading the input, not the film's code
   const plan = steps.find(s => s.id === 'plan');
-  if (hit.step === 'code' && plan && plan.state === 'waiting') return { steps };
+  if (hit.step === 'code' && plan && plan.state === 'waiting' && !/compositions|index\.html|film progress code/.test(JSON.stringify(item))) return { steps };
   return { steps: advance(steps, hit.step, at, hit.detail) };
-  return { steps };
 }
 
 export type Progress = { step?: string; detail?: string; thumbs?: string[]; progress?: { done: number; total: number }; at?: string };
@@ -115,4 +115,19 @@ export function applyProgress(steps: GeneralStep[], progress: Progress, at: stri
   if (id === 'render' && progress.progress && Number.isFinite(progress.progress.done) && Number.isFinite(progress.progress.total)) patch.progress = { done: Number(progress.progress.done), total: Number(progress.progress.total) };
   if (target.state === 'done' || target.state === 'running') next = setStep(next, id, patch);
   return next;
+}
+
+/** 没有执行证据的步骤明确跳过，不能编造完成时间。 */
+export function finishAgentSteps(steps: GeneralStep[], at: string): GeneralStep[] {
+  return steps.map(s => !AGENT_STEPS.includes(s.id) ? s
+    : s.state === 'running' ? { ...s, state: 'done', endedAt: at }
+    : s.state === 'waiting' && s.id !== 'render' ? { ...s, state: 'skipped', detail: '未单独执行，由成片机检继续检查' } : s);
+}
+export function beginRepair(run: GeneralRun, reason: string, at: string): void {
+  (run.rounds ??= []).push({ round: run.round ?? 1, steps: run.steps.map(s => ({ ...s })) });
+  run.round = (run.round ?? 1) + 1;
+  run.repairReason = clip(reason, 140);
+  run.steps = run.steps.map(s => ['code', 'self-check', 'render', 'review', 'deliver'].includes(s.id)
+    ? { ...s, state: s.id === 'code' ? 'running' : 'waiting', detail: s.id === 'code' ? `正在修正：${reason}` : undefined,
+        startedAt: s.id === 'code' ? at : undefined, endedAt: undefined, progress: undefined, thumbs: undefined } : s);
 }

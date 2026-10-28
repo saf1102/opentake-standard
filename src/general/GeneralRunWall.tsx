@@ -78,7 +78,8 @@ export function GeneralRunWall({ project, poster }: { project: GeneralProject; p
   const backdrop = [...pictures.slice(0, upTo + 1)].reverse().map(p => p.image ?? p.grid?.[0]).find(Boolean) ?? poster
   const step = working >= 0 ? rows[working] : undefined
   const started = run ? Date.parse(run.startedAt) : now
-  const title = run?.state === 'needs-network' ? 'Codex 在等你决定要不要联网' : step ? `Codex 正在${step.title.replace(/^正在/, '')}` : 'Codex 正在做片'
+  const repair = run?.repairReason ? `第 ${run.round ?? 2} 轮：修正 ${run.repairReason}` : undefined
+  const title = run?.state === 'done' ? '片子已交付' : run?.state === 'needs-network' ? 'Codex 在等你决定要不要联网' : step ? `Codex 正在${step.title.replace(/^正在/, '')}` : 'Codex 正在做片'
   const elapsed = (row: StepRow) => {
     const s = run?.steps.find(x => x.id === row.id)
     if (!s?.startedAt) return ''
@@ -91,7 +92,8 @@ export function GeneralRunWall({ project, poster }: { project: GeneralProject; p
     <div className="ge-rw-turn">
       <span className="ge-rw-glow" aria-hidden="true" />
       <img className="ge-rw-mark" src="/opentake-icon-512.png" alt="" draggable={false} />
-      <div className="ge-rw-status" role="status"><b>{title}</b>
+      <div className="ge-rw-status" role="status"><b data-repair={repair && live ? true : undefined} title={repair && live ? repair : title}>{repair && live ? repair : title}</b>
+        {step && <small>{step.detail || title} · {elapsed(step)}</small>}
         <small>{working >= 0 ? `第 ${working + 1} / ${rows.length} 步 · ` : ''}已用 {elapsedLabel(now - started)}</small></div>
     </div>
     <div className="ge-rw-wall">

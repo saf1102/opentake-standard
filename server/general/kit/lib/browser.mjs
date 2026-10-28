@@ -1,3 +1,4 @@
+import {sampleArgs} from '../../../../shared/browser-launch.cjs';
 // Headless Chrome inside the agent's sandbox. Two workarounds verified in the Codex trial:
 //  1. the macOS sandbox refuses Chrome's mach-port registration, so Chrome runs as one process (--single-process --no-zygote);
 //  2. no process may listen on a port, so pages are served from disk through page.route on a made-up origin.
@@ -9,8 +10,7 @@ import { chromePath, fontDirs, iconsDir, KIT, LIBRARIES, MEDIA, nodeModules, pla
 export const ORIGIN = 'http://film.localhost';
 // Inside the Codex sandbox Metal is refused (Chrome stops with SIGTRAP when asked for it), so WebGL runs on SwiftShader (CPU).
 // CW_CHROME_GL=metal asks for the GPU when the kit runs outside the sandbox.
-export const CHROME_ARGS = ['--single-process', '--no-zygote', '--ignore-gpu-blocklist', '--font-render-hinting=none', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio',
-  ...(process.env.CW_CHROME_GL === 'metal' ? ['--use-gl=angle', '--use-angle=metal'] : ['--enable-unsafe-swiftshader'])];
+export const CHROME_ARGS = sampleArgs(process.env.CW_CHROME_GL);
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',

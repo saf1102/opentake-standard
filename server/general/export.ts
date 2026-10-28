@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 /** General export jobs own a new directory and an immutable snapshot. No agent run or UI files are changed. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +20,7 @@ export function reconcileExports(id: string) {
   let owner: { pid?: number; worker?: number } = {};
   try { owner = JSON.parse(fs.readFileSync(path.join(lockPath(dir), 'owner.json'), 'utf8')); } catch { /* interrupted before worker start */ }
   if (owner.pid && alive(owner.pid)) return;
-  if (owner.worker) { try { process.kill(-owner.worker, 'SIGKILL'); } catch { /* exited */ } }
+  if (owner.worker) { try { platform.killTree(owner.worker, 'SIGKILL'); } catch { /* exited */ } }
   const job = project.exportTask;
   if (/^[0-9a-f-]{36}$/.test(job.id)) fs.rmSync(path.join(dir, 'exports', job.id), { recursive: true, force: true });
   fs.rmSync(lockPath(dir), { recursive: true, force: true });
@@ -71,7 +72,7 @@ export function startExport(id: string, version: number, format: unknown): Gener
     child = spawn(process.execPath, ['--experimental-strip-types', script, output, format, project.name], { cwd: output, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     fs.writeFileSync(path.join(lockPath(dir), 'owner.json'), JSON.stringify({ pid: process.pid, worker: child.pid }));
     let tail = '', pending = '', settled = false;
-    const stop = () => { if (child?.pid) try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already stopped */ } };
+    const stop = () => { if (child?.pid) try { platform.killTree(child.pid, 'SIGKILL'); } catch { /* already stopped */ } };
     process.once('exit', stop);
     child.stdout?.on('data', data => {
       pending += data.toString();

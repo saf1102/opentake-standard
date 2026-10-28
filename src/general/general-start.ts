@@ -1,10 +1,11 @@
+import type {EnvironmentCheck} from '../../shared/creation-tools'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { generalApi, announceGeneralChange, errorText } from './general-api'
+import { generalApi, announceGeneralChange, errorText, GeneralApiError } from './general-api'
 import type { GeneralAgentChoice, GeneralInputKind, GeneralProject, GeneralSettings } from './general-contract'
 import { generalProjectHref } from './general-logic'
 
-export type StartBusy = { phase: 'create' | 'upload' | 'start'; index?: number; total?: number; ratio?: number }
+export type StartBusy = { phase: 'check' | 'create' | 'upload' | 'start'; index?: number; total?: number; ratio?: number }
 export type StartSpec = {
   styleId: string; kind: GeneralInputKind; text: string; note: string; settings: GeneralSettings; files: readonly { key: string; file: File }[]
   /** the model and effort (absent: 系统默认) and 联网 */
@@ -19,13 +20,24 @@ export function useGeneralStart() {
   const navigate = useNavigate()
   const [busy, setBusy] = useState<StartBusy | null>(null)
   const [error, setError] = useState('')
+  const [environment,setEnvironment] = useState<EnvironmentCheck | null>(null)
+  const starting = useRef(false)
   const created = useRef<{ project: GeneralProject; uploaded: Map<string, string> } | null>(null)
   const start = async (spec: StartSpec) => {
-    if (busy) return
+    if (starting.current) return
+    starting.current=true
     // Asked inside the click, so the desktop app can show its permission prompt; the answer only affects 系统通知.
     try { if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission() } catch { /* not available */ }
     setError('')
     try {
+      setBusy({ phase: 'check' })
+      const response=await fetch('/api/environment')
+      if(!response.ok)throw Error('环境检查失败，请重新检查')
+      const check=await response.json() as EnvironmentCheck & {ffmpeg?:{ok:boolean;message?:string}}
+      if(check.items){
+        setEnvironment(check)
+        if(!check.ok){setBusy(null);return}
+      }
       setBusy({ phase: 'create' })
       const inputs = { kind: spec.kind, text: spec.text, note: spec.note }
       const choice = { ...(spec.agent ? { agent: spec.agent } : {}), network: !!spec.network }
@@ -48,11 +60,12 @@ export function useGeneralStart() {
       announceGeneralChange()
       navigate(generalProjectHref(project.id))
     } catch (failure) {
+      if(failure instanceof GeneralApiError && failure.environment)setEnvironment(failure.environment)
       setError(`没能开始：${errorText(failure)}`)
       setBusy(null)
-    }
+    } finally { starting.current=false }
   }
-  const busyLabel = !busy ? '' : busy.phase === 'create' ? '正在建工程…'
+  const busyLabel = !busy ? '' : busy.phase === 'check' ? '正在检查出片工具…' : busy.phase === 'create' ? '正在建工程…'
     : busy.phase === 'upload' ? `正在上传 ${(busy.index ?? 0) + 1}/${busy.total} · ${Math.round((busy.ratio ?? 0) * 100)}%` : '正在开始…'
-  return { busy, busyLabel, error, start }
+  return { busy, busyLabel, error, environment, start }
 }

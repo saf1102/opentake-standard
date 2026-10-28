@@ -58,8 +58,8 @@ const MAKE = (_kit: string, styleId: string) => [
   '',
   `1. \`film progress read-style\`：读 HF.md${isFree(styleId) ? '' : '和 STYLE.md'}，以及 HF.md 指定的两份格式规则。其他文档只在需要时查一小段。`,
   '2. `film progress read-input`：看清输入。素材用 `film probe`、`film look <素材>`；要卡节奏就自己用 numpy 分析音频。',
-  '3. `film progress plan`：心里定好分镜和节拍，不用写方案文件。',
-  '4. `film progress code`：写 index.html、每个画面变化一个子页面（compositions/）、声音片段；素材、字体复制进工程。',
+  '3. `film progress plan`：心里定好分镜和节拍，运行 `hfx plan <总秒数>` 一次看全切段数量和时长限制；先定每段起止，再写代码，不用写方案文件。',
+  '4. `film progress code`：写 index.html、每个画面变化一个子页面（compositions/）、声音片段；素材、字体复制进工程。准备素材就切到 code，不要拖到写完；响度和真峰值由程序统一处理，不写调响度脚本。',
   '5. `film progress self-check`：`hfx check` 直到通过，再 `hfx look`，用 view_image 看一遍接触表，把用户的要求一条一条对照。没做到的改掉，改完再看一次；都做到了就结束，不要为打磨反复返工。',
   '6. 写 REPORT.md：用户的每条要求一行，写做到了没有、怎么做到的。**不要渲染成片**（OpenTake 会渲染）。最后用中文给用户回两三句：做了什么、有什么已知问题（不讲代码和路径）。',
 ].join('\n');

@@ -1,3 +1,5 @@
+import {requireCreationTools} from '../standard/creation-tools.ts';
+import platform from '../platform.ts';
 /** /api/general：通用剪辑的接口，照 src/general/general-contract.ts 实现。回应沿用工作台的 {ok, result} / {ok:false, error}。 */
 import { startExport, exportRunning, reconcileExports } from './export.ts';
 import fs from 'node:fs';
@@ -71,7 +73,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
       const folder = project.exportTask?.state === 'done' ? project.exportTask.folder : undefined;
       const inside = folder && path.resolve(folder).startsWith(path.join(dir, 'exports') + path.sep) && fs.existsSync(folder);
       if (!inside) return sendJson(res, 404, { ok: false, error: '找不到上次导出的剪映工程，请重新导出' });
-      await exec('/usr/bin/open', ['-R', folder]);
+      const reveal=platform.revealCommand(folder);await exec(reveal.command,reveal.args);
       return ok(res, { revealed: true });
     }
     if (action === 'text-presets' && method === 'GET') return ok(res, await stylePresets(findGeneral(id).project.styleId));
@@ -80,7 +82,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
     if (action === 'media' && method === 'POST' && parts.length === 3) return ok(res, await addMedia(req, id), 201);
     if (action === 'media' && method === 'DELETE' && parts.length === 4) return ok(res, removeMedia(id, parts[3]));
     if (method !== 'POST' || parts.length !== 3) return sendJson(res, 404, { ok: false, error: '接口不存在' });
-    if (action === 'generate') return ok(res, startFirst(id, { request: true }));
+    if (action === 'generate') return ok(res, startFirst(id, { request: true, ...(process.platform==='darwin'?{tools:await requireCreationTools()}:{} ) }));
     if (action === 'stop') return ok(res, stopRun(id));
     if (action === 'resume') return ok(res, resumeRun(id));
     if (action === 'messages') return ok(res, postMessage(id, await bodyJson(req, 16 * 1024 * 1024)));
@@ -92,7 +94,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
     return sendJson(res, 404, { ok: false, error: '接口不存在' });
   } catch (error) {
     const status = (error as { status?: number }).status || 500;
-    if (!res.headersSent) sendJson(res, status, { ok: false, error: error instanceof Error ? error.message : String(error) });
+    if (!res.headersSent) sendJson(res, status, { ok: false, error: error instanceof Error ? error.message : String(error), ...(status===412?{environment:(error as {environment?:unknown}).environment}:{}) });
     else res.destroy();
   }
 }

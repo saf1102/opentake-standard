@@ -1,3 +1,4 @@
+import {ffmpegPath} from '../general/kit-env.ts';
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process';
 import path from 'node:path';
 
@@ -25,8 +26,7 @@ export class VideoFrames {
   }
 
   private start(src: string, fps: number): Stream {
-    const child = spawn(process.env.LINKREADER_BIN_DIR
-      ? path.join(process.env.LINKREADER_BIN_DIR, 'ffmpeg') : 'ffmpeg', [
+    const child = spawn(ffmpegPath(), [
       '-v', 'error', '-nostdin', '-i', src, '-an', '-vf', `fps=${fps}`,
       '-sws_flags', 'neighbor+accurate_rnd', '-f', 'image2pipe',
       '-c:v', 'png', '-pix_fmt', 'rgba', '-threads', '1', 'pipe:1',

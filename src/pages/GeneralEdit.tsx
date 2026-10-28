@@ -1,3 +1,4 @@
+import {EnvironmentResults} from '../standard/EnvironmentResults'
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { ChevronLeft, ChevronRight, FolderLock, RefreshCw, Plus, RectangleHorizontal, RectangleVertical, Upload, X } from 'lucide-react'
@@ -78,7 +79,7 @@ function IntakeStep({ style, kind, draft, setDraft, onChangeStyle }: {
 }) {
   const picker = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
-  const { busy, busyLabel, error, start: begin } = useGeneralStart()
+  const { busy, busyLabel, error, environment, start: begin } = useGeneralStart()
   const blocker = startBlocker(kind, { files: draft.files.length, text: draft.text })
 
   const addFiles = (list: FileList | File[]) => {
@@ -166,10 +167,11 @@ function IntakeStep({ style, kind, draft, setDraft, onChangeStyle }: {
         </div>
         <button type="button" className="ge-primary" disabled={!!blocker && !busy} data-busy={busy ? '' : undefined} aria-busy={!!busy}
           title={blocker} onClick={start}>
-          {busy ? busyLabel : <>{error ? '再试一次' : '开始生成'}<ChevronRight size={17} aria-hidden="true" /></>}
+          {busy ? busyLabel : <>{environment && !environment.ok ? '重新检查' : error ? '再试一次' : '开始生成'}<ChevronRight size={17} aria-hidden="true" /></>}
         </button>
       </div>
-      {error && <p className="ge-error" role="alert">{error}</p>}
+      {environment && !environment.ok && <EnvironmentResults value={environment}/>}
+      {error && <p className="ge-error" role="alert" style={{color:'#9869dc',whiteSpace:'pre-wrap'}}>{error}</p>}
     </div>
   </main>
 }

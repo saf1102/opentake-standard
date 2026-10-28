@@ -5,6 +5,7 @@
  * 3. 结论：通过，或者要改的条目（交给出片会话做第二轮）。
  */
 import fs from 'node:fs';
+import { normalizeAudio } from './audio.ts';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -64,13 +65,15 @@ export async function machineChecks(ffmpeg: string, ffprobe: string, video: stri
     checks.push({ ok, text: `时长 ${info.duration.toFixed(1)} 秒（要求 ${settings.length} 秒）` });
   } else checks.push({ ok: info.duration >= 5 && info.duration <= 75, text: `时长 ${info.duration.toFixed(1)} 秒` });
   checks.push({ ok: !!info.audio, text: info.audio ? `有音轨（${info.audio.codec_name}）` : '没有音轨' });
+  if (info.audio) {
+    const audio = await normalizeAudio(ffmpeg, video);
+    checks.push({ ok: !audio.silent, text: audio.silent ? '音轨是静音，请补充实际声音内容' : `声音已由程序处理：${audio.after.integrated} LUFS / ${audio.after.peak} dBTP（目标 −14 LUFS / ≤ −1 dBTP）` });
+  }
   try {
-    const { stderr } = await run(ffmpeg, ['-hide_banner', '-nostats', '-i', video, '-vf', 'blackdetect=d=0.4:pix_th=0.08', '-af', 'ebur128=peak=true', '-f', 'null', '-'], { maxBuffer: 32 << 20 });
+    const { stderr } = await run(ffmpeg, ['-hide_banner', '-nostats', '-i', video, '-vf', 'blackdetect=d=0.4:pix_th=0.08', '-f', 'null', '-'], { maxBuffer: 32 << 20 });
     const blacks = [...stderr.matchAll(/black_start:([\d.]+) black_end:([\d.]+)/g)].map(m => `${Number(m[1]).toFixed(1)}–${Number(m[2]).toFixed(1)} 秒`);
     checks.push({ ok: blacks.length === 0, text: blacks.length ? `黑场 ${blacks.join('、')}` : '没有黑场' });
-    const loud = [...stderr.matchAll(/I:\s+(-?[\d.]+) LUFS/g)].at(-1)?.[1];
-    if (loud !== undefined && info.audio) checks.push({ ok: Math.abs(Number(loud) + 14) <= 2 || Number(loud) < -60, text: Number(loud) < -60 ? '音轨是静音' : `响度 ${loud} LUFS（目标 −14）` });
-  } catch { checks.push({ ok: true, text: '黑场和响度检查没有跑成' }); }
+  } catch { throw new Error('黑场检查未完成，请检查媒体工具后重试，无需智能体返工'); }
   return checks;
 }
 

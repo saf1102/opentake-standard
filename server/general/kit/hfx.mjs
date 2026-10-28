@@ -1,3 +1,4 @@
+import {sampleArgs} from '../../../shared/browser-launch.cjs';
 // hfx — OpenTake's tools for a HyperFrames film, usable inside the agent's sandbox (offline, nothing to install, no port).
 //   hfx check        HyperFrames' own lint, plus OpenTake's rules: every visual change is its own clip, sound has a role
 //   hfx look [n]     n frames (default 12), drawn exactly as OpenTake's export draws them, tiled into look/sheet.jpg
@@ -8,6 +9,17 @@ const root = process.env.CW_WORK || process.cwd(), [cmd, arg] = process.argv.sli
 const imp = p => import(pathToFileURL(path.join(NM, p)).href);
 const say = (...l) => console.log(l.join('\n'));
 const tool = name => path.join(BIN, name);
+const limits = seconds => ({ min: Math.max(2, Math.floor(seconds / 5)), max: Math.max(8, seconds * 0.5) });
+if (cmd === 'plan') {
+  const seconds = Number(arg);
+  if (!Number.isFinite(seconds) || seconds <= 0) { say('用法：hfx plan <总秒数>'); process.exit(1); }
+  const { min, max } = limits(seconds);
+  const count = Math.max(min, Math.ceil(seconds / Math.min(5, max)));
+  say(`切段规则：至少 ${min} 个画面子页面，每段最多 ${max} 秒（重叠也按各段自身时长计算）。`);
+  say('建议按讲述变化切开，先定片段起止再写画面；下面是可调整的时间骨架，不是内容分镜：');
+  say(JSON.stringify(Array.from({ length: count }, (_, i) => ({ file: `compositions/scene-${i + 1}.html`, start: +(i * seconds / count).toFixed(3), end: +((i + 1) * seconds / count).toFixed(3) })), null, 2));
+  process.exit(0);
+}
 if (!fs.existsSync(path.join(root, 'index.html'))) { say('还没有 index.html（片子的根页面）'); process.exit(1); }
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
@@ -33,12 +45,12 @@ if (cmd === 'check') {
   const problems = findings.filter(f => f.severity === 'error').map(f => `${f.code}: ${f.message}${f.elementId ? ` (#${f.elementId})` : ''}${f.file ? ` [${f.file}]` : ''}`);
   // the person edits the film clip by clip in OpenTake: every visual change has to be its own graphics clip
   const graphics = by('graphics');
-  if (graphics.length < Math.max(2, Math.floor(total / 5))) problems.push(`画面片段太少（${graphics.length} 个）：每一次画面变化（一组字、一张卡、一个色块编排、一个演示步骤）都要是根节点下单独的片段（data-start/data-duration，做成子页面），不要把整片动效写在一个元素或一条时间线里`);
-  const long = graphics.filter(g => g.dur > Math.max(8, total * 0.5));
+  if (graphics.length < limits(total).min) problems.push(`画面片段太少（${graphics.length} 个）：每一次画面变化（一组字、一张卡、一个色块编排、一个演示步骤）都要是根节点下单独的片段（data-start/data-duration，做成子页面），不要把整片动效写在一个元素或一条时间线里`);
+  const long = graphics.filter(g => g.dur > limits(total).max);
   if (long.length) problems.push(`这些画面片段太长，要按画面变化拆开：${long.map(g => `${g.id}（${g.dur.toFixed(1)} 秒）`).join('、')}`);
   for (const a of by('audio')) if (!/^(voice|music|sfx)$/.test(a.role)) problems.push(`声音片段 ${a.id} 要标 data-ot-role="voice|music|sfx"`);
   for (const f of findings.filter(f => f.severity === 'warning').slice(0, 12)) say(`提醒 ${f.code}: ${f.message}`);
-  if (problems.length) { say('', '要改：', ...problems.map(p => `- ${p}`)); process.exit(1); }
+  if (problems.length) { say(`切段完整规则：至少 ${limits(total).min} 个画面子页面；每段最多 ${limits(total).max} 秒。先按画面变化规划全部片段，可用 hfx plan ${total} 查看时间骨架。`); say('', '要改：', ...problems.map(p => `- ${p}`)); process.exit(1); }
   say('', '检查通过');
 } else if (cmd === 'look') {
   const n = Math.max(1, Math.min(48, Number(arg) || 12));
@@ -61,7 +73,7 @@ if (cmd === 'check') {
   // Full Chrome needs macOS application services unavailable inside the offline
   // agent sandbox. Without an override Playwright selects its headless shell.
   const sampleChrome = sampleBrowser(process.env);
-  const browser = await chromium.launch({ executablePath: sampleChrome, args: ['--single-process', '--no-zygote', '--font-render-hinting=none', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio', '--enable-unsafe-swiftshader'] });
+  const browser = await chromium.launch({ executablePath: sampleChrome, args: sampleArgs(process.env.CW_CHROME_GL) });
   try {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     let resourceFailure;

@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -22,9 +23,9 @@ type JsonObject = Record<string, unknown>;
 
 const profile = openScreenProfile();
 const OPENSCREEN_SUPPORT_ROOTS = profile ? [profile] : [
-  path.join(os.homedir(), "Library", "Application Support", "openscreen"),
-  path.join(os.homedir(), "Library", "Application Support", "OpenScreen"),
-  path.join(os.homedir(), "Library", "Application Support", "Openscreen"),
+  path.join(platform.appDataRoot(), "openscreen"),
+  path.join(platform.appDataRoot(), "OpenScreen"),
+  path.join(platform.appDataRoot(), "Openscreen"),
 ];
 const PROJECT_ROOTS = OPENSCREEN_SUPPORT_ROOTS.map((root) => path.join(root, "projects"));
 const RECORDING_ROOTS = [

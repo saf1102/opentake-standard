@@ -15,7 +15,8 @@
 @keyframes ge-rw-breathe { 50% { transform:scale(1.15);opacity:.6; } }
 .ge-rw-status { position:relative;text-align:center;padding:0 16px; }
 .ge-rw-status b { display:block;font-size:16px;font-weight:600; }
-.ge-rw-status small { color:#c9cbd1aa;font-size:12px;font-variant-numeric:tabular-nums; }
+.ge-rw-status b[data-repair] { color:#9869dc;overflow-wrap:anywhere; }
+.ge-rw-status small { display:block;color:#c9cbd1aa;font-size:12px;font-variant-numeric:tabular-nums; }
 
 /* the steps: a wall that slides up and down, the chosen one in the middle */
 .ge-rw-wall { position:absolute;right:0;top:0;bottom:0;width:56%;perspective:1400px; }

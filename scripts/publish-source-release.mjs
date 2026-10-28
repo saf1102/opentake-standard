@@ -33,7 +33,8 @@ export function findReleaseByTag(repo,tag,run=gh){
 export function publishSourceRelease({folder,repo=process.env.GITHUB_REPOSITORY,resumeDraft=false,run=gh}){
  if(!folder||repo!==PUBLIC_REPOSITORY)throw new Error('Only the official Standard repository can publish this source snapshot');
  const manifest=JSON.parse(fs.readFileSync(path.join(folder,'source-release.json'),'utf8'));
- if(manifest.repository!==repo||!/^[a-f0-9]{40}$/.test(manifest.commit)||manifest.tag!==`source-${manifest.commit}`||manifest.filename!=='OpenTake-Standard-source.zip')throw new Error('Invalid source manifest');
+ if(manifest.localCandidate)throw new Error('Local acceptance candidates cannot be published');
+ if(manifest.repository!==repo||!/^[a-f0-9]{40}$/.test(manifest.commit)||!(manifest.tag===`source-${manifest.commit}`||(/^\d+\.\d+\.\d+$/.test(manifest.version||'')&&manifest.tag===`v${manifest.version}`))||manifest.filename!=='OpenTake-Standard-source.zip')throw new Error('Invalid source manifest');
  const zip=path.resolve(folder,manifest.filename),hashFile=zip+'.sha256';
  const actual=sha256(fs.readFileSync(zip)),hashContents=fs.readFileSync(hashFile);
  if(actual!==manifest.sha256||fs.statSync(zip).size!==manifest.bytes||String(hashContents)!==`${actual}  ${manifest.filename}\n`)throw new Error('Source checksum mismatch');
@@ -46,7 +47,7 @@ export function publishSourceRelease({folder,repo=process.env.GITHUB_REPOSITORY,
   if(resumeDraft)throw new Error('No matching draft exists to resume');
   if(run(['api',`${api}/git/ref/tags/${tag}`],{optional404:true})!==null)throw new Error('Tag already exists without a matching draft. Refusing replacement.');
   run(['release','create',manifest.tag,zip,hashFile,'--repo',repo,'--target',manifest.commit,
-   '--title',`OpenTake Standard source ${manifest.commit.slice(0,12)}`,'--notes-file',path.resolve(folder,'release-notes.md'),'--draft']);
+   '--title',`OpenTake Standard ${manifest.version||manifest.commit.slice(0,12)}`,'--notes-file',path.resolve(folder,'release-notes.md'),'--draft']);
   // Drafts can have an untagged-* UI URL and are not reliably retrievable by
   // releases/tags/:tag. The authenticated list includes them with tag_name.
   release=findReleaseByTag(repo,manifest.tag,run);

@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -38,6 +39,10 @@ export function openScreenExecutableCandidates({
   binDirs = ["/opt/homebrew/bin", "/usr/local/bin"],
   applicationDirs = ["/Applications", path.join(home, "Applications")],
 }: OpenScreenLookup = {}) {
+  if(process.platform==='win32'){
+    const dirs=String(env.PATH||env.Path||'').split(path.delimiter).filter(dir=>path.isAbsolute(dir));
+    return [...new Set([env.OPENSCREEN_BIN,...dirs.map(dir=>path.join(dir,'Openscreen.exe')),...[env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs'),env.ProgramFiles].filter((v):v is string=>Boolean(v)).flatMap(dir=>['Openscreen','OpenScreen','openscreen'].map(name=>path.join(dir,name,'Openscreen.exe')))].filter((v):v is string=>Boolean(v)))];
+  }
   const fromPath = String(env.PATH || "").split(path.delimiter).filter((dir) => path.isAbsolute(dir))
     .map((dir) => path.join(dir, "openscreen")).find(executableFile);
   return [...new Set([
@@ -93,6 +98,8 @@ function versionOf(executable: string) {
     }
   }
 
+  // Windows Electron GUI binaries may launch instead of printing a version.
+  if(process.platform==='win32')return undefined;
   for (const args of [["--version"], ["version"], ["--help"]]) {
     const result = spawnSync(executable, args, { encoding: "utf8", timeout: 5_000 });
     const match = `${result.stdout || ""}\n${result.stderr || ""}`.match(/(?:OpenScreen|Openscreen)?\s*v?(\d+\.\d+(?:\.\d+)?)/i);
