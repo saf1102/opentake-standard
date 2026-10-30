@@ -1,4 +1,5 @@
-import {compatibleOpenScreenDocument} from '../../shared/openscreen-compat.ts';
+import { compatibleOpenScreenDocument } from "../../shared/openscreen-compat.ts";
+export { archiveLegacyScreenMotion } from "./openscreen-transcripts.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -8,6 +9,11 @@ import {
   OpenScreenDocumentRefSchema,
 } from "../../src/types/editor.ts";
 import { atomicJson, findProject, save } from "./store.ts";
+import {
+  hydrateOpenScreenSourceTranscripts,
+  syncProjectSourceTranscriptsFromOpenScreen,
+} from "./openscreen-transcripts.ts";
+
 type JsonObject = Record<string, unknown>;
 
 function safeId(value: unknown): string {
@@ -114,7 +120,7 @@ function updateRef(
     ...project.openScreenDocuments.filter((item) => item.id !== documentId),
     ref,
   ];
-
+  syncProjectSourceTranscriptsFromOpenScreen(project, document);
   // OpenScreen documents are recording subprojects, not live clips in the
   // main edit. Only an explicit publish produces a main-editor media asset.
   for (const track of project.timeline.tracks.filter((item) => item.kind === "openscreen")) {
@@ -139,10 +145,18 @@ export function readOpenScreenDocument(projectId: string, documentId: string) {
   const ref = project.openScreenDocuments.find((item) => item.id === safeId(documentId));
   if (!ref || ref.archivedAt) throw new Error("OpenScreen 文档不存在");
   const stored = validateDocument(JSON.parse(fs.readFileSync(projectPath(dir, ref.id), "utf8")));
-  const document = structuredClone(stored);
+  const backfilled = syncProjectSourceTranscriptsFromOpenScreen(
+    project,
+    stored,
+    { onlyMissing: true },
+  );
+  if (backfilled) save(dir, project);
+  const document = hydrateOpenScreenSourceTranscripts(project, stored);
   // Browser embedding must serve project-owned sources through the media API.
-  for(const value of document.assets as JsonObject[]){const asset=project.media.find(a=>a.id===value.id);if(asset)value.originalPath=`/api/editor/projects/${encodeURIComponent(projectId)}/media/${encodeURIComponent(asset.id)}/file?kind=original`;}
-
+  for (const value of document.assets as JsonObject[]) {
+    const asset = project.media.find(item => item.id === value.id);
+    if (asset) value.originalPath = `/api/editor/projects/${encodeURIComponent(projectId)}/media/${encodeURIComponent(asset.id)}/file?kind=original`;
+  }
   return { ref, document, revision: ref.revision };
 }
 
@@ -157,6 +171,8 @@ export function createOpenScreenDocument(projectId: string, input: {
   if (fs.existsSync(projectPath(dir, documentId))) throw new Error("OpenScreen 文档已存在");
   for (const rel of ["backups", "cursor", "transcript"])
     fs.mkdirSync(path.join(documentRoot(dir, documentId), rel), { recursive: true });
+  if ((input.document as JsonObject)?.schemaVersion === 8)
+    writeDocumentFile(path.join(documentRoot(dir, documentId), "native-source.openscreen"), input.document as JsonObject);
   writeDocumentFile(projectPath(dir, documentId), document);
   const ref = updateRef(projectId, documentId, document, 0);
   return { ref, document, revision: 0 };
@@ -210,4 +226,3 @@ export function archiveOpenScreenDocument(projectId: string, documentId: string)
   atomicJson(metadataPath(dir, documentId), current);
   return current;
 }
-

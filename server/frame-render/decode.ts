@@ -1,6 +1,5 @@
 import {ffmpegPath} from '../general/kit-env.ts';
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process';
-import path from 'node:path';
 
 type Stream = {
   child: ChildProcessWithoutNullStreams;

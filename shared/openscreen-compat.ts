@@ -11,9 +11,10 @@ export function compatibleOpenScreenDocument(input:unknown): Obj {
  if(input.schemaVersion===7)return structuredClone(input);
  if(input.schemaVersion!==8)throw Error(`不支持 OpenScreen 工程版本 ${input.schemaVersion}；当前支持 v7 和基础 v8 录屏，原文件已保留`);
  const d=structuredClone(input);
- for(const key of ['audioTracks','shaderEffects','shaderEffectRanges'])if(Array.isArray(d[key])&&d[key].length)throw Error(`此 v8 工程含尚不支持的 ${key}，请在官方 OpenScreen 中编辑；原文件已保留`);
+ for(const key of ['audioTracks','shaderEffects','shaderEffectRanges'])if(d[key]!=null&&(!Array.isArray(d[key])||d[key].length))throw Error(`此 v8 工程含尚不支持的 ${key}，请在官方 OpenScreen 中编辑；原文件已保留`);
  if(!Array.isArray(d.assets)||!Array.isArray(d.timeline?.clips))throw Error('OpenScreen 素材或时间线无效');
  if(d.assets.some((a:Obj)=>a.kind!=='video'))throw Error('此 v8 工程含独立音频素材，当前不能无损导入');
+ for(const key of ['zoomRanges','annotations'])if(d[key]!=null&&!Array.isArray(d[key]))throw Error(`OpenScreen ${key} 必须是列表`);
  if((d.zoomRanges||[]).some((z:Obj)=>z.rotationPreset&&!['iso','left','right'].includes(z.rotationPreset)))throw Error('此 v8 工程含尚不支持的三维运镜');
  if((d.annotations||[]).some((a:Obj)=>a.space==='frame'))throw Error('此 v8 工程含画布坐标标注，当前不能无损导入');
  const editor=d.legacyEditor={...(d.legacyEditor||{})};

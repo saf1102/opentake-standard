@@ -1,7 +1,8 @@
-import {requireCreationTools} from '../standard/creation-tools.ts';
-import platform from '../platform.ts';
+import {readExportPreferences,writeExportPreferences} from '../export-preferences.ts';
+import {requireCreationTools} from '../creation-tools.ts';
+import {extraStyle,styleError,revealCommand} from './edition.ts';
 /** /api/general：通用剪辑的接口，照 src/general/general-contract.ts 实现。回应沿用工作台的 {ok, result} / {ok:false, error}。 */
-import { startExport, exportRunning, reconcileExports } from './export.ts';
+import { startExport, exportRunning, reconcileExports, generalExportSource, generalExportHistory, readGeneralExport, cancelGeneralExport } from './export.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -11,11 +12,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { GeneralMedia, GeneralProject } from '../../src/general/general-contract.ts';
 import { bodyJson, sendJson } from '../http.ts';
 import { assertFreeSpace } from '../system-settings.ts';
-import { serveProjectFile } from './files.ts';
+import { serveProjectFile, serveResolvedFile } from './files.ts';
 import { pageHostPort } from './page-host.ts';
 import { saveEdited, stylePresets } from './layers.ts';
 import { ffmpegPath, ffprobePath } from './kit-env.ts';
-import { answerNetwork, isLive, mediaFile, postMessage, reconcile, resumeRun, startFirst, stopForDelete, stopRun, styleLibrary, readSession, writeSession } from './runner.ts';
+import { answerNetwork, isLive, mediaFile, postMessage, reconcile, resumeRun, assertReady, startFirst, stopForDelete, stopRun, styleLibrary, readSession, writeSession } from './runner.ts';
 import { createGeneral, fileUrl, findGeneral, generalChanges, patchGeneral, scanGeneral, summarize, trashGeneral, updateGeneral } from './store.ts';
 
 const exec = promisify(execFile);
@@ -36,8 +37,8 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
         const body = await bodyJson(req);
         const styleId = String(body.styleId || '');
         // 不用风格 (free) is a choice too: the film follows the person's own words
-        const style = styleLibrary().find(s => s.id === styleId);
-        if (!style) return sendJson(res, 400, { ok: false, error: '请选择 Standard 的 10 种风格之一' });
+        const style = extraStyle?.id === styleId ? extraStyle : styleLibrary().find(s => s.id === styleId);
+        if (!style) return sendJson(res, 400, { ok: false, error: styleError });
         const { project } = createGeneral({ styleId, settings: body.settings, inputs: body.inputs as never, agent: body.agent, network: body.network }, style.name_zh);
         return ok(res, project, 201);
       }
@@ -66,15 +67,40 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
       const version = /^versions\/v(\d+)\.mp4$/.exec(rel)?.[1];
       return serveProjectFile(req, res, dir, rel, version ? `${project.name} 第${version}版.mp4` : undefined);
     }
-    if (action === 'versions' && parts[4] === 'export' && parts.length === 5 && method === 'POST') return ok(res, startExport(id, Number(parts[3]), (await bodyJson(req)).format));
-    // the last 剪映 export's folder, selected in Finder (only a folder inside this project's exports/)
-    if (action === 'exports' && parts[3] === 'reveal' && parts.length === 4 && method === 'POST') {
-      const { dir, project } = findGeneral(id);
-      const folder = project.exportTask?.state === 'done' ? project.exportTask.folder : undefined;
-      const inside = folder && path.resolve(folder).startsWith(path.join(dir, 'exports') + path.sep) && fs.existsSync(folder);
-      if (!inside) return sendJson(res, 404, { ok: false, error: '找不到上次导出的剪映工程，请重新导出' });
-      const reveal=platform.revealCommand(folder);await exec(reveal.command,reveal.args);
-      return ok(res, { revealed: true });
+    if(action==='exports') {
+      const {dir,project}=findGeneral(id);
+      if(parts[3]==='preferences'&&parts.length===4) {
+        if(method==='GET')return ok(res,readExportPreferences(dir));
+        if(method==='PUT')return ok(res,writeExportPreferences(dir,await bodyJson(req)));
+      }
+      if(parts[3]==='capabilities'&&method==='GET') {
+        const source=await generalExportSource(id,Number(url.searchParams.get('version')));
+        const destination=path.join(dir,'exports');fs.mkdirSync(destination,{recursive:true});
+        const stats=fs.statfsSync(destination);
+        return ok(res,{defaultDestination:destination,freeBytes:stats.bavail*stats.bsize,jianying:{available:false,warning:'完成后可从导出文件夹导入剪映'},canvas:{width:source.media.width,height:source.media.height,fps:source.media.fps}});
+      }
+      if(parts[3]==='destination'&&method==='POST') {
+        const {stdout}=await exec('/usr/bin/osascript',['-e','POSIX path of (choose folder with prompt "选择导出位置")']);
+        return ok(res,{path:stdout.trim().replace(/\/$/,'')});
+      }
+      if(parts[3]==='history'&&method==='GET')return ok(res,generalExportHistory(dir));
+      if(parts[3]==='cancel'&&method==='POST')return ok(res,cancelGeneralExport(id));
+      if(parts[4]==='file'&&(method==='GET'||method==='HEAD')) {
+        const job=readGeneralExport(dir,parts[3]);
+        if(job.state!=='done'||!job.outputDir||job.format!=='mp4')throw Error('成片尚未生成');
+        const file=path.join(job.outputDir,`成片.${job.settings?.video.codec==='prores422'?'mov':job.settings?.video.container||'mp4'}`);
+        return serveResolvedFile(req,res,file,path.basename(file));
+      }
+      if(parts[3]==='reveal'&&method==='POST') {
+        const body=await bodyJson(req);const task=body.id?readGeneralExport(dir,String(body.id)):project.exportTask;
+        const target=task?.state==='done'?(task.folder||task.outputDir):undefined;
+        if(!target||!fs.existsSync(target))throw Error('找不到导出文件夹');
+        const cmd=revealCommand(target);await exec(cmd.command,cmd.args);
+        return ok(res,{revealed:true});
+      }
+    }
+    if(action==='versions'&&parts[4]==='export'&&parts.length===5&&method==='POST') {
+      const body=await bodyJson(req);return ok(res,await startExport(id,Number(parts[3]),body.format,body.settings));
     }
     if (action === 'text-presets' && method === 'GET') return ok(res, await stylePresets(findGeneral(id).project.styleId));
     // the person's edits of version n: versions/vN/edited.json, the same shape as layers.json
@@ -82,7 +108,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
     if (action === 'media' && method === 'POST' && parts.length === 3) return ok(res, await addMedia(req, id), 201);
     if (action === 'media' && method === 'DELETE' && parts.length === 4) return ok(res, removeMedia(id, parts[3]));
     if (method !== 'POST' || parts.length !== 3) return sendJson(res, 404, { ok: false, error: '接口不存在' });
-    if (action === 'generate') return ok(res, startFirst(id, { request: true, ...(process.platform==='darwin'?{tools:await requireCreationTools()}:{} ) }));
+    if (action === 'generate') { assertReady(findGeneral(id).project); return ok(res, startFirst(id, { request: true, ...(process.platform==='darwin'?{tools:await requireCreationTools(findGeneral(id).project.agent)}:{} ) })); }
     if (action === 'stop') return ok(res, stopRun(id));
     if (action === 'resume') return ok(res, resumeRun(id));
     if (action === 'messages') return ok(res, postMessage(id, await bodyJson(req, 16 * 1024 * 1024)));

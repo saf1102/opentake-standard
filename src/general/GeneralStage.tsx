@@ -273,7 +273,7 @@ export function GeneralStage({ project, posterFallback, picked, onPickVersion, r
           <button type="button" className="ge-ico r" aria-label="全屏" title="全屏" onClick={() => void frame.current?.requestFullscreen?.().catch(() => {})}><Maximize size={15} aria-hidden="true" /></button>
         </div>
         : <div className="ge-bar">
-          <span>{project.run?.state === 'failed' ? '本次生成未完成，工程已保留' : planSegments.length ? `方案 · ${planSegments.length} 段` : '方案准备中'}</span>
+          <span>{project.run?.state === 'failed' && !planSegments.length ? '本次生成未完成，工程已保留' : planSegments.length ? `方案 · ${planSegments.length} 段` : '方案准备中'}</span>
           <span className="r">{progress ? <><b>{active ? '渲染中' : '渲染到'}</b> {progress.done.toFixed(1)} / {progress.total.toFixed(1)} 秒</> : planSegments.length ? '还没开始渲染' : ''}</span>
         </div>}
 

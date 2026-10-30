@@ -1,3 +1,4 @@
+import {AGENT_CONNECTION_IDS,LIGHT_AGENT_MODULES} from '../shared/agent-connections.ts';
 import platform from './platform.ts';
 import installations from './agent-installation.ts';
 import fs from 'node:fs';
@@ -17,7 +18,7 @@ export function atomicAgentJson(file: string, value: unknown) {
   try { fs.writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: 0o600 }); fs.renameSync(tmp, file); }
   finally { fs.rmSync(tmp, { force: true }); }
 }
-const choiceSchema = z.object({ model: z.string().regex(/^[a-zA-Z0-9._-]+$/), effort: z.enum(['none','minimal','low','medium','high','xhigh','max','ultra']) }).strict();
+const choiceSchema = z.object({ agent:z.enum(AGENT_CONNECTION_IDS).optional(), model: z.string().regex(/^[a-zA-Z0-9._\/:-]+$/), effort: z.enum(['none','minimal','low','medium','high','xhigh','max','ultra']) }).strict();
 const settingsSchema = z.object({ version: z.literal(1), allowRemoteAi: z.boolean().default(false), cliPath: z.string().trim(), modules: z.record(z.enum(AGENT_MODULES.map(m => m.id)), choiceSchema) }).strict();
 export function readAgentSettings(): AgentSettings {
   const file = agentSettingsFile();
@@ -52,6 +53,12 @@ const catalogs = new Map<string, AgentCatalog>();
 const pending = new Map<string, Promise<AgentCatalog>>();
 /** Read the selected binary's real account model catalog, not a hardcoded UI list. */
 export async function getAgentCatalog(configured: string, refresh = false): Promise<AgentCatalog> {
+  const connection=process.platform==='darwin'?(await import('./agent-connections.ts')).getConnectionConfig('codex'):undefined;
+  if(connection?.mode==='api'){
+    if(!connection.connected||!connection.models.length)throw Error('Codex API 接入还没有读取模型，请先测试连接');
+    let executable='';try{executable=resolveCliPath(configured)}catch{/* API only can serve light work. */}
+    return {executable,cliVersion:'Codex · API 密钥',checkedAt:connection.checkedAt||new Date().toISOString(),models:connection.models.map(m=>({...m,efforts:['none','minimal','low','medium','high','xhigh','max','ultra'],defaultEffort:'medium'}))};
+  }
   const executable = resolveCliPath(configured);
   const stat = fs.statSync(executable);
   const key = `${executable}:${stat.mtimeMs}:${stat.size}`;
@@ -106,9 +113,18 @@ export function validateAgentChoice(module: AgentModule, settings: AgentSettings
 }
 export async function saveAgentSettings(value: unknown) {
   const settings = settingsSchema.parse(value);
-  const catalog = await getAgentCatalog(settings.cliPath, true);
+  const hasCodex=process.platform!=='darwin'||AGENT_MODULES.some(m=>!settings.modules[m.id].agent||settings.modules[m.id].agent==='codex');
+  const catalog = hasCodex ? await getAgentCatalog(settings.cliPath, true) : null;
   for (const module of AGENT_MODULES) {
     // A model this Codex lacks is kept (it runs on the default); an effort the chosen model rejects is a mistake to fix now.
+    const agentId=settings.modules[module.id].agent||'codex';
+    if(process.platform==='darwin'&&agentId!=='codex'){
+      const {getConnectionStatus}=await import('./agent-connections.ts');const connection=await getConnectionStatus(agentId);
+      if(!connection.connected)throw Error(`${module.name}：请先接通所选智能体`);
+      if(module.id==='generalEditing'&&(!connection.heavySupported||!connection.cliInstalled))throw Error('出片需要已适配的命令行');
+      continue;
+    }
+    if(!catalog)throw Error('Codex 没有返回可用模型');
     validateAgentChoice(module.id, settings, catalog);
     const choice = settings.modules[module.id], model = catalog.models.find(m => m.id === choice.model);
     if (model && !model.efforts.includes(choice.effort)) throw new Error(`${module.name}：${choice.model} 不支持推理强度 ${choice.effort}`);
@@ -135,4 +151,20 @@ export async function chooseAgentCli() {
     const { stdout } = await execFileAsync('osascript', ['-e', 'POSIX path of (choose file with prompt "选择 Codex CLI 可执行文件" with invisibles)'], { timeout: 120_000 });
     return { path: stdout.trim() };
   } catch (error) { if (String(error).includes('-128')) return { path: null }; throw error; }
+}
+
+/** 统一验证单个业务选择；不写全局设置，用于工程、稿子与单次任务。 */
+export const parseAgentChoice=(value:unknown)=>choiceSchema.parse(value);
+export async function validateModuleAgentChoice(module:AgentModule,value:unknown){
+ const choice=parseAgentChoice(value);if(!AGENT_MODULES.some(m=>m.id===module))throw Error('未知工作模块');
+ const {getConnectionStatus}=await import('./agent-connections.ts');const connection=await getConnectionStatus(choice.agent||'codex');
+ if(!connection.connected)throw Error('请先测试连接');
+ if(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)&&(!connection.cliInstalled||module==='generalEditing'&&!connection.heavySupported))throw Error('出片需要安装已适配的命令行');
+ if(choice.agent&&choice.agent!=='codex'&&module!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)||connection.mode!=='api'))throw Error('此模块的智能体接法待适配，请使用已支持的接入');
+ return choice;
+}
+/** 单模块默认值：首次引导只修改自己的选择，不校验或覆盖其他模块。 */
+export async function saveModuleAgentChoice(module:AgentModule,value:unknown){
+ const choice=await validateModuleAgentChoice(module,value);
+ const settings=readAgentSettings();settings.modules[module]=choice;atomicAgentJson(agentSettingsFile(),settings);return choice;
 }

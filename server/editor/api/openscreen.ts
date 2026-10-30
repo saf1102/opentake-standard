@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { bodyJson, sendJson } from "../../http.ts";
-import { readLock } from "../store.ts";
+import {readScreenLock as readLock, acquireScreenLock} from "../openscreen-lock.ts";
 import {
   archiveOpenScreenDocument,
   createOpenScreenDocument,
@@ -37,11 +37,15 @@ import {
 } from "../openscreen-export.ts";
 const handled = (_value:unknown) => true;
 import type { ServerResponse } from "node:http";
-type ProjectRouteContext={req:IncomingMessage;res:ServerResponse;parts:string[];id:string;dir:string};
+import {handleScreenEditionApi} from './openscreen-edition.ts';
+export type ScreenRouteContext={req:IncomingMessage;res:ServerResponse;parts:string[];id:string;dir:string;recognition?:unknown};
 
 /** OpenScreen 域：录屏文档、文档导出、宿主录制会话、codex 会话、字幕翻译与 STT。 */
-export async function handleOpenScreenApi(ctx: ProjectRouteContext): Promise<boolean> {
+export async function handleOpenScreenApi(ctx: ScreenRouteContext): Promise<boolean> {
+  if(await handleScreenEditionApi(ctx))return true;
   const { req, res, parts, id, dir } = ctx;
+  if(process.platform==='darwin'&&parts[2]==='openscreen'&&parts[3]==='lock'&&parts.length===4&&req.method==='POST')
+    return handled(sendJson(res,200,{ok:true,result:acquireScreenLock(dir,await bodyJson(req))}));
   if (parts[2] === "openscreen" && parts[3] === "documents" && parts.length === 4) {
     if (req.method === "GET")
       return handled(sendJson(res, 200, { ok: true, result: listOpenScreenDocuments(id) }));
@@ -70,11 +74,12 @@ export async function handleOpenScreenApi(ctx: ProjectRouteContext): Promise<boo
     if (parts[5] === "exports" && parts.length === 6 && req.method === "POST") {
       const body = await bodyJson(req);
       const lock = readLock(dir);
-      if (lock && lock.clientId !== String(body.clientId || ""))
+      const savedOnly=body.useSavedDocument===true&&Number.isInteger(body.documentRevision)&&Number(body.documentRevision)>=0;
+      if (lock && lock.clientId !== String(body.clientId || "") && !savedOnly)
         return handled(sendJson(res, 423, { ok: false, error: "工程正由其他设备编辑", lock }));
       return handled(sendJson(res, 201, {
         ok: true,
-        result: startOpenScreenExport(id, documentId, body),
+        result: startOpenScreenExport(id, documentId, {...body,purpose:"export"}),
       }));
     }
     if (parts[5] === "exports" && parts[6] && parts.length === 7 && req.method === "GET") {
@@ -86,7 +91,9 @@ export async function handleOpenScreenApi(ctx: ProjectRouteContext): Promise<boo
     if (parts[5] === "exports" && parts[6] && parts[7] === "cancel" && req.method === "POST") {
       const body = await bodyJson(req);
       const lock = readLock(dir);
-      if (lock && lock.clientId !== String(body.clientId || ""))
+      const job=readOpenScreenExport(id,documentId,parts[6]);
+      const ownSavedExport=job.savedDocumentRevision!==undefined&&Boolean(job.requestClientId)&&job.requestClientId===String(body.clientId||'');
+      if (lock && lock.clientId !== String(body.clientId || "") && !ownSavedExport)
         return handled(sendJson(res, 423, { ok: false, error: "工程正由其他设备编辑", lock }));
       return handled(sendJson(res, 200, {
         ok: true,

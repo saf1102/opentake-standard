@@ -5,7 +5,7 @@ const os = require('node:os');
 const {execFile} = require('node:child_process');
 const {promisify} = require('node:util');
 const installations = require('./agent-installation.cjs');
-const media = require('./media-tools.cjs');
+
 const exec = promisify(execFile);
 const executable = file => { try { fs.accessSync(file, fs.constants.X_OK); return path.isAbsolute(file) && fs.statSync(file).isFile(); } catch { return false; } };
 const PYTHON_ENV = {PYTHONNOUSERSITE:'1', PYTHONDONTWRITEBYTECODE:'1', PYTHONPATH:''};
@@ -49,7 +49,11 @@ async function doctor(options = {}) {
   try { const result = await fn(); items.push({id,label,ok:true,...result}); }
   catch(e) { items.push({id,label,ok:false,message:e.message,install:fixes[id],color:'#9869dc'}); }
  }
- await check('codex','Codex 登录',async()=>{
+ if (options.agentCheck) {
+  await check('agent', options.agentLabel || '出片智能体', async()=>{
+   const agent=await options.agentCheck(); tools.agent=agent; return {path:agent.executable,version:'接入已检查'};
+  });
+ } else await check('codex','Codex 登录',async()=>{
   let file;
   try { file = options.codexPath ? options.codexPath() : installations.resolveAgent('codex','',{env}); }
   catch { throw Error('未找到可运行的 Codex CLI'); }
@@ -58,6 +62,7 @@ async function doctor(options = {}) {
   // Never expose login-status stdout/stderr: it can contain account information.
   tools.codex=file; return {path:file,version:'已登录'};
  });
+ if (!options.onlyCodex) {
  await check('python','Python 3 + numpy',async()=>{
   const configured = env.LINKREADER_PYTHON;
   const candidates = configured ? [configured] : [...new Set([
@@ -83,13 +88,22 @@ async function doctor(options = {}) {
   if(!file || !executable(file)) throw Error('Chromium 不存在或不可执行：'+file);
   try { await probeBrowser(chromium,file,env,renderArgs()); }
   catch { throw Error('Chromium 已找到，但服务端渲染模式启动或页面截图失败：'+file); }
+  if(options.agentCheck) {
+   if(!tools.agent) throw Error('请先接通出片智能体，再重新检查 Chromium');
+   if(tools.agent.id==='codex') {
+    try { await (options.probeSandbox || probeSandbox)(tools.agent.executable,file,env); } catch { throw Error('Chromium 在 Codex 出片沙盒中无法启动或截图：'+file); }
+    tools.chromium=file; return {path:file,version:'服务端渲染模式、出片沙盒单进程样张模式均已完成截图'};
+   }
+   try { await probeBrowser(chromium,file,env,SAMPLE_ARGS); } catch { throw Error('Chromium 样张模式无法启动或截图：'+file); }
+   tools.chromium=file; return {path:file,version:'服务端渲染、样张模式已完成截图；智能体沙盒在启动时强制检查'};
+  }
   if(!tools.codex)throw Error('请先完成 Codex 安装及登录，再重新检查 Chromium');
   try { await (options.probeSandbox || probeSandbox)(tools.codex,file,env); }
   catch { throw Error('Chromium 在出片沙盒中无法启动或截图：'+file+'。请保留此提示交给维护者检查；不会启动智能体。'); }
   tools.chromium=file; return {path:file,version:'服务端渲染模式、出片沙盒单进程样张模式均已完成截图'};
  });
  await check('ffmpeg','FFmpeg / ffprobe',async()=>{
-  const found = (options.findMedia || media.findTools)({env,loginEnv:env});
+  const found = (options.findMedia || require('./media-tools.cjs').findTools)({env,loginEnv:env});
   const versions=[];
   for(const name of ['ffmpeg','ffprobe']) {
    try { const {stdout}=await run(found[name],['-version']); versions.push(stdout.split('\n')[0]); }
@@ -98,6 +112,7 @@ async function doctor(options = {}) {
   tools.ffmpeg=found.ffmpeg; tools.ffprobe=found.ffprobe;
   return {path:found.ffmpeg+'\n'+found.ffprobe,version:versions.join('\n')};
  });
+ }
  items.sort((a,b)=>['python','chromium','ffmpeg','codex'].indexOf(a.id)-['python','chromium','ffmpeg','codex'].indexOf(b.id));
  return {ok:items.every(item=>item.ok),checkedAt:new Date().toISOString(),items,...(items.every(item=>item.ok)?{tools}:{}),color:'#9869dc'};
 }

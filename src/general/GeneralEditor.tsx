@@ -137,7 +137,7 @@ function ClipInspector({ timeline, clipId, presets, segments, media, layers, onC
   const [text, setText] = useState(found?.clip.text ?? '')
   if (!found) return <div className="inspector-empty-state ge-insp-empty"><SlidersHorizontal aria-hidden /><p>点时间线上的片段，在这里改它</p><small>改字、换样式、开关原声、调音量</small></div>
   const { track, clip } = found
-  const patch = (fn: (c: TimelineClip) => void) => onCommit(t => { const hit = findClip(t, clip.id); if (hit) fn(hit.clip) })
+  const patch = (fn: (c: TimelineClip) => void) => onCommit(t => { const hit = findClip(t, clip.id); if (hit && !hit.track.locked) fn(hit.clip) })
   const segmentIndex = segments.findIndex(s => clip.start >= s.start - 1e-6 && clip.start < s.end)
   const segment = segments[segmentIndex]
   // every preset of the style can be chosen (S先生 10-25: 方向 A); those made for this text's role come first, and
@@ -405,11 +405,13 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
     }} onDoubleClick={() => setExtra(0)}><i /></div>
     <TimelineEditor project={editProject} timeline={timeline} zoom={zoom} onZoomChange={setZoom} playhead={time}
       selectedClipIds={selected} snappingEnabled onSnappingChange={noop}
+      mainTrackLinked={false} onMainTrackLinkedChange={noop} onMarkCutEdge={noop} onCutBoundaryChange={noop} onRestoreCut={noop} onCancelCut={noop} onPreviewCut={noop} cutBusy={false}
+      onSmartMusic={noop} onSmartRoughcut={noop} onGlobalMotion={noop} onGlobalSfx={noop} onSmartBroll={noop} onAutoPlace={noop}
       suppressTimelineClickRef={suppressClick} timelinePlayheadRef={playheadRef}
-      onUndo={undo} onRedo={redo}
+      onUndo={undo} onRedo={redo} onSplit={noop} onInsertDirectorGap={noop} onEditDirectorSlot={noop} onOpenDirectorSlot={noop}
       onDelete={() => {
-        const ids = selected.filter(id => findClip(layers.timeline, id)?.track.kind !== 'page')
-        if (!ids.length) { if (selected.length) toast('画面页先不能单独删，可以让 Codex 重做这一段'); return }
+        const ids = selected.filter(id => { const hit = findClip(layers.timeline, id); return hit && !hit.track.locked && hit.track.kind !== 'page' })
+        if (!ids.length) { if (selected.length) toast('锁定轨道或画面页不能删除，请先解锁或让 Codex 重做这一段'); return }
         commit(t => { for (const track of t.tracks) track.clips = track.clips.filter(c => !ids.includes(c.id)) })
         setSelected([])
       }}
@@ -420,7 +422,7 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
       onSelectClip={(clipId, additive) => { setSelected(current => !additive ? [clipId] : current.includes(clipId) ? current.filter(id => id !== clipId) : [...current, clipId]); if (!additive) setTab('props') }}
       onSelectClips={setSelected} onClearSelection={() => setSelected([])}
       onBeginClipDrag={(event, clip, track) => beginClip(event, clip, track)} onBeginClipDurationResize={(event, clip, track, edge) => beginClip(event, clip, track, edge ?? 'right')}
-      draggingClip={drag?.clipId} snapGuide={snapGuide}
-      generalTools={generalTools} />
+      draggingClip={drag?.clipId} snapGuide={snapGuide} onOpenClipMenu={noop} onEditOverlay={noop} onOpenDirectorScene={noop}
+      onDropMedia={noop} generalTools={generalTools} />
   </div>
 }

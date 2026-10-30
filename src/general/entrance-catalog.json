@@ -1,322 +1,322 @@
 {
-  "entries": [
+ "entries": [
+  {
+   "key": "footage",
+   "name": "上传视频就能做",
+   "hint": "自己拍的视频、录屏，可以多段",
+   "cats": [
     {
-      "key": "footage",
-      "name": "上传视频就能做",
-      "hint": "自己拍的视频、录屏，可以多段",
-      "cats": [
-        {
-          "name": "产品发布",
-          "styles": [
-            "blueprint",
-            "ascii-crt",
-            "dark-keynote",
-            "hologram-hud",
-            "brick-toy",
-            "glass-product",
-            "teardown"
-          ],
-          "star": []
-        },
-        {
-          "name": "品牌广告·宣传片",
-          "styles": [
-            "ink-wash",
-            "impasto",
-            "one-line",
-            "urban-sketch",
-            "paper-lantern",
-            "risograph",
-            "woodcut",
-            "engraving",
-            "silkscreen-poster",
-            "swiss-motion",
-            "art-deco",
-            "ascii-crt",
-            "hologram-hud",
-            "rubber-hose",
-            "scifi-toon",
-            "silent-film",
-            "tilt-shift",
-            "glass-product",
-            "data-physical",
-            "archive-lighttable"
-          ],
-          "star": []
-        },
-        {
-          "name": "知识讲解·课件",
-          "styles": [
-            "crayon-book",
-            "watercolor",
-            "whiteboard",
-            "engraving",
-            "swiss-motion",
-            "blueprint",
-            "dataviz",
-            "iso-infographic",
-            "hologram-hud",
-            "midcentury-toon",
-            "microgame",
-            "teardown",
-            "microscope"
-          ],
-          "star": []
-        },
-        {
-          "name": "故事·绘本·短剧",
-          "styles": [
-            "newsreel",
-            "crayon-book",
-            "ink-wash",
-            "shadow-puppet",
-            "papercut-red",
-            "paper-lantern",
-            "halftone-dossier",
-            "woodcut",
-            "stained-glass",
-            "scifi-toon",
-            "hd-2d",
-            "silent-film",
-            "backrooms",
-            "paper-popup",
-            "lowpoly-island"
-          ],
-          "star": [
-            "newsreel"
-          ]
-        },
-        {
-          "name": "音乐 MV·混剪",
-          "styles": [
-            "city-symphony",
-            "impasto",
-            "cel-anime-80s",
-            "pixel-rpg"
-          ],
-          "star": [
-            "city-symphony"
-          ]
-        },
-        {
-          "name": "新闻·数据·报告",
-          "styles": [
-            "caption-news",
-            "visual-investigation",
-            "dataviz",
-            "iso-infographic",
-            "satellite-briefing",
-            "briefing-board",
-            "white-model",
-            "data-physical",
-            "news-package"
-          ],
-          "star": [
-            "caption-news",
-            "visual-investigation"
-          ]
-        },
-        {
-          "name": "节日·活动·开场",
-          "styles": [
-            "newsreel",
-            "countdown",
-            "city-symphony",
-            "kino-montage",
-            "shadow-puppet",
-            "papercut-red",
-            "paper-lantern",
-            "spy-titles",
-            "art-deco",
-            "stained-glass",
-            "game-show"
-          ],
-          "star": [
-            "newsreel",
-            "countdown",
-            "city-symphony",
-            "kino-montage"
-          ]
-        },
-        {
-          "name": "旅行·城市·纪录",
-          "styles": [
-            "city-symphony",
-            "watercolor",
-            "urban-sketch",
-            "shadow-puppet",
-            "ukiyoe",
-            "silkscreen-poster",
-            "stained-glass",
-            "tilt-shift",
-            "lidar-survey",
-            "white-model",
-            "archive-lighttable"
-          ],
-          "star": [
-            "city-symphony"
-          ]
-        },
-        {
-          "name": "游戏·动漫",
-          "styles": [
-            "ascii-crt",
-            "rubber-hose",
-            "cel-anime-80s",
-            "scifi-toon",
-            "midcentury-toon",
-            "pixel-rpg",
-            "hd-2d",
-            "microgame",
-            "game-show",
-            "backrooms",
-            "brick-toy",
-            "paper-popup",
-            "lowpoly-island"
-          ],
-          "star": []
-        }
-      ]
+     "name": "产品发布",
+     "styles": [
+      "blueprint",
+      "ascii-crt",
+      "dark-keynote",
+      "hologram-hud",
+      "brick-toy",
+      "glass-product",
+      "teardown"
+     ],
+     "star": []
     },
     {
-      "key": "topic",
-      "name": "给文案就能做",
-      "hint": "一个想法、一段文字",
-      "cats": [
-        {
-          "name": "产品发布",
-          "styles": [
-            "blueprint",
-            "ascii-crt",
-            "dark-keynote",
-            "hologram-hud",
-            "brick-toy",
-            "glass-product"
-          ],
-          "star": []
-        },
-        {
-          "name": "品牌广告·宣传片",
-          "styles": [
-            "ink-wash",
-            "impasto",
-            "one-line",
-            "urban-sketch",
-            "paper-lantern",
-            "risograph",
-            "woodcut",
-            "engraving",
-            "silkscreen-poster",
-            "swiss-motion",
-            "art-deco",
-            "ascii-crt",
-            "hologram-hud",
-            "rubber-hose",
-            "scifi-toon",
-            "silent-film",
-            "tilt-shift",
-            "glass-product"
-          ],
-          "star": []
-        },
-        {
-          "name": "知识讲解·课件",
-          "styles": [
-            "crayon-book",
-            "watercolor",
-            "whiteboard",
-            "engraving",
-            "swiss-motion",
-            "blueprint",
-            "iso-infographic",
-            "hologram-hud",
-            "midcentury-toon",
-            "microgame"
-          ],
-          "star": []
-        },
-        {
-          "name": "故事·绘本·短剧",
-          "styles": [
-            "crayon-book",
-            "ink-wash",
-            "shadow-puppet",
-            "papercut-red",
-            "paper-lantern",
-            "halftone-dossier",
-            "woodcut",
-            "stained-glass",
-            "scifi-toon",
-            "hd-2d",
-            "silent-film",
-            "backrooms",
-            "paper-popup",
-            "lowpoly-island"
-          ],
-          "star": []
-        },
-        {
-          "name": "音乐 MV·混剪",
-          "styles": [
-            "impasto",
-            "cel-anime-80s",
-            "pixel-rpg"
-          ],
-          "star": []
-        },
-        {
-          "name": "新闻·数据·报告",
-          "styles": [
-            "iso-infographic"
-          ],
-          "star": []
-        },
-        {
-          "name": "节日·活动·开场",
-          "styles": [
-            "shadow-puppet",
-            "papercut-red",
-            "paper-lantern",
-            "spy-titles",
-            "art-deco",
-            "stained-glass",
-            "game-show"
-          ],
-          "star": []
-        },
-        {
-          "name": "旅行·城市·纪录",
-          "styles": [
-            "watercolor",
-            "urban-sketch",
-            "shadow-puppet",
-            "ukiyoe",
-            "silkscreen-poster",
-            "stained-glass",
-            "tilt-shift"
-          ],
-          "star": []
-        },
-        {
-          "name": "游戏·动漫",
-          "styles": [
-            "ascii-crt",
-            "rubber-hose",
-            "cel-anime-80s",
-            "scifi-toon",
-            "midcentury-toon",
-            "pixel-rpg",
-            "hd-2d",
-            "microgame",
-            "game-show",
-            "backrooms",
-            "brick-toy",
-            "paper-popup",
-            "lowpoly-island"
-          ],
-          "star": []
-        }
-      ]
+     "name": "品牌广告·宣传片",
+     "styles": [
+      "ink-wash",
+      "impasto",
+      "one-line",
+      "urban-sketch",
+      "paper-lantern",
+      "risograph",
+      "woodcut",
+      "engraving",
+      "silkscreen-poster",
+      "swiss-motion",
+      "art-deco",
+      "ascii-crt",
+      "hologram-hud",
+      "rubber-hose",
+      "scifi-toon",
+      "silent-film",
+      "tilt-shift",
+      "glass-product",
+      "data-physical",
+      "archive-lighttable"
+     ],
+     "star": []
+    },
+    {
+     "name": "知识讲解·课件",
+     "styles": [
+      "crayon-book",
+      "watercolor",
+      "whiteboard",
+      "engraving",
+      "swiss-motion",
+      "blueprint",
+      "dataviz",
+      "iso-infographic",
+      "hologram-hud",
+      "midcentury-toon",
+      "microgame",
+      "teardown",
+      "microscope"
+     ],
+     "star": []
+    },
+    {
+     "name": "故事·绘本·短剧",
+     "styles": [
+      "newsreel",
+      "crayon-book",
+      "ink-wash",
+      "shadow-puppet",
+      "papercut-red",
+      "paper-lantern",
+      "halftone-dossier",
+      "woodcut",
+      "stained-glass",
+      "scifi-toon",
+      "hd-2d",
+      "silent-film",
+      "backrooms",
+      "paper-popup",
+      "lowpoly-island"
+     ],
+     "star": [
+      "newsreel"
+     ]
+    },
+    {
+     "name": "音乐 MV·混剪",
+     "styles": [
+      "city-symphony",
+      "impasto",
+      "cel-anime-80s",
+      "pixel-rpg"
+     ],
+     "star": [
+      "city-symphony"
+     ]
+    },
+    {
+     "name": "新闻·数据·报告",
+     "styles": [
+      "caption-news",
+      "visual-investigation",
+      "dataviz",
+      "iso-infographic",
+      "satellite-briefing",
+      "briefing-board",
+      "white-model",
+      "data-physical",
+      "news-package"
+     ],
+     "star": [
+      "caption-news",
+      "visual-investigation"
+     ]
+    },
+    {
+     "name": "节日·活动·开场",
+     "styles": [
+      "newsreel",
+      "countdown",
+      "city-symphony",
+      "kino-montage",
+      "shadow-puppet",
+      "papercut-red",
+      "paper-lantern",
+      "spy-titles",
+      "art-deco",
+      "stained-glass",
+      "game-show"
+     ],
+     "star": [
+      "newsreel",
+      "countdown",
+      "city-symphony",
+      "kino-montage"
+     ]
+    },
+    {
+     "name": "旅行·城市·纪录",
+     "styles": [
+      "city-symphony",
+      "watercolor",
+      "urban-sketch",
+      "shadow-puppet",
+      "ukiyoe",
+      "silkscreen-poster",
+      "stained-glass",
+      "tilt-shift",
+      "lidar-survey",
+      "white-model",
+      "archive-lighttable"
+     ],
+     "star": [
+      "city-symphony"
+     ]
+    },
+    {
+     "name": "游戏·动漫",
+     "styles": [
+      "ascii-crt",
+      "rubber-hose",
+      "cel-anime-80s",
+      "scifi-toon",
+      "midcentury-toon",
+      "pixel-rpg",
+      "hd-2d",
+      "microgame",
+      "game-show",
+      "backrooms",
+      "brick-toy",
+      "paper-popup",
+      "lowpoly-island"
+     ],
+     "star": []
     }
-  ]
+   ]
+  },
+  {
+   "key": "topic",
+   "name": "给文案就能做",
+   "hint": "一个想法、一段文字",
+   "cats": [
+    {
+     "name": "产品发布",
+     "styles": [
+      "blueprint",
+      "ascii-crt",
+      "dark-keynote",
+      "hologram-hud",
+      "brick-toy",
+      "glass-product"
+     ],
+     "star": []
+    },
+    {
+     "name": "品牌广告·宣传片",
+     "styles": [
+      "ink-wash",
+      "impasto",
+      "one-line",
+      "urban-sketch",
+      "paper-lantern",
+      "risograph",
+      "woodcut",
+      "engraving",
+      "silkscreen-poster",
+      "swiss-motion",
+      "art-deco",
+      "ascii-crt",
+      "hologram-hud",
+      "rubber-hose",
+      "scifi-toon",
+      "silent-film",
+      "tilt-shift",
+      "glass-product"
+     ],
+     "star": []
+    },
+    {
+     "name": "知识讲解·课件",
+     "styles": [
+      "crayon-book",
+      "watercolor",
+      "whiteboard",
+      "engraving",
+      "swiss-motion",
+      "blueprint",
+      "iso-infographic",
+      "hologram-hud",
+      "midcentury-toon",
+      "microgame"
+     ],
+     "star": []
+    },
+    {
+     "name": "故事·绘本·短剧",
+     "styles": [
+      "crayon-book",
+      "ink-wash",
+      "shadow-puppet",
+      "papercut-red",
+      "paper-lantern",
+      "halftone-dossier",
+      "woodcut",
+      "stained-glass",
+      "scifi-toon",
+      "hd-2d",
+      "silent-film",
+      "backrooms",
+      "paper-popup",
+      "lowpoly-island"
+     ],
+     "star": []
+    },
+    {
+     "name": "音乐 MV·混剪",
+     "styles": [
+      "impasto",
+      "cel-anime-80s",
+      "pixel-rpg"
+     ],
+     "star": []
+    },
+    {
+     "name": "新闻·数据·报告",
+     "styles": [
+      "iso-infographic"
+     ],
+     "star": []
+    },
+    {
+     "name": "节日·活动·开场",
+     "styles": [
+      "shadow-puppet",
+      "papercut-red",
+      "paper-lantern",
+      "spy-titles",
+      "art-deco",
+      "stained-glass",
+      "game-show"
+     ],
+     "star": []
+    },
+    {
+     "name": "旅行·城市·纪录",
+     "styles": [
+      "watercolor",
+      "urban-sketch",
+      "shadow-puppet",
+      "ukiyoe",
+      "silkscreen-poster",
+      "stained-glass",
+      "tilt-shift"
+     ],
+     "star": []
+    },
+    {
+     "name": "游戏·动漫",
+     "styles": [
+      "ascii-crt",
+      "rubber-hose",
+      "cel-anime-80s",
+      "scifi-toon",
+      "midcentury-toon",
+      "pixel-rpg",
+      "hd-2d",
+      "microgame",
+      "game-show",
+      "backrooms",
+      "brick-toy",
+      "paper-popup",
+      "lowpoly-island"
+     ],
+     "star": []
+    }
+   ]
+  }
+ ]
 }

@@ -73,6 +73,7 @@ export async function renderHyperframes(work: string, output: string, options: H
   const server = await createFileServer({ projectDir: work, fps: toFps(fps), preHeadScripts: ['globalThis.__HF_RENDER_CAPTURE_MODE = true;'] });
   const silent = `${output}.${process.pid}.video.mp4`, sound = `${output}.${process.pid}.sound.wav`;
   try {
+    options.onActivity?.('正在抽取素材并解码视频');
     const videos = await extractVideos(work, film.clips.filter(c => c.tag === 'video' && c.src).map(c => c.src), cacheDir);
     const json = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c');
     const inject = `<script>window.__otFps=${fps};window.__otVideos=${json(videos)};window.__otPageEdits=${json(options.edits ?? {})}</script><script>${EDITS}</script><script>${SHIM}</script>`;
@@ -89,6 +90,7 @@ export async function renderHyperframes(work: string, output: string, options: H
       return { body, contentType: res.headers.get('content-type') || 'text/html' };
     };
     const total = Math.round(film.duration * fps);
+    options.onActivity?.('素材解码完成，正在逐帧渲染');
     await renderVideo({
       browserExecutable: options.browserExecutable, serveUrl: work, entryPath: `/${HF_ENTRY}`, assetResolver, concurrency: options.concurrency ?? 4, imageFormat: 'jpeg', jpegQuality: 92, outputLocation: silent,
       composition: { id: 'main', width: film.width, height: film.height, fps, durationInFrames: total },

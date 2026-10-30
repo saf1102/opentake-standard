@@ -1,4 +1,12 @@
-import platform from '../platform.ts';
+import {openScreenProjectProfile} from './openscreen-profile.ts';
+import {ExportSettingsSchema,type ExportSettings} from '../../src/types/editor.ts';
+import {probeExportMedia} from '../general/export-media.ts';
+import {encodeScreenExportMedia} from './openscreen-encode.ts';
+export {encodeScreenExportMedia} from './openscreen-encode.ts';
+import {flatGeneralDraft} from '../general/export-draft.ts';
+import {writeExportPreferences} from '../export-preferences.ts';
+import {validateDirectory} from '../system-settings.ts';
+import {screenPublishingEnabled, screenSpawnOptions, stopScreenExport, revealScreenCommand, registerPublishedAsset} from './openscreen-export-edition.ts';
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -10,19 +18,19 @@ import { readOpenScreenDocument } from "./openscreen-documents.ts";
 import { atomicJson, findProject } from "./store.ts";
 
 type JsonObject = Record<string, unknown>;
-type LiveExport = { child: ChildProcess; startedAt: number; job: OpenScreenExportJob };
+type LiveExport = { controller?:AbortController; cleanup:()=>void; child: ChildProcess; startedAt: number; job: OpenScreenExportJob };
 
 const live = new Map<string, LiveExport>();
 export const activeOpenScreenExports = () => live.size;
 
 /** Run the user's installed OpenScreen as a separate process. Its own Electron,
  * native compositor and FFmpeg stay together; never load its .node addon into
- * Standard's Electron or silently substitute OpenTake's renderer. */
+ * OpenTake's Electron or silently substitute OpenTake's renderer. */
 export function resolveOpenScreenExportRunner(_document: unknown, lookup?: import("./openscreen.ts").OpenScreenLookup) {
   const executable = findOpenScreenExecutable(lookup);
   if (!executable) throw new Error("未检测到用户安装的 OpenScreen，暂不能录制或导出。请先安装支持当前 v7 工程及 export 命令的 OpenScreen，再重试；现有工程已保留。");
-  const env = {...process.env};
-  // The embedded Standard service can run in Electron's Node mode. Do not
+  const env = {...process.env, ...lookup?.env};
+  // The embedded OpenTake service can run in Electron's Node mode. Do not
   // propagate that mode to the independently installed GUI/export application.
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.OPENSCREEN_COMPOSITOR_VIEW_NODE;
@@ -223,7 +231,7 @@ function readJsonLines(chunk: string, state: { pending: string }, onEvent: (even
 export function mp4ExportArguments(fps: unknown, codec: unknown) {
   const rate = fps === undefined ? 30 : Number(fps);
   if (![24, 30, 60].includes(rate)) throw new Error("MP4 帧率必须为 24、30 或 60");
-  if (codec !== undefined && codec !== "h264") throw new Error("当前 OpenScreen CLI 仅支持 H.264，请选择 H.264 后导出");
+  if (codec !== undefined && !["h264", "h265", "hevc", "prores422"].includes(String(codec))) throw new Error("录屏编码无效");
   return ["--fps", String(rate)];
 }
 
@@ -234,14 +242,35 @@ export function stageEditorSettings(document: unknown, snapshot: unknown, root =
   }
   const editor = staged.legacyEditor as JsonObject | null;
   if (editor && typeof editor.wallpaper === "string" && /^\/wallpapers\/wallpaper\d+\.jpg$/.test(editor.wallpaper)) {
-    const file = path.join(root, "public/openscreen", editor.wallpaper.slice(1));
-    if (!fs.existsSync(file)) throw new Error("录屏背景资源缺失，不能导出不同的背景");
+    const relativeWallpaper = editor.wallpaper.slice(1);
+    const file = ["dist/openscreen", "public/openscreen"].map(folder => path.join(root, folder, relativeWallpaper)).find(candidate => fs.existsSync(candidate));
+    if (!file) throw new Error("录屏背景资源缺失，不能导出不同的背景");
     editor.wallpaper = file;
   }
   return staged;
 }
 
-/** The installed renderer discovers telemetry beside the video, not in Standard's media database. */
+/** 已保存版本导出不接受窗口内的 editor 覆盖；版本变化时请重新打开弹窗。 */
+export function savedExportDocument(current:{document:unknown;revision:number},input:{useSavedDocument?:unknown;documentRevision?:unknown;exportEditor?:unknown;savedEditor?:unknown}) {
+  if(input.useSavedDocument===true && (!Number.isInteger(input.documentRevision)||input.documentRevision!==current.revision))
+    throw Error('已保存版本已变化，请关闭并重新打开导出窗口');
+  // savedEditor 只补齐从已保存文档计算的预览默认值；已保存的显式字段始终优先。
+  const defaults=input.savedEditor&&typeof input.savedEditor==='object'&&!Array.isArray(input.savedEditor)?input.savedEditor:{};
+  const stored=(current.document as JsonObject).legacyEditor as JsonObject|null;
+  return stageEditorSettings(current.document,input.useSavedDocument===true?{...defaults,...stored}:input.exportEditor);
+}
+
+/** 渲染和最终编码共用工程时钟，不能把原生中间文件的平均帧率当成工程帧率。 */
+export function screenExportFrameRate(settings: ExportSettings | undefined, projectFps: unknown, document: unknown) {
+  const doc = document as {project?:{primaryAssetId?:string};assets?:Array<{id:string;video?:{fps?:number}}>};
+  const asset = doc.assets?.find(a=>a.id===doc.project?.primaryAssetId) || doc.assets?.find(a=>a.video);
+  const fps = settings && settings.preset !== 'jianying' && typeof settings.fps === 'number'
+    ? settings.fps : Number(projectFps) || Number(asset?.video?.fps) || 30;
+  if (!Number.isFinite(fps) || fps <= 0 || fps > 240) throw Error('工程帧率无效');
+  return fps;
+}
+
+/** The installed renderer discovers telemetry beside the video, not in OpenTake's media database. */
 export function stageCursorSidecars(document: unknown, project: EditProject, projectDir: string, stagingDir: string) {
   const staged = structuredClone(document) as JsonObject;
   for (const asset of (Array.isArray(staged.assets) ? staged.assets : []) as JsonObject[]) {
@@ -276,14 +305,30 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   mp4Fps?: unknown;
   codec?: unknown;
   exportEditor?: unknown;
+  settings?: unknown;
+  clientId?: unknown;
+  useSavedDocument?: unknown;
+  documentRevision?: unknown;
+  savedEditor?: unknown;
 }) {
+  const existing=[...live.values()].find(item=>item.job.projectId===projectId&&item.job.documentId===documentId&&['queued','running'].includes(item.job.status));
+  if(existing)throw Error('此录屏正在导出，请等待完成或取消后重试');
   const found = findProject(projectId, true);
   const current = readOpenScreenDocument(projectId, documentId);
-  const runner = resolveOpenScreenExportRunner(current.document);
-  const purpose = "export";
-  const format = input.format === "gif" ? "gif" : "mp4";
-  const mp4Args = format === "mp4" ? mp4ExportArguments(input.mp4Fps, input.codec) : [];
-  const target = input.outPath
+  // Revision validation is read-only; staging failures below become persisted failed jobs.
+  if(input.useSavedDocument===true && input.documentRevision!==current.revision)throw Error('已保存版本已变化，请关闭并重新打开导出窗口');
+  const runner = resolveOpenScreenExportRunner(current.document, process.platform === 'win32' ? undefined : {env:{...process.env,OPENSCREEN_USER_DATA_DIR:openScreenProjectProfile(projectId)}});
+  const purpose = input.purpose === 'publish' && screenPublishingEnabled ? 'publish' : 'export';
+  const settings=purpose==='publish'?undefined:input.settings===undefined
+    ? ['hevc','h265','prores422'].includes(String(input.codec)) ? ExportSettingsSchema.parse({fps:input.mp4Fps===24||input.mp4Fps===60?input.mp4Fps:'project',video:{codec:input.codec==='hevc'?'h265':input.codec}}) : undefined
+    : ExportSettingsSchema.parse(input.settings);
+  const requestedFps=screenExportFrameRate(settings,found.project.settings.fps,current.document);
+  if(settings)writeExportPreferences(found.dir,settings);
+  const publishedAssetId = purpose === 'publish' ? `osout_${crypto.randomUUID()}` : undefined;
+  const publicationVersion = purpose === 'publish' ? found.project.media.filter(asset=>asset.origin==='openscreen-published'&&asset.openScreenDocumentId===documentId).length+1 : undefined;
+  const format = purpose==='publish' ? 'mp4' : input.format === "gif" ? "gif" : "mp4";
+  const mp4Args = format === "mp4" ? settings ? ['--fps',String(requestedFps)] : mp4ExportArguments(input.mp4Fps,input.codec) : [];
+  let target = purpose==='publish' ? path.join(found.dir,'media','originals',`${publishedAssetId}.mp4`) : input.outPath
     ? assertWithinExports(found.dir, input.outPath)
     : createOpenScreenExportTarget(projectId, documentId, {
         suggested: `${current.ref.title}.${format}`,
@@ -291,7 +336,14 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
       }).path;
   if (path.extname(target).toLowerCase() !== `.${format}`)
     throw new Error(`导出文件扩展名必须为 .${format}`);
+  if(settings) {
+    const destination=settings.destinationDir.trim()?validateDirectory(settings.destinationDir):path.join(found.dir,'exports');
+    target=path.join(destination,crypto.randomUUID(),'source.mp4');
+  }
+  if(fs.existsSync(target))throw Error('导出目标已存在，请选择新文件名');
   fs.mkdirSync(path.dirname(target), { recursive: true });
+  const outputDir=path.dirname(target);
+  const resultFile=settings?path.join(outputDir,settings.preset==='jianying'?'剪映工程':`成片.${settings.video.codec==='prores422'?'mov':settings.video.container}`):target;
 
   const id = crypto.randomUUID();
   const now = Date.now();
@@ -299,31 +351,47 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     id,
     projectId,
     documentId,
+    ...(input.useSavedDocument===true?{requestClientId:String(input.clientId||''),savedDocumentRevision:current.revision}:{}),
     status: "queued",
     format,
     purpose,
-    quality: qualityOf(input.quality),
+    publishedAssetId,
+    quality: settings?'source':qualityOf(input.quality),
     progress: 0,
     totalFrames: Number.isInteger(Number(input.totalFrames)) && Number(input.totalFrames) > 0
       ? Number(input.totalFrames)
       : undefined,
-    outputFile: target,
+    outputFile: resultFile,
+    ...(settings?{outputDir,exportSettings:settings}:{}),
     createdAt: now,
     updatedAt: now,
   });
   persist(job);
 
   const stagingDir = path.join(exportJobsDir(found.dir, documentId), `.staging-${id}`);
+  const cleanup = () => {
+    fs.rmSync(stagingDir, {recursive:true,force:true});
+    // These paths are allocated for this job; never erase a user's destination directory.
+    fs.rmSync(target, {force:true});
+    fs.rmSync(`${target}.cfr.mp4`, {force:true});
+    if(settings)fs.rmSync(outputDir, {recursive:true,force:true});
+  };
+  const stagedProject = path.join(stagingDir, "project.openscreen");
+  try {
   fs.mkdirSync(stagingDir, { recursive: true });
+  const exportDocument=savedExportDocument(current,input);
   const localizedDocument = localizeDocument(
-    stageEditorSettings(current.document, input.exportEditor),
+    exportDocument,
     found.dir,
     found.project,
     path.dirname(path.join(found.dir, current.ref.relativePath)),
   );
   const stagedDocument = stageCursorSidecars(localizedDocument, found.project, found.dir, stagingDir);
-  const stagedProject = path.join(stagingDir, "project.openscreen");
   fs.writeFileSync(stagedProject, JSON.stringify(stagedDocument, null, 2));
+  } catch(error) {
+    job.status='failed';job.error=error instanceof Error?error.message:String(error);
+    cleanup();persist(job);throw error;
+  }
 
   const args = [
     ...runner.argsPrefix,
@@ -345,14 +413,18 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     args.push("--gif-fps", String(fps), "--gif-size", size);
   }
 
-  const child = spawn(runner.executable, args, {
-    detached: process.platform === "win32",
-    windowsHide: true,
+  let child: ChildProcess;
+  try { child = spawn(runner.executable, args, {
+    ...screenSpawnOptions,
     cwd: runner.cwd,
     env: runner.env,
     stdio: ["ignore", "pipe", "pipe"],
-  });
-  live.set(id, { child, startedAt: Date.now(), job });
+  }); } catch (error) {
+    job.status='failed';job.error=error instanceof Error?error.message:String(error);
+    cleanup();persist(job);throw error;
+  }
+  const controller=new AbortController();
+  live.set(id, { child, controller, cleanup, startedAt: Date.now(), job });
   job.status = "running";
   job.startedAt = Date.now();
   job.progress = 1;
@@ -361,7 +433,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   const stdout = { pending: "" };
   const diagnostics: string[] = [];
   const stderr: string[] = [];
-  child.stdout.on("data", (chunk) => readJsonLines(String(chunk), stdout, (event) => {
+  child.stdout!.on("data", (chunk) => readJsonLines(String(chunk), stdout, (event) => {
     if (job.status === "cancelled") return;
     inferProgress(event, job);
     if (event.error || event.message || event.type === "error") {
@@ -370,33 +442,48 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     }
     persist(job);
   }));
-  child.stderr.on("data", (chunk) => {
+  child.stderr!.on("data", (chunk) => {
     stderr.push(String(chunk));
     if (stderr.length > 80) stderr.shift();
   });
   child.once("error", (error) => {
+    cleanup();
     live.delete(id);
     if (job.status === "cancelled") return;
     job.status = "failed";
     job.error = error.message;
     persist(job);
   });
-  child.once("close", (code, signal) => {
-    live.delete(id);
+  child.once("close", async (code, signal) => {
     if (job.status === "cancelled") {
-      fs.rmSync(stagingDir, {recursive: true, force: true});
-      persist(job);
+      cleanup();
+      persist(job);live.delete(id);
       return;
     }
     if (code === 0 && fs.existsSync(target) && fs.statSync(target).size > 0) {
       try {
+        if(settings) {
+          job.progress=95;persist(job);
+          if(settings.preset==='jianying')await flatGeneralDraft(target,resultFile,current.ref.title,await probeExportMedia(target),controller.signal);
+          else await encodeScreenExportMedia(target,resultFile,settings,requestedFps,current.ref.duration,controller.signal);
+          if(controller.signal.aborted)throw Error('导出已停止');
+          fs.rmSync(target,{force:true});
+        }
+        if(!settings && format==='mp4' && purpose==='export' && process.platform==='darwin') {
+          const clockFps=typeof input.mp4Fps==='number'?input.mp4Fps:requestedFps;
+          const exactSettings=ExportSettingsSchema.parse({resolution:'original',video:{codec:'h264'}});
+          await encodeScreenExportMedia(target,`${target}.cfr.mp4`,exactSettings,clockFps,current.ref.duration,controller.signal);
+          if(controller.signal.aborted)throw Error('导出已停止');
+          fs.renameSync(`${target}.cfr.mp4`,target);
+        }
+        if(purpose==='publish'&&publishedAssetId&&publicationVersion)registerPublishedAsset({projectId,documentId,assetId:publishedAssetId,target,revision:current.revision,version:publicationVersion});
         job.status = "completed";
         job.progress = 100;
         job.completedAt = Date.now();
         job.wallS = job.wallS ?? Math.max(0, (job.completedAt - (job.startedAt || job.createdAt)) / 1000);
       } catch (error) {
         job.status = "failed";
-        job.error = `成片已生成，但登记到剪辑台失败：${error instanceof Error ? error.message : String(error)}`;
+        job.error = `录屏导出收尾失败：${error instanceof Error ? error.message : String(error)}`;
       }
     } else {
       job.status = "failed";
@@ -404,6 +491,9 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
         || diagnostics.join("\n").trim().slice(-4_000)
         || `OpenScreen 导出退出（${code ?? "未知"}${signal ? `，${signal}` : ""}）`;
     }
+    if(controller.signal.aborted){job.status='cancelled';job.error=undefined;}
+    if(job.status==='cancelled'||job.status==='failed')cleanup();
+    live.delete(id);
     persist(job);
     fs.rmSync(stagingDir, { recursive: true, force: true });
   });
@@ -430,18 +520,41 @@ export function cancelOpenScreenExport(projectId: string, documentId: string, jo
   if (job.status !== "running" && job.status !== "queued") return job;
   job.status = "cancelled";
   job.completedAt = Date.now();
+  live.get(job.id)?.controller?.abort();
+  stopScreenExport(live.get(job.id)?.child);
+  // The worker may still be writing. Cleanup belongs to its close/encode-finally
+  // handler so cancellation cannot unlink a file that the worker then recreates.
   const worker=live.get(job.id)?.child;
-  if(process.platform==="win32"&&worker?.pid)platform.killTree(worker.pid);else worker?.kill("SIGTERM");
+  if(worker && process.platform==='darwin') {
+    const timer=setTimeout(()=>{if(worker.exitCode===null&&worker.signalCode===null)worker.kill('SIGKILL');},3000);
+    timer.unref();worker.once('close',()=>clearTimeout(timer));
+  }
   persist(job);
   return job;
 }
 
 export function revealOpenScreenExport(projectId: string, value: unknown) {
   const { dir } = findProject(projectId, true);
-  const target = assertWithinExports(dir, value);
+  const saved=listScreenExports(projectId).find(j=>j.status==='completed'&&(j.outputFile===value||j.outputDir===value));
+  const target = saved ? String(value) : assertWithinExports(dir, value);
   if (!fs.existsSync(target)) throw new Error("导出文件不存在");
-  const reveal=platform.revealCommand(target);
+  const reveal=revealScreenCommand(target);
   const child = spawn(reveal.command, reveal.args, { detached: true, stdio: "ignore" });
   child.unref();
   return { path: target };
+}
+
+/** Read only this project's persisted jobs, including jobs from prior app sessions. */
+export function listScreenExports(projectId:string):OpenScreenExportJob[] {
+ const {dir}=findProject(projectId,true),root=path.join(dir,'analysis','openscreen');
+ if(!fs.existsSync(root))return [];
+ const jobs:OpenScreenExportJob[]=[];
+ for(const entry of fs.readdirSync(root,{withFileTypes:true})) {
+  if(!entry.isDirectory()||!/^[a-zA-Z0-9_-]{1,96}$/.test(entry.name))continue;
+  const folder=path.join(root,entry.name,'export-jobs');if(!fs.existsSync(folder))continue;
+  for(const file of fs.readdirSync(folder).filter(f=>/^[a-zA-Z0-9_-]+\.json$/.test(f))) {
+   const job=readOpenScreenExport(projectId,entry.name,file.slice(0,-5));jobs.push(job);
+  }
+ }
+ return jobs.sort((a,b)=>b.createdAt-a.createdAt);
 }

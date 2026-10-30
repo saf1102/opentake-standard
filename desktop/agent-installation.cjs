@@ -4,8 +4,14 @@ const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const versions=new Map();
 let shellCache;
-function sanitizeAgentEnv(input=process.env){
- return Object.fromEntries(Object.entries(input).filter(([k,v])=>v!==undefined&&!/^(CLAUDECODE|CLAUDE_CODE_.*|ANTHROPIC_BASE_URL|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY)$/.test(k)));
+function sanitizeAgentEnv(input=process.env,connection){
+ const clean=Object.fromEntries(Object.entries(input).filter(([k,v])=>v!==undefined&&!/^(CLAUDECODE|CLAUDE_CODE_.*|ANTHROPIC_BASE_URL|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY)$/.test(k)));
+ // Existing Windows behavior stays unchanged. API credentials are explicit per-launch additions on macOS.
+ if(process.platform==='darwin'&&connection){
+  const keys=connection.agent==='claude'?['ANTHROPIC_BASE_URL','ANTHROPIC_API_KEY']:connection.agent==='codex'?['OPENTAKE_CODEX_API_KEY']:[];
+  for(const key of keys)if(typeof connection.variables?.[key]==='string')clean[key]=connection.variables[key];
+ }
+ return clean;
 }
 function loginEnvironment(base=process.env,refresh=false){
  const env=sanitizeAgentEnv(base), now=Date.now();
@@ -46,8 +52,8 @@ function versionOf(kind,file,env){
 }
 /**
  * Claude Code's version, read only from what is installed beside it: its bundle's Info.plist, its npm package.json, or
- * the version folder in its real path. OpenTake never runs Claude Code, not even `--version` or `auth status`: running
- * it may go online or update itself, and S先生 rules out any account risk. A file that is there and executable is found.
+ * the version folder in its real path. Detection never runs Claude Code, not even `--version` or `auth status`.
+ * Actual execution belongs only to the explicit unified connection gate. A file that is there and executable is found.
  */
 function claudeVersionFromFiles(file){
  let real=file;try{real=fs.realpathSync(file)}catch{/* Keep the path as given. */}
@@ -97,7 +103,9 @@ function detectAgent(kind,options={}){
  const seen=new Set();
  for(const item of candidates){
   item.status='missing';if(!executable(item.path))continue;
-  const real=fs.realpathSync(item.path);if(seen.has(real)){item.status='duplicate';continue}seen.add(real);
+  const real=fs.realpathSync(item.path);
+  if(process.platform!=='win32'&&kind==='codex'&&(/(?:^|[\\/])claude(?:-code)?(?:\.exe)?$/i.test(item.path)||/(?:^|[\\/])claude(?:-code)?(?:\.exe)?$/i.test(real)||/[\\/]@anthropic-ai[\\/]claude-code[\\/]|[\\/]claude[\\/]versions[\\/]/.test(real))){item.status='invalid';continue;}
+  if(seen.has(real)){item.status='duplicate';continue}seen.add(real);
   // Claude Code: found when the file is there and executable; it is never started, so its version comes from files.
   if(kind==='claude'){const semver=claudeVersionFromFiles(item.path);Object.assign(item,{status:'valid',semver:semver||'0.0.0'},semver?{version:semver}:{});continue}
   const version=versionOf(kind,item.path,env);if(version){Object.assign(item,version);item.status='valid'}else item.status='invalid';

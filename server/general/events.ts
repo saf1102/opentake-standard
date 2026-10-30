@@ -131,3 +131,8 @@ export function beginRepair(run: GeneralRun, reason: string, at: string): void {
     ? { ...s, state: s.id === 'code' ? 'running' : 'waiting', detail: s.id === 'code' ? `正在修正：${reason}` : undefined,
         startedAt: s.id === 'code' ? at : undefined, endedAt: undefined, progress: undefined, thumbs: undefined } : s);
 }
+
+/** A phase transition is not evidence of a visual check. */
+export function verifySelfCheck(steps: GeneralStep[], hasSheet: boolean, at: string): GeneralStep[] {
+  return hasSheet ? steps : setStep(steps, 'self-check', {state:'skipped',endedAt:at,detail:'未生成自查样张；继续执行成片检查',thumbs:undefined});
+}

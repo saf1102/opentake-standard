@@ -1,3 +1,4 @@
+import {ExportMenu} from '@/general/project-edition';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { ChevronDown, Download, Lock, Plus, X } from 'lucide-react'
@@ -5,7 +6,7 @@ import { toast } from 'sonner'
 import { LIBRARY_STYLES } from '@/workspace/style-library/library-styles'
 import { STYLE_INPUT_COPY, styleById, type LibraryStyle } from '@/workspace/style-library/style-library'
 import { GENERAL_EDIT_PATH } from '@/workspace/modules'
-import { GeneralApiError, announceGeneralChange, errorText, generalApi, generalEditorApi } from '@/general/general-api'
+import { GeneralApiError, announceGeneralChange, errorText, generalApi } from '@/general/general-api'
 import type { GeneralProject as Project, GeneralSegment } from '@/general/general-contract'
 import {
   AGENT_PANEL, ASPECT_LABELS, applyPrefill, briefLine, clampAgentWidth, clipDuration, fittedAgentWidth, latestRenderFrame, lengthSummary,
@@ -15,7 +16,7 @@ import { NavSlot, Spinner } from '@/general/GeneralBits'
 import { GeneralStage, type StageHandle, type StageReference } from '@/general/GeneralStage'
 import { GeneralAgentPanel, type AgentActions } from '@/general/GeneralAgentPanel'
 import { GeneralEditor } from '@/general/GeneralEditor'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import '@/general/general.css'
 
 const storage = () => { try { return window.localStorage } catch { return undefined } }
@@ -146,51 +147,6 @@ function Resizer({ width, onChange, onCommit, onDragging }: { width: number; onC
     }} />
 }
 
-const EXPORT_LABEL = { mp4: '成片', jianying: '剪映草稿' } as const
-
-/** 导出 for a layered version: the film or a 剪映 draft, with the person's edits. Progress comes back on the project (SSE). */
-function ExportMenu({ project, version }: { project: Project; version: number }) {
-  const task = project.exportTask
-  const running = task?.state === 'running'
-  const [starting, setStarting] = useState(false)
-  // say when an export finishes or fails (once, when its state changes while this page is open)
-  const seen = useRef(task ? `${task.id}:${task.state}` : '')
-  useEffect(() => {
-    if (!task) return
-    const key = `${task.id}:${task.state}`
-    if (key === seen.current) return
-    seen.current = key
-    if (task.state === 'done' && task.downloadUrl) toast.success(`${EXPORT_LABEL[task.format]}导出好了`, { action: { label: '下载', onClick: () => download(task.downloadUrl!) }, duration: 15000 })
-    if (task.state === 'done' && task.folder) toast.success('剪映工程做好了，双击里面的「导入剪映」就能放进剪映草稿箱', { action: { label: '在访达中显示', onClick: () => void generalEditorApi.revealExport(project.id).catch(failure => toast.error(errorText(failure))) }, duration: 15000 })
-    if (task.state === 'failed') toast.error(`导出没成功：${task.error || '原因不明'}`)
-  }, [task, project.id])
-  const reveal = () => generalEditorApi.revealExport(project.id).catch(failure => toast.error(errorText(failure)))
-  const start = async (format: 'mp4' | 'jianying') => {
-    setStarting(true)
-    try { await generalEditorApi.export(project.id, version, format) } catch (failure) { toast.error(`导出没开始：${errorText(failure)}`) } finally { setStarting(false) }
-  }
-  if (running) return <span className="ge-export" role="status" aria-disabled="true" title={task.step}><Download aria-hidden="true" />{`导出 ${Math.round(task.progress * 100)}%`}</span>
-  const last = task?.state === 'done' && task.version === version && (task.downloadUrl || task.folder) ? task : undefined
-  return <><DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <button type="button" className="ge-export" disabled={starting}><Download aria-hidden="true" />{starting ? '正在开始…' : '导出'}</button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="preview-style-menu">
-      <DropdownMenuLabel>{versionName(version)}，带上你的修改</DropdownMenuLabel>
-      <DropdownMenuItem onSelect={() => void start('mp4')}>导出成片（MP4）</DropdownMenuItem>
-      {last && <><DropdownMenuSeparator />{last.downloadUrl
-        ? <><DropdownMenuItem onSelect={() => download(last.downloadUrl!)}>下载上次导出的成片</DropdownMenuItem></>
-        : <DropdownMenuItem onSelect={() => void reveal()}>在访达中显示上次的剪映工程</DropdownMenuItem>}</>}
-    </DropdownMenuContent>
-  </DropdownMenu></>
-}
-
-function download(url: string) {
-  const a = document.createElement('a')
-  a.href = url; a.download = ''
-  document.body.append(a); a.click(); a.remove()
-}
-
 function PageState({ title, text, retry }: { title: string; text?: string; retry?: () => void }) {
   return <main className="ge ge-state">
     <h1>{title}</h1>
@@ -283,15 +239,12 @@ export default function GeneralProject() {
     requestAnimationFrame(() => { const element = composer.current; if (element) { element.focus(); element.setSelectionRange(line.length, line.length) } })
   }
   const editing = !!shown?.layersUrl && !active
-  const exportName = shown ? `${project.name}-${versionName(shown.n).replace(/\s/g, '')}.mp4` : ''
   const panelWidth = fittedAgentWidth(width, viewport)
 
   return <>
     <NavSlot id="workspace-project-title-slot"><ProjectTitle project={project} onRename={async name => { setProject(await generalApi.patch(project.id, { name })); announceGeneralChange() }} /></NavSlot>
     <NavSlot id="workspace-primary-action-slot">
-      {editing && shown ? <ExportMenu project={project} version={shown.n} />
-      : shown && !active
-        ? <a className="ge-export" href={shown.videoUrl} download={exportName} title={`导出${versionName(shown.n)}`}><Download aria-hidden="true" />导出</a>
+      {shown && !active ? <ExportMenu project={project} version={shown.n} />
         : <span className="ge-export" role="link" aria-disabled="true" title={active ? '做完以后可以导出' : '还没有可以导出的版本'}><Download aria-hidden="true" />导出</span>}
     </NavSlot>
     {project.versions.length > 0 && <NavSlot id="workspace-preview-island-slot">

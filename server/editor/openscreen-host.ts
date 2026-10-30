@@ -1,7 +1,9 @@
-import platform from '../platform.ts';
+import { openScreenProjectProfile } from "./openscreen-profile.ts";
+export { openScreenProjectProfile } from "./openscreen-profile.ts";
+import { openScreenAppDataRoot, legacyWindowsHud } from "./openscreen-platform.ts";
+import { compatibleOpenScreenDocument } from "../../shared/openscreen-compat.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import type {
@@ -14,23 +16,17 @@ import {
   OpenScreenHostCandidateSchema,
   OpenScreenHostSessionSchema,
 } from "../../src/types/editor.ts";
-import { findOpenScreenExecutable, appBundleForExecutable, openScreenProfile, openScreenProfileArgs } from "./openscreen.ts";
+import { findOpenScreenExecutable, appBundleForExecutable, openScreenProfileArgs } from "./openscreen.ts";
 import { processMedia } from "./media.ts";
 import { createOpenScreenDocument } from "./openscreen-documents.ts";
 import { atomicJson, findProject, save } from "./store.ts";
 
 type JsonObject = Record<string, unknown>;
 
-const profile = openScreenProfile();
-const OPENSCREEN_SUPPORT_ROOTS = profile ? [profile] : [
-  path.join(platform.appDataRoot(), "openscreen"),
-  path.join(platform.appDataRoot(), "OpenScreen"),
-  path.join(platform.appDataRoot(), "Openscreen"),
-];
-const PROJECT_ROOTS = OPENSCREEN_SUPPORT_ROOTS.map((root) => path.join(root, "projects"));
-const RECORDING_ROOTS = [
-  ...OPENSCREEN_SUPPORT_ROOTS.map((root) => path.join(root, "recordings")),
-];
+function supportRoots(projectId: string) {
+  const profile = openScreenProjectProfile(projectId);
+  return profile ? [profile] : ["openscreen", "OpenScreen", "Openscreen"].map(name => path.join(openScreenAppDataRoot(), name));
+}
 
 function sessionDir(projectId: string) {
   const { dir } = findProject(projectId, true);
@@ -73,6 +69,7 @@ function collectFiles(
 /** Case aliases, symlinks and hard links can name one recording on macOS.
  * Keep the original path for display, but deduplicate by filesystem identity. */
 export function uniqueRecordingFiles(files: string[]) {
+  if (process.platform === "win32" && legacyWindowsHud) return [...new Set(files)];
   const seen = new Set<string>();
   return files.filter(file => {
     try {
@@ -84,13 +81,13 @@ export function uniqueRecordingFiles(files: string[]) {
     } catch { return false; }
   });
 }
-function projectFiles() {
-  return uniqueRecordingFiles(PROJECT_ROOTS.flatMap(root => collectFiles(
+function projectFiles(projectId: string) {
+  return uniqueRecordingFiles(supportRoots(projectId).map(root => path.join(root, "projects")).flatMap(root => collectFiles(
     root, (_file, entry) => entry.name.toLowerCase().endsWith(".openscreen"),
   )));
 }
-function recordingFiles() {
-  return uniqueRecordingFiles(RECORDING_ROOTS.flatMap(root => collectFiles(
+function recordingFiles(projectId: string) {
+  return uniqueRecordingFiles(supportRoots(projectId).map(root => path.join(root, "recordings")).flatMap(root => collectFiles(
     root, (_file, entry) => /\.(?:mp4|mov|m4v|webm|mkv|json)$/i.test(entry.name),
   )));
 }
@@ -168,7 +165,7 @@ function candidateMetadata(file: string, document: JsonObject): OpenScreenHostCa
 }
 
 function sessionCandidates(session: OpenScreenHostSession) {
-  return projectFiles().flatMap((file) => {
+  return projectFiles(session.projectId).flatMap((file) => {
     const resolved = path.resolve(file);
     if (session.baselineFingerprints[resolved] === fingerprint(resolved)) return [];
     const document = candidateDocument(resolved);
@@ -182,7 +179,7 @@ function sessionCandidates(session: OpenScreenHostSession) {
 
 function updateActivityStatus(session: OpenScreenHostSession) {
   const now = Date.now();
-  const artifacts = recordingFiles().filter((file) => {
+  const artifacts = recordingFiles(session.projectId).filter((file) => {
     const resolved = path.resolve(file);
     return session.baselineFingerprints[resolved] !== fingerprint(resolved);
   });
@@ -201,29 +198,54 @@ function updateActivityStatus(session: OpenScreenHostSession) {
 
 export function launchOpenScreenHud(projectId: string): OpenScreenHostSession {
   findProject(projectId, true);
-  const executable = findOpenScreenExecutable();
+  const oldWindows = process.platform === "win32" && legacyWindowsHud;
+  const executable = oldWindows ? "Openscreen" : findOpenScreenExecutable();
   if (!executable) throw new Error("未检测到用户安装的 OpenScreen，请安装后重试录制；现有工程已保留。");
   const now = Date.now();
   const session = OpenScreenHostSessionSchema.parse({
     id: crypto.randomUUID(), projectId, status: "launching", mode: "native-hud",
     createdAt: now, updatedAt: now, candidateFiles: [], candidates: [],
-    baselineFingerprints: snapshot([...projectFiles(), ...recordingFiles()]),
+    baselineFingerprints: snapshot([...projectFiles(projectId), ...recordingFiles(projectId)]),
     observedArtifacts: {},
   });
   persist(session);
+  const profile = openScreenProjectProfile(projectId);
+  if (profile && process.platform !== "win32") fs.mkdirSync(profile, { recursive: true });
   const app = process.platform === "darwin" ? appBundleForExecutable(executable) : undefined;
-  const env = {...process.env}; delete env.ELECTRON_RUN_AS_NODE;
-  const child = spawn(app ? "/usr/bin/open" : executable, app ? [...(profile ? ["-n"] : []), "-a", app, ... (profile ? ["--args", ...openScreenProfileArgs()] : [])] : openScreenProfileArgs(), { env, detached: true, stdio: "ignore" });
-  child.once("close", (code) => {if(code && !["completed","cancelled"].includes(session.status)){session.status="failed";session.error=`OpenScreen 启动失败（${code}），请检查本机安装。`;persist(session)}});
+  const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+  const profileArgs = openScreenProfileArgs({ ...env, OPENSCREEN_USER_DATA_DIR: profile });
+  const command = oldWindows || app ? "/usr/bin/open" : executable;
+  const args = oldWindows ? ["-a", "Openscreen"] : app
+    ? [...(profile ? ["-n"] : []), "-a", app, ...(profile ? ["--args", ...profileArgs] : [])]
+    : profileArgs;
+  const child = spawn(command, args, { ...(oldWindows ? {} : { env }), detached: true, stdio: "ignore" });
+  const terminal = () => {
+    try {
+      const current = JSON.parse(fs.readFileSync(sessionFile(projectId, session.id), "utf8"));
+      return ["completed", "cancelled", "failed"].includes(current.status);
+    } catch { return false; }
+  };
+  child.once("close", (code, signal) => {
+    const failed = process.platform === "win32"
+      ? !oldWindows && code && !["completed", "cancelled"].includes(session.status)
+      : (code || signal) && !terminal();
+    if (failed) {
+      session.status = "failed";
+      session.error = `OpenScreen 启动失败（${signal || code}），请检查本机安装。`;
+      persist(session);
+    }
+  });
   child.once("error", (error) => {
+    if (process.platform !== "win32" && terminal()) return;
     session.status = "failed";
     session.error = error.message;
     persist(session);
   });
   child.once("spawn", () => {
+    child.unref();
+    if (process.platform !== "win32" && terminal()) return;
     session.status = "waiting";
     persist(session);
-    child.unref();
   });
   return session;
 }
@@ -294,7 +316,7 @@ function rootMediaUrl(projectId: string, assetId: string, kind = "original") {
 
 async function materializeCandidate(projectId: string, selected: string, raw: JsonObject) {
   const found = findProject(projectId, true);
-  const document = structuredClone(raw) as JsonObject;
+  const document = compatibleOpenScreenDocument(raw) as JsonObject;
   const documentProject = asObject(document.project);
   if (!documentProject) throw new Error("OpenScreen 录制工程缺少 project");
   let documentId = String(documentProject.id || "").trim();

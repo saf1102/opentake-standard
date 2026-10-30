@@ -99,7 +99,7 @@ export function WorkspaceNavigation() {
               data-proximity={active === index ? 'active' : near ? 'near' : 'idle'}
               aria-current={m.id === current?.id ? 'page' : undefined}
               onPointerEnter={() => setActive(index)} onPointerLeave={() => setActive(null)} onFocus={() => setActive(index)} onClick={closeDock}>
-              <span className="workspace-module-surface"><Icon size={18} /><span className="workspace-module-name">{m.shortName}{m.pro && <small className="home-only">Pro</small>}{m.only && <small className="workspace-module-only" data-only={m.only}><i aria-hidden="true" />{MODULE_ONLY_LABELS[m.only]}</small>}</span></span>
+              <span className="workspace-module-surface"><Icon size={18} /><span className="workspace-module-name">{m.shortName}{'pro' in m && m.pro === true && <small className="home-only">Pro</small>}{m.only && <small className="workspace-module-only" data-only={m.only}><i aria-hidden="true" />{MODULE_ONLY_LABELS[m.only]}</small>}</span></span>
             </Link>
           })}
         </div>)}

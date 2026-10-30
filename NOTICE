@@ -1907,6 +1907,21 @@ licenses/npm/node_modules__yocto-queue/license
 zod 4.6.7 — MIT
 licenses/npm/node_modules__zod/LICENSE
 
+@radix-ui/react-tooltip 1.2.8 — MIT
+licenses/npm/node_modules__@radix-ui__react-tooltip/LICENSE
+
+@radix-ui/react-visually-hidden 1.2.3 — MIT
+licenses/npm/node_modules__@radix-ui__react-visually-hidden/LICENSE
+
+@radix-ui/react-slot 1.2.4 — MIT
+licenses/npm/node_modules__@radix-ui__react-slot/LICENSE
+
+class-variance-authority 0.7.1 — Apache-2.0
+licenses/npm/node_modules__class-variance-authority/LICENSE
+
+@radix-ui/react-slot 1.2.3 — MIT
+licenses/npm/node_modules__@radix-ui__react-tooltip__node_modules__@radix-ui__react-slot/LICENSE
+
 @actions/core 3.0.1 — MIT
 licenses/npm/vendor__openscreen__node_modules__@actions__core/LICENSE.md
 

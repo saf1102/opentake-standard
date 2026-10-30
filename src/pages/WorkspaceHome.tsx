@@ -15,7 +15,7 @@ import { formatProjectDuration } from '@/studio/project-duration'
 import { LoginBackdrop } from '@/desktop/LoginBackdrop'
 import '@/workspace/workspace-home.css'
 import { DeployStrip } from '@/onboarding/DeployWizard'
-import '@/workspace/publish-home.css'
+import {homeHasKoubo, loadHomeEditorProjects} from '@/workspace/home-edition'
 
 /** Entrance loops. Until real clips are placed here the slots stay a neutral dark frame; a missing file only hides the video. */
 const HOME_LOOPS: Record<'koubo' | 'general' | 'publish', { src: string; poster?: string }> = {
@@ -40,7 +40,7 @@ const MOTION_QUERY = '(prefers-reduced-motion: no-preference) and (min-width: 76
 const motionOn = () => typeof window.matchMedia === 'function' && window.matchMedia(MOTION_QUERY).matches
 const EASE = 'cubic-bezier(.2,.8,.2,1)'
 const PROJECT_FILTERS: { value: ProjectKindFilter; label: string }[] = [
-  { value: 'all', label: '全部' }, { value: 'general', label: PROJECT_KIND_LABELS.general },
+  { value: 'all', label: '全部' }, ...(homeHasKoubo ? [{ value: 'koubo' as const, label: PROJECT_KIND_LABELS.koubo }] : []), { value: 'general', label: PROJECT_KIND_LABELS.general },
 ]
 const MODULE_SIDES = { prepare: 'left', make: 'center', review: 'right' } as const
 
@@ -186,16 +186,17 @@ function useModuleLoop(rest = 0) {
 
 function ModuleCard({ module }: { module: ReturnType<typeof groupedModules>[number]['modules'][number] }) {
   const Icon = MODULE_ICONS[module.id]
+  const pro = 'pro' in module && module.pro === true
   const loop = MODULE_LOOPS[module.id]
   const { video, handlers } = useModuleLoop(loop?.rest)
   const [failed, setFailed] = useState(false)
-  return <li><Link className="home-module" data-pro={module.pro || undefined} to={module.path} title={module.description} {...(loop ? handlers : {})}>
+  return <li><Link className="home-module" data-pro={pro || undefined} to={module.path} title={module.description} {...(loop ? handlers : {})}>
     <span className="home-module__media" aria-hidden="true">
       {loop && !failed ? <video ref={video} src={loop.src} poster={loop.poster} loop muted playsInline preload="metadata" disablePictureInPicture tabIndex={-1} onError={() => setFailed(true)} onLoadedMetadata={event => { if (loop.rest) event.currentTarget.currentTime = loop.rest }} />
         : <Icon size={26} strokeWidth={1.4} />}
     </span>
     <span className="home-module__top"><Icon size={18} strokeWidth={1.6} aria-hidden="true" />{module.only && <span className="home-only"><i className="home-dot" data-kind={module.only} aria-hidden="true" />{MODULE_ONLY_LABELS[module.only]}</span>}</span>
-    {module.pro && <span className="home-only standard-pro-badge">Pro</span>}
+    {pro && <span className="home-only standard-pro-badge">Pro</span>}
     <span className="home-module__name">{module.shortName}</span>
     <span className="home-module__brief">{module.brief}</span>
   </Link></li>
@@ -235,8 +236,8 @@ function HomeProjects({ refreshKey }: { refreshKey: number }) {
   const row = useRef<HTMLDivElement>(null)
   useEffect(() => {
     let active = true
-    // Both kinds share one row. General projects come from their own API; while it is not answering, the row shows 口播 only.
-    const load = () => void Promise.all([Promise.resolve([] as EditProject[]), generalApi.list()])
+    // Both kinds share one row. Any library failure remains visible instead of impersonating an empty library.
+    const load = () => void Promise.all([loadHomeEditorProjects(), generalApi.list()])
       .then(([koubo, general]) => { if (active) { setProjects(mergeProjectLibrary(koubo, general)); setError('') } })
       .catch(e => { if (active) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (active) setLoading(false) })
@@ -328,7 +329,7 @@ export default function WorkspaceHome() {
   const [activity, setActivity] = useState<QuickEditActivity | null>(null)
   // ?intake=1 opens 一键剪辑 at once (拿去剪 › 口播剪辑 from 文案发布)
   const [params, setParams] = useSearchParams()
-  const [intakeOpen, setIntakeOpen] = useState(() => params.get('intake') === '1')
+  const [intakeOpen, setIntakeOpen] = useState(() => homeHasKoubo && params.get('intake') === '1')
   useEffect(() => { if (params.has('intake')) setParams({}, { replace: true }) }, [params, setParams])
   const [projectsKey, setProjectsKey] = useState(0)
   useLayoutEffect(() => { window.scrollTo(0, 0) }, [])
@@ -346,13 +347,13 @@ export default function WorkspaceHome() {
     <div className="home-hero" inert={intakeOpen}>
       <DeployStrip />
       <div className="home-entries">
-        <section className="home-entry" data-pro="true" data-kind="koubo" aria-labelledby="home-entry-koubo">
+        <section className="home-entry" data-pro={!homeHasKoubo || undefined} data-kind="koubo" aria-labelledby="home-entry-koubo">
           <div>
             <p className="home-entry__eyebrow"><i className="home-dot" data-kind="koubo" aria-hidden="true" />专业 · 极致可控</p>
-            <h2 id="home-entry-koubo">口播剪辑<span className="home-only standard-pro-badge">Pro</span></h2>
+            <h2 id="home-entry-koubo">口播剪辑{!homeHasKoubo && <span className="home-only standard-pro-badge">Pro</span>}</h2>
             <p className="home-entry__line">导入口播原片，粗剪、动效、配乐，每一步都能精细调整。</p>
             <div className="home-entry__actions">
-              <Link className="home-entry__button" to="/pro/koubo">升级到 Pro<ChevronRight size={16} aria-hidden="true" /></Link>
+              {homeHasKoubo ? <button ref={kouboButton} type="button" className="home-entry__button" aria-haspopup="dialog" aria-expanded={intakeOpen} aria-controls="home-intake" onClick={() => setIntakeOpen(true)}>新建口播工程<ChevronRight size={16} aria-hidden="true" /></button> : <Link className="home-entry__button" to="/pro/koubo">升级到 Pro<ChevronRight size={16} aria-hidden="true" /></Link>}
               {status && <span className="home-entry__status" role="status"><i className="home-dot" data-kind="koubo" aria-hidden="true" />{status}</span>}
             </div>
           </div>
@@ -369,13 +370,13 @@ export default function WorkspaceHome() {
           </div>
           <HomeLoop source={HOME_LOOPS.general} />
         </section>
-        <section className="home-entry" data-pro="true" data-kind="publish" aria-labelledby="home-entry-publish">
+        <section className="home-entry" data-pro={!homeHasKoubo || undefined} data-kind="publish" aria-labelledby="home-entry-publish">
           <div>
             <p className="home-entry__eyebrow"><i className="home-dot" data-kind="publish" aria-hidden="true" />写好 · 发出去</p>
-            <h2 id="home-entry-publish">文案发布<span className="home-only standard-pro-badge">Pro</span></h2>
+            <h2 id="home-entry-publish">文案发布{!homeHasKoubo && <span className="home-only standard-pro-badge">Pro</span>}</h2>
             <p className="home-entry__line">写稿、审核、标题简介、封面，一键填进各平台发布页。</p>
             <div className="home-entry__actions">
-              <Link className="home-entry__button" to="/pro/publish">升级到 Pro<ChevronRight size={16} aria-hidden="true" /></Link>
+              <Link className="home-entry__button" to={homeHasKoubo ? "/publish" : "/pro/publish"}>{homeHasKoubo ? "新建稿子" : "升级到 Pro"}<ChevronRight size={16} aria-hidden="true" /></Link>
             </div>
           </div>
           <HomeLoop source={HOME_LOOPS.publish} />
@@ -389,6 +390,6 @@ export default function WorkspaceHome() {
       <HomeProjects refreshKey={projectsKey} />
       <HomeModules />
     </div>
-    <HomeIntake open={intakeOpen} onClose={closeIntake} onActivity={setActivity} activity={activity} />
+    {homeHasKoubo && <HomeIntake open={intakeOpen} onClose={closeIntake} onActivity={setActivity} activity={activity} />}
   </main>
 }

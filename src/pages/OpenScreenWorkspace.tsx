@@ -1,3 +1,6 @@
+import {ProjectAgentChoice} from '@/studio/components/ScopedAgentChoice'
+import { ScreenExportDialog, type ScreenExportRequest } from '@/screen-motion/ScreenExportDialog'
+import { prepareScreenWorkspace, ScreenWorkspaceExtraActions } from '@/screen-motion/workspace-edition'
 import { useWorkspaceLeaveGuard, WorkspaceLink as Link } from '@/workspace/navigation-guard'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CircleStop, FileVideo2, MonitorUp, RefreshCw, ShieldCheck } from 'lucide-react'
@@ -29,15 +32,42 @@ function getClientId() {
   return value
 }
 
+function isMacScreenWorkspace() {
+  return /Mac/i.test(window.navigator.platform)
+}
+
+function getScreenClientId() {
+  if (!isMacScreenWorkspace()) return getClientId()
+  // 录屏窗口使用独立身份；口播继续使用自己的旧身份和锁规则。
+  const key = 'opentake-screen-editor-client'
+  const existing = window.sessionStorage.getItem(key)
+  if (existing) return existing
+  const value = createClientId()
+  window.sessionStorage.setItem(key, value)
+  return value
+}
+
+async function acquireScreenWorkspaceLock(id: string, clientId: string, takeover: boolean) {
+  if (!isMacScreenWorkspace()) return acquireLock(id, clientId, takeover)
+  const response = await fetch(`/api/editor/projects/${encodeURIComponent(id)}/openscreen/lock`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, clientName: '录屏窗口', takeover }),
+  })
+  const data = await response.json()
+  if (!response.ok || !data.ok) throw Error(data.error || '无法取得录屏编辑锁')
+  return data.result as { acquired: boolean; lock: { clientName: string } }
+}
+
 export default function OpenScreenWorkspace() {
   const { id = '' } = useParams()
-  const clientId = useMemo(getClientId, [])
+  const clientId = useMemo(getScreenClientId, [])
   const [project, setProject] = useState<EditProject | null>(null)
   const [writable, setWritable] = useState(false)
   const [status, setStatus] = useState('正在连接 OpenScreen 编辑器…')
   const [hostSession, setHostSession] = useState<OpenScreenHostSession | null>(null)
   const [importingCandidate, setImportingCandidate] = useState('')
   const [error, setError] = useState('')
+  const [exportRequest, setExportRequest] = useState<ScreenExportRequest>()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   useEffect(() => {
     const sync = () => { const doc = iframeRef.current?.contentDocument; if (doc) doc.documentElement.dataset.uiTheme = document.documentElement.dataset.uiTheme || 'original'; };
@@ -51,7 +81,7 @@ export default function OpenScreenWorkspace() {
   const refreshLock = useCallback(async (takeover = false) => {
     if (!id) return
     try {
-      const lock = await acquireLock(id, clientId, takeover)
+      const lock = await acquireScreenWorkspaceLock(id, clientId, takeover)
       setWritable(lock.acquired)
       if (!lock.acquired) setStatus(`只读：${lock.lock.clientName} 正在编辑`)
     } catch (reason) {
@@ -63,7 +93,7 @@ export default function OpenScreenWorkspace() {
   useEffect(() => {
     if (!id) return
     let cancelled = false
-    void Promise.all([getProject(id), refreshLock()])
+    void Promise.all([getProject(id), refreshLock(), prepareScreenWorkspace(id)])
       .then(([nextProject]) => {
         if (cancelled) return
         setProject(nextProject)
@@ -79,6 +109,8 @@ export default function OpenScreenWorkspace() {
   useEffect(() => {
     const onMessage = (event: MessageEvent<OpenScreenBridgeMessage>) => {
       if (event.origin !== window.location.origin || event.data?.projectId !== id) return
+      if (event.source !== iframeRef.current?.contentWindow) return
+      if (event.data.type === 'export-dialog') { setError(''); setExportRequest(event.data.payload as ScreenExportRequest) }
       if (event.data.type === 'ready') setStatus(writable ? 'OpenScreen 全功能模式' : 'OpenScreen 只读模式')
       if (event.data.type === 'save-state') {
         setStatus(writable ? String(event.data.payload.label || '已保存') : 'OpenScreen 只读模式')
@@ -164,18 +196,19 @@ export default function OpenScreenWorkspace() {
         </span>
       </div>
       <div className="openscreen-hostbar__actions">
+        {isMacScreenWorkspace()&&project&&<ProjectAgentChoice projectId={id} workspace="screen" clientId={clientId} disabled={!writable}/>}
         {!writable && <button type="button" onClick={() => void refreshLock(true)}>接管编辑</button>}
         <button type="button" onClick={() => iframeRef.current?.contentWindow?.location.reload()}><RefreshCw size={15} />重新载入</button>
         <button type="button" onClick={() => void launchHud()} disabled={!writable}><MonitorUp size={15} />开始录屏</button>
-
+        <ScreenWorkspaceExtraActions id={id} />
       </div>
     </header>
-    {error && <div className="openscreen-host-error">{error}<button onClick={() => setError('')}>关闭</button></div>}
+    {error && <div className="openscreen-host-error" role="alert" style={{ color: '#9869dc', background: 'color-mix(in srgb,#9869dc 12%,transparent)' }}>{error}<button onClick={() => setError('')}>关闭</button></div>}
     {hostSession && !['completed', 'cancelled'].includes(hostSession.status) && <div className={`openscreen-host-session openscreen-host-session--${hostSession.status}`}>
       <span className="openscreen-host-session__pulse" />
       <div>
         <strong>{hostStatusLabel}</strong>
-        <small>录制对象是当前宿主 Mac；OpenTake Standard 只接收本次会话新增的 OpenScreen 工程。</small>
+        <small>录制对象是当前宿主 Mac；OpenTake 只接收本次会话新增的 OpenScreen 工程。</small>
       </div>
       {hostSession.status !== 'failed' && <button type="button" onClick={() => void cancelHudReceive()} disabled={!writable}>
         <CircleStop size={15} />停止接收
@@ -200,6 +233,7 @@ export default function OpenScreenWorkspace() {
         </button>)}
       </div>
     </div>}
+    {exportRequest && project && <ScreenExportDialog id={id} name={project.name} clientId={clientId} input={{ ...exportRequest, canvas: { ...exportRequest.canvas, fps: Number(project.settings.fps) || 30 } }} onClose={() => setExportRequest(undefined)} />}
     <iframe
       key={editorUrl}
       ref={iframeRef}

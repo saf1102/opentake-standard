@@ -5790,6 +5790,56 @@
     ]
   },
   {
+    "scope": "standard",
+    "name": "@radix-ui/react-tooltip",
+    "version": "1.2.8",
+    "license": "MIT",
+    "source": "git+https://github.com/radix-ui/primitives.git",
+    "notices": [
+      "licenses/npm/node_modules__@radix-ui__react-tooltip/LICENSE"
+    ]
+  },
+  {
+    "scope": "standard",
+    "name": "@radix-ui/react-visually-hidden",
+    "version": "1.2.3",
+    "license": "MIT",
+    "source": "git+https://github.com/radix-ui/primitives.git",
+    "notices": [
+      "licenses/npm/node_modules__@radix-ui__react-visually-hidden/LICENSE"
+    ]
+  },
+  {
+    "scope": "standard",
+    "name": "@radix-ui/react-slot",
+    "version": "1.2.4",
+    "license": "MIT",
+    "source": "git+https://github.com/radix-ui/primitives.git",
+    "notices": [
+      "licenses/npm/node_modules__@radix-ui__react-slot/LICENSE"
+    ]
+  },
+  {
+    "scope": "standard",
+    "name": "class-variance-authority",
+    "version": "0.7.1",
+    "license": "Apache-2.0",
+    "source": "https://github.com/joe-bell/cva.git",
+    "notices": [
+      "licenses/npm/node_modules__class-variance-authority/LICENSE"
+    ]
+  },
+  {
+    "scope": "standard",
+    "name": "@radix-ui/react-slot",
+    "version": "1.2.3",
+    "license": "MIT",
+    "source": "git+https://github.com/radix-ui/primitives.git",
+    "notices": [
+      "licenses/npm/node_modules__@radix-ui__react-tooltip__node_modules__@radix-ui__react-slot/LICENSE"
+    ]
+  },
+  {
     "scope": "vendor/openscreen",
     "name": "@actions/core",
     "version": "3.0.1",

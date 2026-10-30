@@ -158,7 +158,7 @@ interface VirtualPreviewProps {
 	 * cursor layer that Electron deliberately omits to avoid drawing twice. */
 	renderBrowserCursor?: boolean;
 	cursorFrameShortSide?: number;
-	cursorPreviousFrame?: {x:number;y:number;width:number;height:number};
+	cursorPreviousFrame?: { x: number; y: number; width: number; height: number };
 }
 
 export function VirtualPreview({
@@ -968,179 +968,193 @@ export function VirtualPreview({
 		<div className={styles.container} data-load-state={loadState}>
 			{activeSource ? (
 				<>
-					<div ref={videoFrameRef} className={styles.videoFrame} style={renderBrowserCursor ? {overflow: "visible"} : undefined}>
-						<div style={{position: "absolute", inset: 0, overflow: "hidden", borderRadius: videoStyle?.borderRadius, display: "flex", alignItems: "center", justifyContent: "center"}}>
-						<video
-							// Key on the asset id, not the URL: distinct assets that resolve
-							// to the same file URL must still remount the <video> on switch so
-							// onLoadedMetadata refires and the pending cross-asset seek/resume
-							// runs (otherwise playback stalls at the clip boundary).
-							key={activeSource.id}
-							ref={videoRef}
-							src={activeSource.src}
-							className={`${styles.video}${isIdentityCrop ? "" : ` ${styles.videoCropped}`}`}
-							// When a synthetic cursor is being drawn on top (CursorPreviewLayer),
-							// hide the real OS pointer here so it doesn't compete with it.
+					<div
+						ref={videoFrameRef}
+						className={styles.videoFrame}
+						style={renderBrowserCursor ? { overflow: "visible" } : undefined}
+					>
+						<div
 							style={{
-								...cropVideoStyle,
-								...videoStyle,
-								cursor: settings.cursorShow ? "none" : undefined,
+								position: "absolute",
+								inset: 0,
+								overflow: "hidden",
+								borderRadius: videoStyle?.borderRadius,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
 							}}
-							preload="metadata"
-							muted
-							playsInline
-							onLoadedMetadata={(e) => {
-								setLoadState("ready");
-								markSourceLoaded();
-								// ponytail: forward the raw duration (possibly NaN for
-								// MediaRecorder WebMs) to the parent. handleLoadedMetadata
-								// falls back to a 60s seed when it isn't finite so the
-								// timeline gets a populated clip even before the EBML fix
-								// lands. Previously this gate skipped the callback for
-								// non-finite durations and stranded the editor on
-								// "No clips yet" until manual intervention. The assetId is
-								// forwarded so the parent only ever corrects clips that
-								// belong to the asset which actually fired this event —
-								// without it, switching between clips of different assets
-								// during multi-clip playback clobbered clip[0]'s duration
-								// with whichever asset's video happened to load last.
-								onLoadedMetadata?.(
-									e.currentTarget.duration,
-									activeSource.id,
-									e.currentTarget.videoWidth,
-									e.currentTarget.videoHeight,
-								);
-								if (pendingSeekRef.current) {
-									const { sourceTimeSec, play } = pendingSeekRef.current;
-									pendingSeekRef.current = null;
-									e.currentTarget.currentTime = sourceTimeSec;
-									if (play) {
-										// See the other video.play() catch above: a rejection means
-										// playback never started, so there's no state to reconcile.
-										void e.currentTarget.play().catch(() => {
-											// swallow: rejection just means playback never started
-										});
-									}
-								} else if (clips.length > 0) {
-									seekToVirtualTime(virtualTimeSec);
-								}
-							}}
-							onSeeked={(e) => {
-								// The demuxer is free again: apply the newest target that
-								// arrived while it was busy, if the playhead has moved on.
-								const queued = pendingScrubTargetRef.current;
-								if (queued !== null) {
-									pendingScrubTargetRef.current = null;
-									applySourceTime(e.currentTarget, queued);
-								}
-							}}
-							onWaiting={() => setLoadState("loading")}
-							onCanPlay={() => {
-								setLoadState("ready");
-								markSourceLoaded();
-							}}
-							onError={(e) => {
-								const el = e.currentTarget;
-								const description = describeMediaError(el.error);
-								// An element whose source was torn out from under it reports a
-								// "load failure" that says nothing about the media (Chromium
-								// calls it "Empty src attribute"). Never act on that.
-								const hasSource = Boolean(el.getAttribute("src")) || Boolean(el.currentSrc);
-								const nowMs = Date.now();
-								reloadsRef.current = pruneReloads(reloadsRef.current, nowMs);
-								const reloadsInWindow = reloadsRef.current.length;
-								const disposition = hasSource
-									? mediaErrorDisposition(description.code, reloadsInWindow, gaveUpRef.current)
-									: "ignore";
-								const detail = formatMediaError(description);
-								// The code is the whole diagnosis, and it used to be thrown
-								// away — which is why issue #395 could only ever be reported
-								// as "the preview disappeared". Keep it, whatever we decide.
-								const context = {
-									assetId: activeSource.id,
-									src: activeSource.src,
-									detail,
-									networkState: el.networkState,
-									readyState: el.readyState,
-									currentTime: el.currentTime,
-									reloadsInWindow,
-									gaveUp: gaveUpRef.current,
-									disposition,
-								};
-								if (disposition === "ignore") {
-									// Routine: every cross-asset clip boundary remounts this
-									// element mid-load. `debug`, not `warn` — this fires during
-									// ordinary playback and must not read as a problem.
-									console.debug(
-										"[preview] ignoring a <video> error from a cancelled load",
-										context,
+						>
+							<video
+								// Key on the asset id, not the URL: distinct assets that resolve
+								// to the same file URL must still remount the <video> on switch so
+								// onLoadedMetadata refires and the pending cross-asset seek/resume
+								// runs (otherwise playback stalls at the clip boundary).
+								key={activeSource.id}
+								ref={videoRef}
+								src={activeSource.src}
+								className={`${styles.video}${isIdentityCrop ? "" : ` ${styles.videoCropped}`}`}
+								// When a synthetic cursor is being drawn on top (CursorPreviewLayer),
+								// hide the real OS pointer here so it doesn't compete with it.
+								style={{
+									...cropVideoStyle,
+									...videoStyle,
+									cursor: settings.cursorShow ? "none" : undefined,
+								}}
+								preload="metadata"
+								muted
+								playsInline
+								onLoadedMetadata={(e) => {
+									setLoadState("ready");
+									markSourceLoaded();
+									// ponytail: forward the raw duration (possibly NaN for
+									// MediaRecorder WebMs) to the parent. handleLoadedMetadata
+									// falls back to a 60s seed when it isn't finite so the
+									// timeline gets a populated clip even before the EBML fix
+									// lands. Previously this gate skipped the callback for
+									// non-finite durations and stranded the editor on
+									// "No clips yet" until manual intervention. The assetId is
+									// forwarded so the parent only ever corrects clips that
+									// belong to the asset which actually fired this event —
+									// without it, switching between clips of different assets
+									// during multi-clip playback clobbered clip[0]'s duration
+									// with whichever asset's video happened to load last.
+									onLoadedMetadata?.(
+										e.currentTarget.duration,
+										activeSource.id,
+										e.currentTarget.videoWidth,
+										e.currentTarget.videoHeight,
 									);
-									return;
-								}
-								if (disposition === "retry") {
-									console.warn("[preview] <video> failed, reloading", context);
-									reloadsRef.current.push(nowMs);
-									// Deliberately no pause(): a 400 ms reload should be a blip
-									// the user never sees, and pausing here would flip the
-									// shell's transport for it. What keeps the rAF from
-									// steering the dead decoder in the meantime is
-									// `recoveringRef`, set by reloadActiveSource.
-									reloadActiveSource(!el.paused, retryDelayMs(reloadsInWindow));
-									return;
-								}
-								// ponytail: don't blindly advance to the next source — if
-								// the failed source owns the current virtual clip, the
-								// next sourceIndex will seekToVirtualTime right back into
-								// the same failed asset, looping. Fail the preview.
-								console.error("[preview] <video> failed for good", context);
-								pendingSeekRef.current = null;
-								recoveringRef.current = false;
-								// Latched so an expiring window cannot restart the cycle behind
-								// the card. Only Retry or a media change lifts it.
-								gaveUpRef.current = true;
-								setLoadState("error");
-								// An 'error' doesn't itself fire 'pause', so make sure the shell's
-								// transport state (single source of truth, see NewEditorShell's
-								// own play/pause/ended listener) actually learns playback stopped.
-								el.pause();
-								onVideoError?.(activeSource.id, detail);
-							}}
-							onEnded={() => {
-								// BUG corrigé : ce handler stoppait TOUJOURS la lecture dès que le
-								// <video> brut atteignait SA PROPRE fin de fichier — une course
-								// avec la boucle rAF (reachedClipEnd, plus haut) qui gère
-								// l'enchaînement multi-clip. Pour un clip NON trimé, la fin réelle
-								// du fichier coïncide avec la fin de sa fenêtre timeline, et
-								// l'événement navigateur 'ended' gagnait quasi systématiquement
-								// cette course (déclenché par le navigateur dès la dernière frame,
-								// avant le prochain tick rAF) : la lecture s'arrêtait au lieu
-								// d'enchaîner sur le clip suivant — le "ça s'arrête en fin de clip"
-								// qui persistait malgré les fixes de la boucle rAF elle-même.
-								// `forceResume` (voir seekToVirtualTime) est nécessaire ici : le
-								// navigateur a déjà mis `.paused = true` avant de déclencher
-								// 'ended', donc le check `!video.paused` habituel empêcherait
-								// toujours la reprise de la lecture sur le clip suivant. Si aucun
-								// clip suivant n'existe, on ne fait rien de plus ici : le navigateur
-								// a déjà mis la vidéo en pause, et NewEditorShell (seule source de
-								// vérité pour l'état de lecture) l'apprend via son propre listener
-								// 'ended'/'pause' sur ce même élément.
-								const current = clipsRef.current.find(
-									(clip) => clip.id === activeClipIdRef.current,
-								);
-								const nextClip = current
-									? findNextClipByTimelineOrder(clipsRef.current, current.timelineStartSec)
-									: undefined;
-								if (nextClip) {
-									seekToVirtualTime(nextClip.timelineStartSec, true, true);
-								}
-							}}
-							// ponytail: handleTimeUpdate is now driven by the rAF loop
-							// above (60 Hz) instead of the <video> onTimeUpdate event
-							// (~4 Hz) — the 4 Hz sync was too slow to keep the webcam
-							// <video> and any audio in sync. The rAF tick also
-							// handles clip-end advancement, so dropping the event
-							// handler here is safe.
-						/>
+									if (pendingSeekRef.current) {
+										const { sourceTimeSec, play } = pendingSeekRef.current;
+										pendingSeekRef.current = null;
+										e.currentTarget.currentTime = sourceTimeSec;
+										if (play) {
+											// See the other video.play() catch above: a rejection means
+											// playback never started, so there's no state to reconcile.
+											void e.currentTarget.play().catch(() => {
+												// swallow: rejection just means playback never started
+											});
+										}
+									} else if (clips.length > 0) {
+										seekToVirtualTime(virtualTimeSec);
+									}
+								}}
+								onSeeked={(e) => {
+									// The demuxer is free again: apply the newest target that
+									// arrived while it was busy, if the playhead has moved on.
+									const queued = pendingScrubTargetRef.current;
+									if (queued !== null) {
+										pendingScrubTargetRef.current = null;
+										applySourceTime(e.currentTarget, queued);
+									}
+								}}
+								onWaiting={() => setLoadState("loading")}
+								onCanPlay={() => {
+									setLoadState("ready");
+									markSourceLoaded();
+								}}
+								onError={(e) => {
+									const el = e.currentTarget;
+									const description = describeMediaError(el.error);
+									// An element whose source was torn out from under it reports a
+									// "load failure" that says nothing about the media (Chromium
+									// calls it "Empty src attribute"). Never act on that.
+									const hasSource = Boolean(el.getAttribute("src")) || Boolean(el.currentSrc);
+									const nowMs = Date.now();
+									reloadsRef.current = pruneReloads(reloadsRef.current, nowMs);
+									const reloadsInWindow = reloadsRef.current.length;
+									const disposition = hasSource
+										? mediaErrorDisposition(description.code, reloadsInWindow, gaveUpRef.current)
+										: "ignore";
+									const detail = formatMediaError(description);
+									// The code is the whole diagnosis, and it used to be thrown
+									// away — which is why issue #395 could only ever be reported
+									// as "the preview disappeared". Keep it, whatever we decide.
+									const context = {
+										assetId: activeSource.id,
+										src: activeSource.src,
+										detail,
+										networkState: el.networkState,
+										readyState: el.readyState,
+										currentTime: el.currentTime,
+										reloadsInWindow,
+										gaveUp: gaveUpRef.current,
+										disposition,
+									};
+									if (disposition === "ignore") {
+										// Routine: every cross-asset clip boundary remounts this
+										// element mid-load. `debug`, not `warn` — this fires during
+										// ordinary playback and must not read as a problem.
+										console.debug(
+											"[preview] ignoring a <video> error from a cancelled load",
+											context,
+										);
+										return;
+									}
+									if (disposition === "retry") {
+										console.warn("[preview] <video> failed, reloading", context);
+										reloadsRef.current.push(nowMs);
+										// Deliberately no pause(): a 400 ms reload should be a blip
+										// the user never sees, and pausing here would flip the
+										// shell's transport for it. What keeps the rAF from
+										// steering the dead decoder in the meantime is
+										// `recoveringRef`, set by reloadActiveSource.
+										reloadActiveSource(!el.paused, retryDelayMs(reloadsInWindow));
+										return;
+									}
+									// ponytail: don't blindly advance to the next source — if
+									// the failed source owns the current virtual clip, the
+									// next sourceIndex will seekToVirtualTime right back into
+									// the same failed asset, looping. Fail the preview.
+									console.error("[preview] <video> failed for good", context);
+									pendingSeekRef.current = null;
+									recoveringRef.current = false;
+									// Latched so an expiring window cannot restart the cycle behind
+									// the card. Only Retry or a media change lifts it.
+									gaveUpRef.current = true;
+									setLoadState("error");
+									// An 'error' doesn't itself fire 'pause', so make sure the shell's
+									// transport state (single source of truth, see NewEditorShell's
+									// own play/pause/ended listener) actually learns playback stopped.
+									el.pause();
+									onVideoError?.(activeSource.id, detail);
+								}}
+								onEnded={() => {
+									// BUG corrigé : ce handler stoppait TOUJOURS la lecture dès que le
+									// <video> brut atteignait SA PROPRE fin de fichier — une course
+									// avec la boucle rAF (reachedClipEnd, plus haut) qui gère
+									// l'enchaînement multi-clip. Pour un clip NON trimé, la fin réelle
+									// du fichier coïncide avec la fin de sa fenêtre timeline, et
+									// l'événement navigateur 'ended' gagnait quasi systématiquement
+									// cette course (déclenché par le navigateur dès la dernière frame,
+									// avant le prochain tick rAF) : la lecture s'arrêtait au lieu
+									// d'enchaîner sur le clip suivant — le "ça s'arrête en fin de clip"
+									// qui persistait malgré les fixes de la boucle rAF elle-même.
+									// `forceResume` (voir seekToVirtualTime) est nécessaire ici : le
+									// navigateur a déjà mis `.paused = true` avant de déclencher
+									// 'ended', donc le check `!video.paused` habituel empêcherait
+									// toujours la reprise de la lecture sur le clip suivant. Si aucun
+									// clip suivant n'existe, on ne fait rien de plus ici : le navigateur
+									// a déjà mis la vidéo en pause, et NewEditorShell (seule source de
+									// vérité pour l'état de lecture) l'apprend via son propre listener
+									// 'ended'/'pause' sur ce même élément.
+									const current = clipsRef.current.find(
+										(clip) => clip.id === activeClipIdRef.current,
+									);
+									const nextClip = current
+										? findNextClipByTimelineOrder(clipsRef.current, current.timelineStartSec)
+										: undefined;
+									if (nextClip) {
+										seekToVirtualTime(nextClip.timelineStartSec, true, true);
+									}
+								}}
+								// ponytail: handleTimeUpdate is now driven by the rAF loop
+								// above (60 Hz) instead of the <video> onTimeUpdate event
+								// (~4 Hz) — the 4 Hz sync was too slow to keep the webcam
+								// <video> and any audio in sync. The rAF tick also
+								// handles clip-end advancement, so dropping the event
+								// handler here is safe.
+							/>
 						</div>
 						<audio
 							key={`${activeSource.id}:primary-audio`}

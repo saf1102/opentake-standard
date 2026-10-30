@@ -98,11 +98,12 @@ if (cmd === 'check') {
     if (resourceFailure) throw resourceFailure;
     await page.waitForFunction(() => window.__otRender, null, { timeout: 30000 });
     const comp = await page.evaluate(() => window.__otRender.select('main'));
-    const fontAudit = [{frame: 0, fonts: await page.evaluate(sampleFontStatus)}];
+    const frameFonts = async () => (await Promise.all(page.frames().map(frame => frame.evaluate(sampleFontStatus)))).flat();
+    const fontAudit = [{frame: 0, fonts: await frameFonts()}];
     for (let i = 0; i < n; i++) {
       const frame = Math.min(comp.durationInFrames - 1, Math.round((i + 0.5) / n * comp.durationInFrames));
       await page.evaluate(f => window.__otRender.seek(f), frame);
-      fontAudit.push({frame, fonts: await page.evaluate(sampleFontStatus)});
+      fontAudit.push({frame, fonts: await frameFonts()});
       await page.screenshot({ path: path.join(tmp, `f${String(i).padStart(2, '0')}.jpg`), type: 'jpeg', quality: 80 });
     }
     if (resourceFailure) throw resourceFailure;

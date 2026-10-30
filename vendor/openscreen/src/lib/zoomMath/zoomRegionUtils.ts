@@ -53,19 +53,20 @@ function easeConnectedPan(value: number) {
 // compositor: the earlier fixed window/500ms overlap moved both video and
 // cursor ahead of the exported frame during zoom transitions.
 export function computeRegionStrength(
- region: ZoomRegion,
- timeMs: number,
- playbackRate = 1,
+	region: ZoomRegion,
+	timeMs: number,
+	playbackRate = 1,
 ): number {
- const window = (600 + 550 * Math.log(Math.max(1, getZoomScale(region)))) * Math.max(0.001, playbackRate);
- const ease = (value: number) => {
-  const t = 7 * clamp01(value);
-  return (1 - (1 + t) * Math.exp(-t)) / (1 - 8 * Math.exp(-7));
- };
- if (timeMs < region.startMs - window || timeMs > region.endMs + window) return 0;
- if (timeMs < region.startMs) return ease((timeMs - region.startMs + window) / window);
- if (timeMs <= region.endMs) return 1;
- return 1 - ease((timeMs - region.endMs) / window);
+	const window =
+		(600 + 550 * Math.log(Math.max(1, getZoomScale(region)))) * Math.max(0.001, playbackRate);
+	const ease = (value: number) => {
+		const t = 7 * clamp01(value);
+		return (1 - (1 + t) * Math.exp(-t)) / (1 - 8 * Math.exp(-7));
+	};
+	if (timeMs < region.startMs - window || timeMs > region.endMs + window) return 0;
+	if (timeMs < region.startMs) return ease((timeMs - region.startMs + window) / window);
+	if (timeMs <= region.endMs) return 1;
+	return 1 - ease((timeMs - region.endMs) / window);
 }
 
 function getLinearFocus(start: ZoomFocus, end: ZoomFocus, amount: number): ZoomFocus {

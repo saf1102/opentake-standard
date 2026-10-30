@@ -1,27 +1,17 @@
-import platform from '../platform.ts';
-import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { windowsExecutableCandidates, skipExecutableVersionProbe, windowsVersionSupported } from "./openscreen-platform.ts";
+export * from "./openscreen-capture.ts";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type {
-  CaptureJob,
   CaptureSource,
-  MediaAsset,
   OpenScreenEnvironmentStatus,
 } from "../../src/types/editor.ts";
-import { CaptureJobSchema, CaptureSettingsSchema } from "../../src/types/editor.ts";
 
 const REPOSITORY = "https://github.com/getopenscreen/openscreen";
 const INSTALL_URL = "https://github.com/getopenscreen/openscreen/releases";
 const EXPECTED_VERSION = "2.1.2";
-type LiveCapture = {
-  child: ChildProcessWithoutNullStreams;
-  rawProject: string;
-  viaLaunchServices: boolean;
-};
-const live = new Map<string, LiveCapture>();
-export const activeCaptureJobs = () => live.size;
-
 /** Where to look; the defaults are this server's own environment, Homebrew's folders and both Applications folders. */
 export type OpenScreenLookup = { env?: NodeJS.ProcessEnv; home?: string; binDirs?: string[]; applicationDirs?: string[] };
 const executableFile = (file: string) => {
@@ -39,10 +29,8 @@ export function openScreenExecutableCandidates({
   binDirs = ["/opt/homebrew/bin", "/usr/local/bin"],
   applicationDirs = ["/Applications", path.join(home, "Applications")],
 }: OpenScreenLookup = {}) {
-  if(process.platform==='win32'){
-    const dirs=String(env.PATH||env.Path||'').split(path.delimiter).filter(dir=>path.isAbsolute(dir));
-    return [...new Set([env.OPENSCREEN_BIN,...dirs.map(dir=>path.join(dir,'Openscreen.exe')),...[env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs'),env.ProgramFiles].filter((v):v is string=>Boolean(v)).flatMap(dir=>['Openscreen','OpenScreen','openscreen'].map(name=>path.join(dir,name,'Openscreen.exe')))].filter((v):v is string=>Boolean(v)))];
-  }
+  const windows = windowsExecutableCandidates(env);
+  if (windows) return windows;
   const fromPath = String(env.PATH || "").split(path.delimiter).filter((dir) => path.isAbsolute(dir))
     .map((dir) => path.join(dir, "openscreen")).find(executableFile);
   return [...new Set([
@@ -98,8 +86,7 @@ function versionOf(executable: string) {
     }
   }
 
-  // Windows Electron GUI binaries may launch instead of printing a version.
-  if(process.platform==='win32')return undefined;
+  if (skipExecutableVersionProbe()) return undefined;
   for (const args of [["--version"], ["version"], ["--help"]]) {
     const result = spawnSync(executable, args, { encoding: "utf8", timeout: 5_000 });
     const match = `${result.stdout || ""}\n${result.stderr || ""}`.match(/(?:OpenScreen|Openscreen)?\s*v?(\d+\.\d+(?:\.\d+)?)/i);
@@ -115,10 +102,16 @@ function accessibilityStatus(): "granted" | "missing" | "unknown" {
   return String(result.stdout).trim() === "true" ? "granted" : "missing";
 }
 
+/** Match the shared deployment minimum; 2.1.2 is the verified baseline. */
+export function supportedOpenScreenVersion(version: string | undefined) {
+  const match = version?.match(/^(\d+)\.(\d+)(?:\.(\d+))?$/);
+  return Boolean(match && (Number(match[1]) > 2 || (Number(match[1]) === 2 && Number(match[2]) >= 1)));
+}
+
 export function openScreenEnvironmentStatus(): OpenScreenEnvironmentStatus {
   const executable = findOpenScreenExecutable();
   const version = executable ? versionOf(executable) : undefined;
-  const supported = Boolean(version && /^2\.1\.2$/.test(version));
+  const supported = process.platform === "win32" ? windowsVersionSupported(version) : supportedOpenScreenVersion(version);
   return {
     installed: Boolean(executable), executable, version, supported,
     expectedVersion: EXPECTED_VERSION, repository: REPOSITORY, installUrl: INSTALL_URL,
@@ -131,7 +124,7 @@ export function openScreenEnvironmentStatus(): OpenScreenEnvironmentStatus {
       ? "未检测到 OpenScreen。安装后请在系统设置中授予屏幕录制权限。"
       : supported
         ? "已检测到受支持的 OpenScreen。首次录制时 macOS 会请求屏幕录制和系统音频权限。"
-        : `检测到 OpenScreen ${version || "未知版本"}，当前已验证 2.1.2。`,
+        : `检测到 OpenScreen ${version || "未知版本"}，需要 OpenScreen ≥2.1，当前已验证 2.1.2。`,
   };
 }
 

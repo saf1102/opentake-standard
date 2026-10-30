@@ -1,4 +1,4 @@
-import os from 'node:os';
+import {canCreateLegacyProjectRoot} from './edition.ts';
 /**
  * 通用剪辑工程的存储。每个工程是共享工程根目录下的一个文件夹，里面放 general-project.json：
  *   general-project.json  工程（src/general/general-contract.ts 的 GeneralProject）
@@ -126,8 +126,9 @@ const EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ul
 function parseAgent(value: unknown): GeneralAgentChoice | undefined {
   if (value === null || value === undefined) return undefined;
   const v = value as Record<string, unknown>;
-  if (typeof v !== 'object' || typeof v.model !== 'string' || !/^[a-zA-Z0-9._-]{1,80}$/.test(v.model) || typeof v.effort !== 'string' || !EFFORTS.includes(v.effort)) throw Object.assign(new Error('模型或推理强度不对'), { status: 400 });
-  return { model: v.model, effort: v.effort };
+  if (typeof v !== 'object' || typeof v.model !== 'string' || !/^[a-zA-Z0-9._\/:_-]{1,120}$/.test(v.model) || typeof v.effort !== 'string' || !EFFORTS.includes(v.effort)) throw Object.assign(new Error('模型或推理强度不对'), { status: 400 });
+  if (v.agent !== undefined && !['codex','claude','kimi','deepseek','minimax','codebuddy'].includes(String(v.agent))) throw Object.assign(new Error('智能体不在接入列表里'), {status:400});
+  return { model: v.model, effort: v.effort, ...(v.agent ? {agent:v.agent as GeneralAgentChoice['agent']} : {}) };
 }
 
 export function createGeneral(body: { styleId: string; settings?: unknown; inputs?: { kind?: unknown; text?: unknown; note?: unknown }; agent?: unknown; network?: unknown }, styleName: string): { dir: string; project: GeneralProject } {
@@ -135,7 +136,7 @@ export function createGeneral(body: { styleId: string; settings?: unknown; input
   if (kind !== 'footage' && kind !== 'topic') throw Object.assign(new Error('输入类型只能是 footage（放视频）或 topic（给文案）'), { status: 400 });
   const inputs: GeneralInputs = { kind, media: [], text: text(body.inputs?.text, 20_000, '文案') ?? '', note: text(body.inputs?.note, 4_000, '补充说明') ?? '' };
   const root = defaultProjectRoot();
-  if (root === legacyProjectsRoot() && root.startsWith(os.homedir() + path.sep)) fs.mkdirSync(root, { recursive: true });
+  if (root === legacyProjectsRoot() && canCreateLegacyProjectRoot(root)) fs.mkdirSync(root, { recursive: true });
   validateDirectory(root);
   const created = new Date();
   const stamp = `${created.getFullYear()}${String(created.getMonth() + 1).padStart(2, '0')}${String(created.getDate()).padStart(2, '0')}-${String(created.getHours()).padStart(2, '0')}${String(created.getMinutes()).padStart(2, '0')}${String(created.getSeconds()).padStart(2, '0')}`;

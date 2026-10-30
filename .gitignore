@@ -9,3 +9,5 @@ release/
 
 # Generated source provenance; never commit local receipts.
 /release-source.json
+
+/.setup-state.json

@@ -1,0 +1,8 @@
+.export-dialog .export-method-icon{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:36px;height:36px;min-width:36px;flex:0 0 36px;padding:0;border:0;border-radius:6px;color:#fff;gap:0}
+.export-dialog .export-method-icon--video{background:#2463a8}
+.export-dialog .export-method-icon--jianying{background:#7651ab}
+.export-dialog .export-method-icon--files{background:#64748b}
+.export-dialog .export-method-icon>svg{width:24px;height:24px;min-width:24px;padding:0;border:0;border-radius:0;color:inherit;background:none;stroke-width:2}
+.export-dialog .export-presets>button{grid-template-columns:36px minmax(0,1fr) 14px}
+html:is([data-ui-theme=warm],[data-ui-theme=frost]) .export-dialog .export-presets>button b{color:var(--ui-ink)}
+@media(max-width:900px){.export-dialog .export-presets>button{grid-template-columns:36px minmax(0,1fr)}}

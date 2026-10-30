@@ -1,3 +1,5 @@
+import type {AgentConnectionId} from '../../shared/agent-connections';
+import type {ExportSettings} from '../types/editor';
 /**
  * 通用剪辑 (general editing): the contract between the pages (src/pages/General*.tsx) and the server (server/general/).
  * A general project lives in the shared projects root as its own folder with general-project.json, so the 0.2.40
@@ -33,7 +35,7 @@ export type GeneralTransition = 'cut' | 'dissolve' | 'fade' | 'dip-black' | 'dip
 
 export type GeneralRunState = 'idle' | 'running' | 'stopping' | 'stopped' | 'needs-network' | 'done' | 'failed';
 export type GeneralRun = {
-  id: string; state: GeneralRunState; agent: 'codex'; model?: string; effort?: string;
+  id: string; state: GeneralRunState; agent: 'codex' | 'claude'; method?: 'cli' | 'api'; model?: string; effort?: string;
   /** what this run makes: the first cut, or the next version from a message */
   purpose: 'first' | 'revision' | 'resume';
   steps: GeneralStep[]; startedAt: string; endedAt?: string; error?: string;
@@ -86,10 +88,11 @@ export type GeneralMessage = {
 
 /** Export status is additive: old projects have no exportTask until their first export. */
 export type GeneralExport = {
-  id: string; version: number; format: 'mp4' | 'jianying'; state: 'running' | 'done' | 'failed';
+  id: string; version: number; format: 'mp4' | 'jianying'; state: 'running' | 'done' | 'failed' | 'cancelled';
   step: string; progress: number; startedAt: string; endedAt?: string; error?: string; downloadUrl?: string;
   /** a 剪映 export: the 剪映工程 folder (with its double-click importers), shown in Finder */
   folder?: string;
+  outputDir?: string; settings?: ExportSettings; media?: {width:number;height:number;fps:number};
 };
 export type GeneralProject = {
   exportTask?: GeneralExport;
@@ -103,7 +106,7 @@ export type GeneralProject = {
   /** 联网: the agent's commands may reach the network from the start (default off; it can still ask) */
   network?: boolean;
 };
-export type GeneralAgentChoice = { model: string; effort: string };
+export type GeneralAgentChoice = { agent?: AgentConnectionId; model: string; effort: string };
 /** One row of the shared project library (home page, /studio) for a general project. */
 export type GeneralProjectSummary = {
   id: string; kind: 'general'; name: string; styleId: string; updatedAt: string; createdAt: string;

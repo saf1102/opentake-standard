@@ -1,0 +1,20 @@
+{
+  "source": "task19-real-20261028-233115 / Standard / 通用剪辑 20261028-233728 / work/assets",
+  "description": "现场智能体生成的 15 秒音乐与笔画提示音；无损转为 FLAC，回归测试按原页面同时混音，不含用户语音。",
+  "files": [
+    {
+      "file": "music.flac",
+      "originalFile": "music.wav",
+      "originalSha256": "09bb78c9c4423a88236028707d3b6788991e5d0cd4c418f6e9fdba71e26b9fdb",
+      "sha256": "3a8f9610053b8fcb59cb1421ae5dec52dca22e191d23142a7c169a79d5d24e79",
+      "decodedPcmSha256": "1f914a10a5b9fb58a631ffd9738e8bcecf051b9ba74cad0cc8b0ead04ba4ee50"
+    },
+    {
+      "file": "marker.flac",
+      "originalFile": "marker.wav",
+      "originalSha256": "233eab65eaa615c9a5ad16b845524b875076f0d4cfe0d18db0ecfc604d791143",
+      "sha256": "ee1091b441a94fb7b40e73e6caeedbe1857738975e757e397e678cb12828ee8f",
+      "decodedPcmSha256": "1f281e872a0457fbb74489f31975656eeaf7db4b5251e6d4dea384c0fe26d580"
+    }
+  ]
+}

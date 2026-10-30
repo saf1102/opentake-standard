@@ -56,7 +56,7 @@ export function serveProjectFile(req: IncomingMessage, res: ServerResponse, dir:
   return serveResolvedFile(req,res,file,downloadName);
 }
 
-/** Caller must validate the file against its own module's positive allowlist. */
+/** Only call after resolving the file from a trusted persisted export record. */
 export function serveResolvedFile(req:IncomingMessage,res:ServerResponse,file:string,downloadName?:string){
   const stat = fs.statSync(file);
   const type = TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream';

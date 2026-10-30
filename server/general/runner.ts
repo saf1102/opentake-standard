@@ -1,6 +1,6 @@
 import type {CreationTools} from '../../shared/creation-tools.ts';
-import {requireCreationTools} from '../standard/creation-tools.ts';
-import standardStyles from '../../src/standard/styles.json' with {type:'json'};
+import {requireCreationTools} from '../creation-tools.ts';
+import {standardEdition,extraStyle,includeStyle,recordCodexUsage} from './edition.ts';
 /**
  * 通用剪辑的一次运行：一轮做片（读需求、设计、写、自己看一遍、渲染）→ OpenTake 机检（不过才改一轮）→ 交付第 N 版。
  * 和 OpenFilm 一样只靠 Agent 自己看接触表；另开一个 Codex 看图审片（agentReview）默认关掉，它又慢又费 token。
@@ -25,10 +25,12 @@ import { promisify } from 'node:util';
 import type { GeneralAgentChoice, GeneralLayers, GeneralMessage, GeneralProject, GeneralReference, GeneralRun, GeneralSegment, GeneralStep } from '../../src/general/general-contract.ts';
 import type { AgentRun } from '../../src/studio/agent-settings.ts';
 import installations from '../agent-installation.ts';
-import { agentSettingsFile, atomicAgentJson } from '../agent-settings.ts';
+import { agentSettingsFile, atomicAgentJson, readAgentSettings } from '../agent-settings.ts';
 import { buildBrief, turnPrompt, type Phase, type QueuedNote, type StyleInfo } from './brief.ts';
-import { filmTurnArgs, reviewArgs, startCodex, type CodexProcess } from './codex.ts';
-import { beginRepair, finishAgentSteps, applyCodexEvent, applyProgress, initialSteps, setStep, type Progress, type Usage } from './events.ts';
+import { reviewArgs, type CodexProcess } from './codex.ts';
+import {filmAgentId,filmAgentArgs,startFilmAgent,applyFilmAgentEvent,filmAgentRedactor,type ResolvedFilmAgent} from './agent-adapter.ts';
+import {assertAgentExecutionAllowed,resolveAgentConnectionLaunch,getConnectionConfig,effectiveConnectionModel} from '../agent-connections.ts';
+import { beginRepair, finishAgentSteps, verifySelfCheck, applyCodexEvent, applyProgress, initialSteps, setStep, type Progress, type Usage } from './events.ts';
 import { KIT_DIR, ffmpegPath, ffprobePath, prepareWork } from './kit-env.ts';
 import { REVIEW_SCHEMA, extractFrames, machineChecks, parseVerdict, reviewPrompt, verdictText, type Verdict } from './review.ts';
 import { fileUrl, findGeneral, updateGeneral, type GeneralLocation } from './store.ts';
@@ -37,9 +39,11 @@ const exec = promisify(execFile);
 const now = () => new Date().toISOString();
 
 // ——— what the runner needs from outside (replaced in tests) ———
-export type ResolvedCodex = { executable: string; model: string; effort: string; requested?: GeneralAgentChoice };
+export type ResolvedCodex = ResolvedFilmAgent;
 export type GeneralRuntime = {
   /** the project's own choice, or the settings' 通用剪辑出片 when it has none (系统默认) */
+  creationTools: (choice?:GeneralAgentChoice) => Promise<CreationTools | undefined>;
+  render: typeof renderHyperframes;
   resolveCodex: (choice?: GeneralAgentChoice) => Promise<ResolvedCodex>;
   style: (id: string) => StyleInfo | undefined;
   baseEnv: () => NodeJS.ProcessEnv;
@@ -48,15 +52,32 @@ export type GeneralRuntime = {
   agentReview: boolean;
 };
 let runtime: GeneralRuntime = {
+  creationTools: requireCreationTools,
+  render: renderHyperframes,
   resolveCodex: async choice => {
     const { resolveAgent } = await import('../agent-runtime.ts');
     const { readAgentSettings } = await import('../agent-settings.ts');
     const settings = readAgentSettings();
-    // checked against the CLI's own model list, like the settings' choice
-    const agent = await resolveAgent('generalEditing', choice ? { ...settings, modules: { ...settings.modules, generalEditing: choice } } : settings);
-    return { executable: agent.executable, model: agent.model, effort: agent.effort, ...(agent.requested ? {requested: agent.requested} : {}) };
+    if (process.platform !== 'darwin') {
+      const agent = await resolveAgent('generalEditing', choice ? { ...settings, modules: { ...settings.modules, generalEditing: choice } } : settings);
+      return { executable: agent.executable, model: agent.model, effort: agent.effort, ...(agent.requested ? {requested: agent.requested} : {}) };
+    }
+    const selected=choice ?? settings.modules.generalEditing;
+    const id=filmAgentId(selected);
+    assertAgentExecutionAllowed(id);
+    const connection=getConnectionConfig(id);
+    // Subscription Codex keeps its original catalog, model validation and argv.
+    if(id==='codex' && connection.mode!=='api') {
+      const selectedSettings={...settings,cliPath:connection.cliPath||settings.cliPath};
+      const agent = await resolveAgent('generalEditing', choice ? { ...selectedSettings, modules: { ...settings.modules, generalEditing: choice } } : selectedSettings);
+      return { executable: agent.executable, model: agent.model, effort: agent.effort, ...(agent.requested ? {requested: agent.requested} : {}) };
+    }
+    const launch=await resolveAgentConnectionLaunch(id);
+    const model=effectiveConnectionModel(id,selected.model);
+    const requested=selected.model && selected.model!=='default' && selected.model!==model?selected:undefined;
+    return {agent:id,executable:launch.executable,model,effort:selected.effort||'medium',env:launch.env,args:launch.args,method:launch.method,...(requested?{requested}:{})};
   },
-  style: id => styleLibrary().find(s => s.id === id),
+  style: id => extraStyle?.id === id ? extraStyle : styleLibrary().find(s => s.id === id),
   baseEnv: () => installations.sanitizeAgentEnv(installations.loginEnvironment()),
   maxTurns: 6,
   agentReview: false,
@@ -67,7 +88,7 @@ let styles: StyleInfo[] | undefined;
 export function styleLibrary(): StyleInfo[] {
   if (!styles) {
     const file = new URL('../../src/workspace/style-library/style-library.json', import.meta.url);
-    styles = (JSON.parse(fs.readFileSync(file, 'utf8')) as { styles: StyleInfo[] }).styles.filter(s => standardStyles.includes(s.id));
+    styles = (JSON.parse(fs.readFileSync(file, 'utf8')) as { styles: StyleInfo[] }).styles.filter(s => includeStyle(s.id));
   }
   return styles;
 }
@@ -75,6 +96,7 @@ export function styleLibrary(): StyleInfo[] {
 // ——— internal session state ———
 export type Session = {
   threadId?: string;
+  agent?: 'codex' | 'claude';
   autoName: boolean;
   /** what the run does next when it (re)starts */
   pending?: Phase | 'review' | 'deliver';
@@ -110,6 +132,7 @@ function editSession(dir: string, change: (s: Session) => void) { const s = read
 // ——— live runs in this process ———
 type Live = { proc?: CodexProcess; driving: boolean; again?: boolean; stopRun?: string };
 const live = new Map<string, Live>();
+export const activeGeneralRuns = () => live.size;
 export const isLive = (id: string) => live.has(id);
 
 const ACTIVE: GeneralRun['state'][] = ['running', 'stopping'];
@@ -134,12 +157,12 @@ function message(role: GeneralMessage['role'], text: string, extra: Partial<Gene
 const checkedTools = new Map<string, CreationTools>();
 // ——— starting runs ———
 function newRun(purpose: GeneralRun['purpose'], project: GeneralProject, steps?: GeneralStep[]): GeneralRun {
-  return { id: crypto.randomUUID(), state: 'running', agent: 'codex', purpose, steps: steps ?? initialSteps(project.inputs.kind, purpose), startedAt: now(), queued: 0 };
+  return { id: crypto.randomUUID(), state: 'running', agent: filmAgentId(project.agent ?? readAgentSettings().modules.generalEditing), purpose, steps: steps ?? initialSteps(project.inputs.kind, purpose), startedAt: now(), queued: 0 };
 }
 function assertIdle(project: GeneralProject) {
   if (project.run && [...ACTIVE, 'needs-network'].includes(project.run.state)) throw Object.assign(new Error('正在出片，请先停止或等它做完'), { status: 409 });
 }
-function assertReady(project: GeneralProject) {
+export function assertReady(project: GeneralProject) {
   if (!runtime.style(project.styleId)) throw Object.assign(new Error(`风格 ${project.styleId} 不在风格库里`), { status: 400 });
   if (project.inputs.kind === 'footage' && !project.inputs.media.length) throw Object.assign(new Error('还没有放视频'), { status: 400 });
   if (project.inputs.kind === 'topic' && !project.inputs.text.trim()) throw Object.assign(new Error('还没有文案'), { status: 400 });
@@ -238,7 +261,7 @@ function ensureRevisionWork(dir: string, version: number) {
     // Windows cannot rename onto an existing directory, even an empty one.
     // rmdir is deliberately non-recursive: concurrent/unsaved files must survive.
     let removedEmpty=false;
-    if(fs.existsSync(work)){fs.rmdirSync(work);removedEmpty=true;}
+    if(standardEdition && fs.existsSync(work)){fs.rmdirSync(work);removedEmpty=true;}
     try{fs.renameSync(staging,work);}catch(error){if(removedEmpty&&!fs.existsSync(work))fs.mkdirSync(work);throw error;}
   } finally {
     if (fs.existsSync(staging)) fs.rmSync(staging, {recursive: true, force: true});
@@ -262,8 +285,8 @@ export function postMessage(id: string, body: { text?: unknown; reference?: unkn
   assertReady(project);
   const session = readSession(dir);
   const current = project.current ?? project.versions.at(-1)?.n;
-  if (current !== undefined) {
-    ensureRevisionWork(dir, current);
+  if (standardEdition ? current !== undefined : !!current) {
+    ensureRevisionWork(dir, current!);
     editSession(dir, s => Object.assign(s, { pending: 'revise', resumed: false, reviewRounds: 0, polished: false, extraTurns: 0, review: undefined, networkAnswer: undefined, revision: { version: current, text, reference: note.reference } }));
     const out = updateGeneral(id, p => { p.messages.push(msg); p.run = { ...newRun('revision', p), queued: readSession(dir).queue.length }; });
     void drive(id);
@@ -393,7 +416,7 @@ function afterTurn(id: string, dir: string, phase: Phase) {
     if (phase === 'plan' && session.lastAgentMessage) p.messages.push(message('agent', session.lastAgentMessage));
     if (p.run) {
       if (phase === 'plan') p.run.steps = p.run.steps.map(s => ['read-style', 'read-input', 'plan'].includes(s.id) && s.state !== 'skipped' ? { ...s, state: 'done', startedAt: s.startedAt ?? now(), endedAt: s.endedAt ?? now() } : s);
-      else p.run.steps = finishAgentSteps(p.run.steps, now());
+      else p.run.steps = verifySelfCheck(finishAgentSteps(p.run.steps, now()), hasSelfCheckSheet(dir), now());
     }
   });
   editSession(dir, s => {
@@ -424,25 +447,33 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   const stopped = () => entry.stopRun === runId;
   const { project } = findGeneral(id);
   const codex = await runtime.resolveCodex(project.agent);
+  const agentId=filmAgentId(codex);
+  assertAgentExecutionAllowed(agentId);
   if (stopped()) return 'stopped';
   const style = runtime.style(project.styleId)!;
   const work = path.join(dir, 'work');
   const session = readSession(dir);
+  if(session.threadId && (session.agent || 'codex')!==agentId) { session.threadId=undefined; editSession(dir,s=>{s.threadId=undefined;s.resumed=false;}); }
+  editSession(dir,s=>{s.agent=agentId;});
   const queued = session.queue;
   // the steps this turn will move through start again (a polish round re-does code → render)
   updateGeneral(id, p => {
     if (!p.run) return;
-    p.run.model = codex.model; p.run.effort = codex.effort; p.run.queued = 0;
+    p.run.agent=agentId; p.run.method=codex.method||'cli'; p.run.model = codex.model; p.run.effort = codex.effort; p.run.queued = 0;
+    if(codex.requested) {
+      const text=`原模型 ${codex.requested.model} 不可用，已改用 ${agentId==='claude'?'Claude Code':'Codex'} 默认模型 ${codex.model}。`;
+      if(!p.messages.some(m=>m.role==='system'&&m.text===text))p.messages.push(message('system',text));
+    }
     if (phase === 'polish' && session.review) beginRepair(p.run, session.review, now());
     else if (phase === 'polish' || phase === 'revise') p.run.steps = p.run.steps.map(s => ['code', 'self-check', 'render', 'review', 'deliver'].includes(s.id) && s.state !== 'skipped' ? { ...s, state: 'waiting', progress: undefined, startedAt: undefined, endedAt: undefined } : s);
   });
-  editSession(dir, s => { s.queue = []; });
   // 联网: the project's switch; projects from before it follow the agent's request answered in this session
   const network = project.network ?? session.networkAllowed;
-  const tools = process.platform==='darwin' ? (checkedTools.get(id) ?? await requireCreationTools()) : undefined;
+  const tools = process.platform==='darwin' ? (checkedTools.get(id) ?? await runtime.creationTools(project.agent)) : undefined;
   if (stopped()) return 'stopped';
-  if(tools) { checkedTools.set(id,tools); codex.executable=tools.codex; }
-  const env = prepareWork(dir, runtime.baseEnv(), network, tools);
+  if(tools) { checkedTools.set(id,tools); if(agentId==='codex' && tools.codex) codex.executable=tools.codex; }
+  const env = prepareWork(dir, {...runtime.baseEnv(),...codex.env}, network, tools);
+  editSession(dir, s => { s.queue = []; });
   let brief: string | undefined;
   if (!session.threadId) {
     const media = project.inputs.media.map(m => ({ ...m, file: mediaFile(dir, m.id) })).filter(m => m.file) as (GeneralProject['inputs']['media'][number] & { file: string })[];
@@ -456,7 +487,7 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   });
   const images = [...queued.map(n => n.reference?.image), phase === 'revise' ? session.revision?.reference?.image : undefined].filter((f): f is string => !!f && fs.existsSync(f));
   const lastFile = path.join(dir, 'agent', `last-${runId}-${session.turns.length + 1}.txt`);
-  const args = filmTurnArgs({ ...codex, work, lastMessage: lastFile, network, resumeThread: session.threadId, images });
+  const args = filmAgentArgs(codex,{ ...codex, work, lastMessage: lastFile, network, resumeThread: session.threadId, images });
   const startedAt = now();
   const record = editSession(dir, s => { s.turns.push({ runId, phase, startedAt, threadId: s.threadId }); }).turns.length - 1;
   const agentRecord = agentRunRecord(codex, startedAt);
@@ -465,10 +496,10 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   let steps = findGeneral(id).project.run!.steps;
   let usage: Usage | undefined, failure: string | undefined, dirty = false;
   const flush = () => { if (!dirty) return; dirty = false; patchRun(id, r => { r.steps = steps; }); };
-  const proc = startCodex(codex.executable, args, {
-    cwd: work, env, prompt, eventLog: path.join(dir, 'agent', `events-${runId}.jsonl`),
+  const proc = startFilmAgent(codex, args, {
+    cwd: work, env, prompt, lastMessage:lastFile,images, eventLog: path.join(dir, 'agent', `events-${runId}.jsonl`),
     onEvent: event => {
-      const out = applyCodexEvent(steps, event, now());
+      const out = applyFilmAgentEvent(agentId,steps,event,now());
       if (out.threadId) editSession(dir, s => { s.threadId = out.threadId; s.turns[record].threadId = out.threadId; });
       if (out.usage) usage = out.usage;
       if (out.error) failure = out.error;
@@ -498,8 +529,9 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   editSession(dir, s => { Object.assign(s.turns[record], { endedAt: now(), code: result.code, usage, ...(failure ? { error: failure } : {}) }); s.lastAgentMessage = last || undefined; });
   finishAgentRecord(agentRecord, stopped() ? 'failed' : result.code === 0 && !failure ? 'completed' : 'failed', stopped() ? '已停止' : failure || (result.code !== 0 ? stderrTail(result.stderr) : undefined));
 
+  if(agentId==='codex') recordCodexUsage();
   if (stopped()) { if (queued.length) editSession(dir, s => { s.queue = [...queued, ...s.queue]; }); return 'stopped'; }
-  if ((result.code !== 0 || failure) && session.threadId && !recoveredMissingThread
+  if (agentId==='codex' && (result.code !== 0 || failure) && session.threadId && !recoveredMissingThread
       && missingCodexRollout(`${failure || ''} ${result.stderr}`)) {
     // A portable project keeps its media and work, but a Codex rollout is local
     // to its original computer. Retry once with a fresh brief, not a fresh project.
@@ -507,7 +539,7 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
     updateGeneral(id, p => { p.messages.push(message('system', '原来的 Codex 会话在本机不存在，已保留工程内容并用新会话继续。')); });
     return turn(id, dir, phase, runId, true);
   }
-  if (result.code !== 0 || failure) throw new Error(`Codex 这一轮没有完成：${failure || stderrTail(result.stderr) || `退出码 ${result.code}`}`);
+  if (result.code !== 0 || failure) throw new Error(`${agentId==='claude'?'Claude Code':'Codex'} 这一轮没有完成：${failure || stderrTail(result.stderr) || `退出码 ${result.code}`}`);
   const request = readNetworkRequest(work, dir);
   if (request) {
     editSession(dir, s => { s.resumed = true; s.lastAgentMessage = undefined; });
@@ -518,6 +550,9 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
     return 'network';
   }
   return 'ok';
+}
+function hasSelfCheckSheet(dir: string) {
+  try { const stat = fs.statSync(path.join(dir,'work','look','sheet.jpg')); return stat.isFile() && stat.size > 0; } catch { return false; }
 }
 export function missingCodexRollout(error: string) {
   return /thread\/resume[\s\S]*no rollout found for thread id/i.test(error);
@@ -545,15 +580,7 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
   const style = runtime.style(project.styleId)!;
   const n = (project.versions.at(-1)?.n ?? 0) + 1;
   const reviewDir = path.join(dir, 'review', `v${n}-r${round}`);
-  // Advancing an agent phase is not evidence that its visual self-check succeeded.
-  // A missing contact sheet must never appear as a completed self-check.
-  const sheet = path.join(dir, 'work', 'look', 'sheet.jpg');
-  if (!fs.existsSync(sheet) || fs.statSync(sheet).size === 0) {
-    patchRun(id, r => { r.steps = setStep(r.steps, 'self-check', {
-      state: 'skipped', endedAt: now(), detail: '未生成自查样张；继续执行成片检查', thumbs: undefined,
-    }); });
-  }
-
+  patchRun(id, r => { r.steps = verifySelfCheck(r.steps, hasSelfCheckSheet(dir), now()); });
 
   const video = path.join(dir, 'work', 'out.mp4');
   if (isHyperframesWork(path.join(dir, 'work'))) {
@@ -561,7 +588,7 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
     patchRun(id, r => { r.steps = setStep(r.steps, 'render', { state: 'running', startedAt: now(), endedAt: undefined, detail: '逐帧渲染', progress: undefined }); });
     fs.rmSync(video, { force: true });
     let last = 0;
-    await renderHyperframes(path.join(dir, 'work'), video, { browserExecutable:checkedTools.get(id)?.chromium, onProgress: p => { const pct = Math.round(p * 100); if (pct - last >= 5) { last = pct; patchRun(id, r => { r.steps = setStep(r.steps, 'render', { progress: { done: pct, total: 100 } }); }); } } });
+    await runtime.render(path.join(dir, 'work'), video, { browserExecutable:checkedTools.get(id)?.chromium, onActivity: detail => { patchRun(id, r => { r.steps = setStep(r.steps, 'render', { detail }); }); }, onProgress: p => { const pct = Math.round(p * 100); if (pct - last >= 5) { last = pct; patchRun(id, r => { r.steps = setStep(r.steps, 'render', { progress: { done: pct, total: 100 } }); }); } } });
     patchRun(id, r => { r.steps = setStep(r.steps, 'render', { state: 'done', endedAt: now(), detail: '渲染成片', progress: { done: 100, total: 100 } }); });
   }
   patchRun(id, r => { r.steps = setStep(r.steps, 'review', { state: 'running', startedAt: now(), endedAt: undefined, detail: round > 1 ? '复审改过的版本' : '抽帧、机检' }); });
@@ -573,7 +600,7 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
   const thumbs = frames.frames.map(f => fileUrl(id, path.relative(dir, f.file)));
   patchRun(id, r => { r.steps = setStep(r.steps, 'review', { thumbs, detail: `看图审片（${checks.filter(c => !c.ok).length ? `机检有 ${checks.filter(c => !c.ok).length} 项不合格` : '机检通过'}）` }); });
   let verdict: Verdict | undefined, problem: string | undefined;
-  if (!runtime.agentReview) {
+  if (!runtime.agentReview || filmAgentId(project.agent ?? readAgentSettings().modules.generalEditing)==='claude') {
     const failed = checks.filter(c => !c.ok);
     verdict = { pass: !failed.length, summary: failed.length ? '成片没过机检' : '机检通过', issues: failed.map(c => ({ time: null, problem: c.text, fix: '' })) };
     patchRun(id, r => { r.steps = setStep(r.steps, 'review', { state: 'done', endedAt: now(), detail: verdict!.pass ? '机检通过' : `机检要改：${failed.map(c => c.text).join('；')}`.slice(0, 600) }); });
@@ -586,16 +613,19 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
     fs.writeFileSync(schema, JSON.stringify(REVIEW_SCHEMA));
     const lastFile = path.join(reviewDir, 'verdict.txt');
     const pick = frames.frames.filter((_, i) => i % 3 === 1).map(f => f.file); // seven large frames beside the sheet
-    const args = reviewArgs({ ...codex, dir: reviewDir, lastMessage: lastFile, schema, images: [frames.sheet, ...pick] });
+    const reviewArgv = reviewArgs({ ...codex, dir: reviewDir, lastMessage: lastFile, schema, images: [frames.sheet, ...pick] });
+    if(codex.method==='api'&&codex.model==='default'){const at=reviewArgv.indexOf('-m');if(at>=0)reviewArgv.splice(at,2);}
+    const args=codex.args?.length?[reviewArgv[0],...codex.args,...reviewArgv.slice(1)]:reviewArgv;
     const prompt = reviewPrompt({ styleId: style.id, styleName: style.name_zh, kit: KIT_DIR, project, frames, checks, round });
     const record = agentRunRecord(codex, now());
     let usage: Usage | undefined;
-    const proc = startCodex(codex.executable, args, { cwd: reviewDir, env: runtime.baseEnv(), prompt, eventLog: path.join(reviewDir, 'events.jsonl'), onEvent: e => { const o = applyCodexEvent([], e, now()); if (o.usage) usage = o.usage; } });
+    const proc = startFilmAgent(codex, args, { cwd: reviewDir, env: {...runtime.baseEnv(),...codex.env}, redact:filmAgentRedactor(codex.env||{}), prompt, eventLog: path.join(reviewDir, 'events.jsonl'), onEvent: e => { const o = applyCodexEvent([], e, now()); if (o.usage) usage = o.usage; } });
     entry.proc = proc;
     const result = await proc.done;
     entry.proc = undefined;
     finishAgentRecord(record, result.code === 0 ? 'completed' : 'failed', result.code === 0 ? undefined : stderrTail(result.stderr));
-  
+
+    recordCodexUsage();
     editSession(dir, s => { s.turns.push({ runId: project.run!.id, phase: `review-${round}`, startedAt: record.startedAt, endedAt: now(), code: result.code, usage }); });
     if (stopped()) throw new Error('已停止');
     if (result.code !== 0) throw new Error(stderrTail(result.stderr) || `退出码 ${result.code}`);
@@ -715,7 +745,7 @@ export function mediaFile(dir: string, mediaId: string): string | undefined {
 
 // ——— the agent-runs log the settings page lists ———
 function agentRunRecord(codex: ResolvedCodex, startedAt: string): AgentRun {
-  const record: AgentRun = { id: crypto.randomUUID(), module: 'generalEditing', executable: codex.executable, model: codex.model, effort: codex.effort, ...(codex.requested ? {requested: codex.requested} : {}), startedAt, status: 'running' };
+  const record: AgentRun = { id: crypto.randomUUID(), module: 'generalEditing', ...(codex.agent?{agent:codex.agent}:{}), ...(codex.method?{method:codex.method}:{}), executable: codex.executable, model: codex.model, effort: codex.effort, ...(codex.requested ? {requested: codex.requested} : {}), startedAt, status: 'running' };
   persistAgentRun(record);
   return record;
 }

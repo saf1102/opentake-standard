@@ -1,10 +1,14 @@
-import {compatibleOpenScreenDocument} from '../../../../shared/openscreen-compat';
-import { getEditorSettings, patchEditorSettings } from "../lib/ai-edition/store/editorSettings";
+import { installBridgeEdition } from "./bridge-edition";
+import { compatibleOpenScreenDocument } from "../../../../shared/openscreen-compat";
+import { prepareSavedScreenExport } from "../../../../shared/openscreen-export-request";
+import { collectEffectiveClipDims, pickExtremeDims, resolveAspectRatioValue } from "../lib/ai-edition/document/outputFormat";
+import { calculateMp4ExportSettings } from "../lib/exporter/mp4ExportSettings";
 import {
 	type AxcutTimelineOperation,
 	applyTimelineOperation,
 } from "../lib/ai-edition/document/operations";
 import { type AxcutDocument, createEmptyDocument, documentSchema } from "../lib/ai-edition/schema";
+import { getEditorSettings, patchEditorSettings } from "../lib/ai-edition/store/editorSettings";
 import { nativeBridgeClient } from "../native/client";
 
 type JsonObject = Record<string, unknown>;
@@ -50,7 +54,7 @@ type DocumentRef = {
 	lastPublishedAt?: number;
 	archivedAt?: number;
 };
-type DocumentEnvelope = { ref: DocumentRef; document: AxcutDocument; revision: number };
+export type DocumentEnvelope = { ref: DocumentRef; document: AxcutDocument; revision: number };
 type CodexOperation =
 	| { kind: "timeline"; operation: AxcutTimelineOperation; summary: string }
 	| {
@@ -129,7 +133,7 @@ type CodexRunResult = {
 	userMessageCheckpointId?: string;
 };
 
-type OpenScreenExportJob = {
+export type OpenScreenExportJob = {
 	id: string;
 	status: "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 	format: "mp4" | "gif";
@@ -144,11 +148,25 @@ type OpenScreenExportJob = {
 	error?: string;
 };
 
+export type BridgeEditionContext = {
+  electron: Record<string, any>;
+  projectId: string;
+  clientId: string;
+  writable: boolean;
+  getActiveDocumentId: () => string;
+  api: <T>(url: string, init?: RequestInit) => Promise<T>;
+  bridgeMessage: (type: string, payload?: Record<string, unknown>) => void;
+  readDocument: (id: string) => Promise<DocumentEnvelope>;
+  exportBase: (id: string) => string;
+  sleep: (ms: number) => Promise<unknown>;
+};
+
 const query = new URLSearchParams(location.search);
 const projectId = query.get("linkreaderProjectId") || "";
 const clientId = query.get("linkreaderClientId") || "";
 const writable = query.get("linkreaderWritable") === "1";
 const revisions = new Map<string, number>();
+const savedDocuments = new Map<string, string>();
 let activeDocumentId = "";
 const nativeExportProgressListeners = new Set<(frames: number) => void>();
 
@@ -171,7 +189,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 	const response = await fetch(url, { cache: "no-store", ...init });
 	const data = (await response.json()) as { ok: boolean; result?: T; error?: string };
 	if (!response.ok || !data.ok || data.result === undefined) {
-		throw new Error(data.error || `LinkReader 请求失败（${response.status}）`);
+		throw Object.assign(new Error(data.error || `LinkReader 请求失败（${response.status}）`), { status: response.status });
 	}
 	return data.result;
 }
@@ -219,6 +237,12 @@ function rebaseLinkReaderMediaUrls(value: unknown, key = ""): unknown {
 
 function normalizeDocument(value: unknown): AxcutDocument {
 	return documentSchema.parse(compatibleOpenScreenDocument(rebaseLinkReaderMediaUrls(value)));
+}
+
+function documentFingerprint(document: AxcutDocument) {
+  const value=normalizeDocument(document);
+  // 更新时间不是编辑内容；撤销回原样、导出保存后再开也不应重复写入。
+  return JSON.stringify({...value,project:{...value.project,updatedAt:undefined}});
 }
 
 function assetIdFromMediaPath(value?: string) {
@@ -294,13 +318,21 @@ function gifSizeFromParams(params: Record<string, unknown> | undefined) {
 }
 
 let browserExportCancelRequested = false;
-let activeBrowserExport: {documentId: string; started: Promise<OpenScreenExportJob>} | null = null;
+let activeBrowserExport: { documentId: string; started: Promise<OpenScreenExportJob> } | null =
+	null;
 export async function cancelBrowserExport() {
- browserExportCancelRequested = true;
- const active = activeBrowserExport;
- if (!active) return;
- const job = await active.started;
- return api<OpenScreenExportJob>(`${exportBase(active.documentId)}/exports/${encodeURIComponent(job.id)}/cancel`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({clientId})});
+	browserExportCancelRequested = true;
+	const active = activeBrowserExport;
+	if (!active) return;
+	const job = await active.started;
+	return api<OpenScreenExportJob>(
+		`${exportBase(active.documentId)}/exports/${encodeURIComponent(job.id)}/cancel`,
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ clientId }),
+		},
+	);
 }
 
 async function runNativeExport(request: {
@@ -328,7 +360,10 @@ async function runNativeExport(request: {
 	// Freeze the embedded editor's defaults: the separately installed renderer
 	// may have different defaults and bundled wallpaper bytes.
 	const exportDocument = (await readDocument(activeDocumentId)).document;
-	const exportEditor = patchEditorSettings(exportDocument, getEditorSettings(exportDocument)).legacyEditor;
+	const exportEditor = patchEditorSettings(
+		exportDocument,
+		getEditorSettings(exportDocument),
+	).legacyEditor;
 	bridgeMessage("export-state", {
 		status: "running",
 		label: `OpenScreen 正在导出 ${format.toUpperCase()}…`,
@@ -350,45 +385,46 @@ async function runNativeExport(request: {
 			totalFrames,
 		}),
 	});
-	const active = {documentId: activeDocumentId, started: startedPromise};
+	const active = { documentId: activeDocumentId, started: startedPromise };
 	activeBrowserExport = active;
 	try {
-	let job = await startedPromise;
-	if (browserExportCancelRequested) job = await cancelBrowserExport() ?? job;
-	let lastFrame = -1;
-	while (job.status === "queued" || job.status === "running") {
-		const frame = Math.min(
-			totalFrames,
-			job.currentFrame ?? Math.round((job.progress / 100) * totalFrames),
-		);
-		if (frame !== lastFrame) {
-			lastFrame = frame;
-			for (const listener of nativeExportProgressListeners) listener(frame);
+		let job = await startedPromise;
+		if (browserExportCancelRequested) job = (await cancelBrowserExport()) ?? job;
+		let lastFrame = -1;
+		while (job.status === "queued" || job.status === "running") {
+			const frame = Math.min(
+				totalFrames,
+				job.currentFrame ?? Math.round((job.progress / 100) * totalFrames),
+			);
+			if (frame !== lastFrame) {
+				lastFrame = frame;
+				for (const listener of nativeExportProgressListeners) listener(frame);
+			}
+			await sleep(450);
+			job = await api<OpenScreenExportJob>(
+				`${exportBase(active.documentId)}/exports/${encodeURIComponent(job.id)}`,
+			);
 		}
-		await sleep(450);
-		job = await api<OpenScreenExportJob>(
-			`${exportBase(active.documentId)}/exports/${encodeURIComponent(job.id)}`,
-		);
+		if (job.status === "cancelled") throw new Error("OPENSCREEN_EXPORT_CANCELLED");
+		if (job.status !== "completed") throw new Error(job.error || `OpenScreen 导出${job.status}`);
+		for (const listener of nativeExportProgressListeners) listener(totalFrames);
+		bridgeMessage("export-state", {
+			status: "completed",
+			label: `已导出到 ${job.outputFile}`,
+			path: job.outputFile,
+			documentId: activeDocumentId,
+		});
+		return {
+			frames: totalFrames,
+			fps,
+			videoDurationS: job.videoDurationS ?? totalDuration,
+			wallS: job.wallS ?? 0,
+			...(format === "gif" ? { fileBytes: 0 } : {}),
+		};
+	} finally {
+		if (activeBrowserExport === active) activeBrowserExport = null;
 	}
-	if (job.status === "cancelled") throw new Error("OPENSCREEN_EXPORT_CANCELLED");
-	if (job.status !== "completed") throw new Error(job.error || `OpenScreen 导出${job.status}`);
-	for (const listener of nativeExportProgressListeners) listener(totalFrames);
-	bridgeMessage("export-state", {
-		status: "completed",
-		label: `已导出到 ${job.outputFile}`,
-		path: job.outputFile,
-		documentId: activeDocumentId,
-	});
-	return {
-		frames: totalFrames,
-		fps,
-		videoDurationS: job.videoDurationS ?? totalDuration,
-		wallS: job.wallS ?? 0,
-		...(format === "gif" ? { fileBytes: 0 } : {}),
-	};
-	} finally { if (activeBrowserExport === active) activeBrowserExport = null; }
 }
-
 
 function applyCodexOperations(input: AxcutDocument, operations: CodexOperation[]): AxcutDocument {
 	let next = documentSchema.parse(input);
@@ -580,6 +616,7 @@ async function readDocument(id: string): Promise<DocumentEnvelope> {
 	);
 	activeDocumentId = id;
 	revisions.set(id, result.revision);
+	savedDocuments.set(id, documentFingerprint(result.document));
 	return { ...result, document: normalizeDocument(result.document) };
 }
 
@@ -595,11 +632,12 @@ async function createDocument(document: AxcutDocument): Promise<DocumentEnvelope
 		},
 	);
 	revisions.set(result.ref.id, result.revision);
+	savedDocuments.set(result.ref.id, documentFingerprint(result.document));
 	activeDocumentId = result.ref.id;
 	return { ...result, document: normalizeDocument(result.document) };
 }
 
-async function persistHostDocument(document: AxcutDocument): Promise<DocumentEnvelope> {
+async function persistHostDocument(document: AxcutDocument, reportError = true): Promise<DocumentEnvelope> {
 	if (!writable) throw new Error("当前工程为只读，修改不会保存");
 	const normalized = normalizeDocument(document);
 	const id = normalized.project.id;
@@ -615,10 +653,11 @@ async function persistHostDocument(document: AxcutDocument): Promise<DocumentEnv
 			},
 		);
 		revisions.set(id, result.revision);
+		savedDocuments.set(id, documentFingerprint(result.document));
 		bridgeMessage("save-state", { label: "已保存", documentId: id, revision: result.revision });
 		return { ...result, document: normalizeDocument(result.document) };
 	} catch (error) {
-		bridgeMessage("error", { message: error instanceof Error ? error.message : String(error) });
+		if (reportError) bridgeMessage("error", { message: error instanceof Error ? error.message : String(error) });
 		throw error;
 	}
 }
@@ -634,8 +673,7 @@ async function ensureInitialDocument(): Promise<DocumentRef[]> {
 	const represented = new Set(allRefs.flatMap((ref) => ref.sourceAssetIds));
 	let recordings = project.media.filter(
 		(asset) =>
-			asset.type === "video" &&
-			(asset.origin === "screen-recording" || Boolean(asset.capture)),
+			asset.type === "video" && (asset.origin === "screen-recording" || Boolean(asset.capture)),
 	);
 	// Legacy projects predate the origin field. When no recording has ever been
 	// classified, preserve their first-entry experience without aggregating all
@@ -647,7 +685,8 @@ async function ensureInitialDocument(): Promise<DocumentRef[]> {
 		if (
 			represented.has(asset.id) ||
 			(asset.openScreenDocumentId && allRefs.some((ref) => ref.id === asset.openScreenDocumentId))
-		) continue;
+		)
+			continue;
 		const created = await createDocument(seedDocument(project, asset));
 		for (const assetId of created.ref.sourceAssetIds) represented.add(assetId);
 	}
@@ -761,20 +800,22 @@ export async function installLinkReaderBridge() {
 			const latestPublished = ref.latestPublishedAssetId
 				? project.media.find((asset) => asset.id === ref.latestPublishedAssetId)
 				: undefined;
-			return [{
-				id: ref.id,
-				title: ref.title,
-				updatedAt: new Date(ref.updatedAt).toISOString(),
-				assetCount: ref.sourceAssetIds.length,
-				durationSec: ref.duration,
-				revision: ref.revision,
-				sourceAssetNames: recordingSources.map((asset) => asset.name),
-				latestPublishedAssetId: ref.latestPublishedAssetId,
-				latestPublishedAssetName: latestPublished?.name,
-				lastPublishedAt: ref.lastPublishedAt
-					? new Date(ref.lastPublishedAt).toISOString()
-					: undefined,
-			}];
+			return [
+				{
+					id: ref.id,
+					title: ref.title,
+					updatedAt: new Date(ref.updatedAt).toISOString(),
+					assetCount: ref.sourceAssetIds.length,
+					durationSec: ref.duration,
+					revision: ref.revision,
+					sourceAssetNames: recordingSources.map((asset) => asset.name),
+					latestPublishedAssetId: ref.latestPublishedAssetId,
+					latestPublishedAssetName: latestPublished?.name,
+					lastPublishedAt: ref.lastPublishedAt
+						? new Date(ref.lastPublishedAt).toISOString()
+						: undefined,
+				},
+			];
 		});
 	};
 	ai.get = async (id: string) => {
@@ -823,9 +864,10 @@ export async function installLinkReaderBridge() {
 	ai.addAsset = async (id: string, path: string, label?: string) => {
 		const current = await readDocument(id);
 		const linkReaderAssetId = assetIdFromMediaPath(path);
-		const assetId = linkReaderAssetId && !current.document.assets.some((asset) => asset.id === linkReaderAssetId)
-			? linkReaderAssetId
-			: `asset_${crypto.randomUUID()}`;
+		const assetId =
+			linkReaderAssetId && !current.document.assets.some((asset) => asset.id === linkReaderAssetId)
+				? linkReaderAssetId
+				: `asset_${crypto.randomUUID()}`;
 		const next = documentSchema.parse({
 			...current.document,
 			project: {
@@ -883,11 +925,23 @@ export async function installLinkReaderBridge() {
 		],
 	};
 	const hostAgentSnapshot = async () => {
-		const { settings } = await api<{ settings: { modules: { screenEditing: { model: string; effort: string } } } }>("/api/editor/agent-settings");
-		return { ...codexSnapshot, config: { ...codexSnapshot.config, model: settings.modules.screenEditing.model, reasoningEffort: settings.modules.screenEditing.effort } };
+		const { settings } = await api<{
+			settings: { modules: { screenEditing: { model: string; effort: string } } };
+		}>("/api/editor/agent-settings");
+		return {
+			...codexSnapshot,
+			config: {
+				...codexSnapshot.config,
+				model: settings.modules.screenEditing.model,
+				reasoningEffort: settings.modules.screenEditing.effort,
+			},
+		};
 	};
 	ai.llmGetSnapshot = hostAgentSnapshot;
-	ai.llmSetConfig = async () => ({ success: false, error: "请在工作台首页的 Agent 设置中修改录屏编辑模型" });
+	ai.llmSetConfig = async () => ({
+		success: false,
+		error: "请在工作台首页的 Agent 设置中修改录屏编辑模型",
+	});
 	ai.llmSetApiKey = async () => ({
 		success: false,
 		error: "LinkReader 使用宿主机 Codex，无需设置 API Key",
@@ -1020,7 +1074,6 @@ export async function installLinkReaderBridge() {
 	});
 
 	electron.openVideoFilePicker = pickAndUploadVideo;
-
 	electron.findRecordingCamera = async (videoPath: string) => {
 		if (!activeDocumentId) return { success: false };
 		try {
@@ -1117,7 +1170,7 @@ export async function installLinkReaderBridge() {
 				const message = error instanceof Error ? error.message : String(error);
 				bridgeMessage("export-state", {
 					status: message === "OPENSCREEN_EXPORT_CANCELLED" ? "cancelled" : "failed",
-					label: message === "OPENSCREEN_EXPORT_CANCELLED" ? "已取消导出" : message,
+					label: message === "OPENSCREEN_EXPORT_CANCELLED" ? "导出已取消" : message,
 					documentId: activeDocumentId,
 				});
 				return {
@@ -1137,9 +1190,7 @@ export async function installLinkReaderBridge() {
 			meta: nativeMeta(request.requestId),
 		};
 	};
-	// Standard has no local ASR endpoint. Do not advertise a transcription engine:
-	// the upstream store then skips automatic transcription on import and reopen.
-	delete electron.stt;
+	installBridgeEdition({ electron, projectId, clientId, writable, getActiveDocumentId: () => activeDocumentId, api, bridgeMessage, readDocument, exportBase, sleep });
 	electron.getAppInfo = async () => ({ version: "1.10.0-linkreader", canCheckForUpdates: false });
 	electron.getSources = async () => {
 		const sources = await api<
@@ -1170,4 +1221,39 @@ export async function installLinkReaderBridge() {
 		bridgeMessage("save-state", { label: dirty ? "未保存" : "已保存" });
 
 	bridgeMessage("ready", { version: "1.10.0", writable });
+}
+
+/** 只读/未修改时只读已保存版本；有编辑权的脏文档才先保存。 */
+export async function requestSharedExportDialog(document: AxcutDocument, dirty: boolean) {
+  try {
+    // 导出读取不能推进编辑器的 revision 或基线，否则旧内容可能覆盖其他窗口的新修改。
+    const readSaved = async () => {
+      const result = await api<DocumentEnvelope>(
+        `/api/editor/projects/${encodeURIComponent(projectId)}/openscreen/documents/${encodeURIComponent(document.project.id)}`,
+      );
+      return { ...result, document: normalizeDocument(result.document) };
+    };
+    const { saved, readOnly } = await prepareSavedScreenExport({
+      writable, dirty,
+      unchanged: savedDocuments.get(document.project.id) === documentFingerprint(document),
+      persist: () => persistHostDocument(document, false),
+      readSaved,
+    });
+    const source = pickExtremeDims(collectEffectiveClipDims(saved.document), "smallest");
+    if (!source) throw Error("上次保存的版本没有录屏素材，无法导出");
+    const dims = calculateMp4ExportSettings({
+      quality: "source", sourceWidth: source.width, sourceHeight: source.height,
+      aspectRatioValue: resolveAspectRatioValue(saved.document, getEditorSettings(saved.document).aspectRatio),
+    });
+    const asset = saved.document.assets.find(value => value.id === saved.document.project.primaryAssetId) || saved.document.assets[0];
+    bridgeMessage("export-dialog", {
+      documentId: saved.ref.id, revision: saved.revision, useSavedDocument: true,
+      savedEditor: patchEditorSettings(saved.document, getEditorSettings(saved.document)).legacyEditor,
+      canvas: { width: dims.width, height: dims.height, fps: asset?.video?.fps || 30 },
+      notice: readOnly ? "另一个窗口正在编辑，导出的是上次保存的版本" : undefined,
+    });
+  } catch (error) {
+    bridgeMessage("error", { message: `无法打开导出：${error instanceof Error ? error.message : String(error)}` });
+    throw error;
+  }
 }

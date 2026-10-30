@@ -5,11 +5,13 @@ import { generalApi, announceGeneralChange, errorText, GeneralApiError } from '.
 import type { GeneralAgentChoice, GeneralInputKind, GeneralProject, GeneralSettings } from './general-contract'
 import { generalProjectHref } from './general-logic'
 
+import {linkEdit,clearHandoff} from './start-edition'
+
 export type StartBusy = { phase: 'check' | 'create' | 'upload' | 'start'; index?: number; total?: number; ratio?: number }
 export type StartSpec = {
   styleId: string; kind: GeneralInputKind; text: string; note: string; settings: GeneralSettings; files: readonly { key: string; file: File }[]
   /** the model and effort (absent: 系统默认) and 联网 */
-  agent?: GeneralAgentChoice; network?: boolean
+  agent?: GeneralAgentChoice; network?: boolean; fromDraft?: string
 }
 
 /**
@@ -43,6 +45,7 @@ export function useGeneralStart() {
       const choice = { ...(spec.agent ? { agent: spec.agent } : {}), network: !!spec.network }
       if (!created.current) {
         created.current = { project: await generalApi.create({ styleId: spec.styleId, settings: spec.settings, inputs, ...choice }), uploaded: new Map() }
+        if(spec.fromDraft) await linkEdit(spec.fromDraft, 'general', created.current.project.id).catch(() => {})
       }
       else created.current.project = await generalApi.patch(created.current.project.id, { settings: spec.settings, inputs: { text: inputs.text, note: inputs.note }, agent: spec.agent ?? null, network: !!spec.network })
       const { project, uploaded } = created.current
@@ -58,6 +61,7 @@ export function useGeneralStart() {
       setBusy({ phase: 'start' })
       await generalApi.generate(project.id)
       announceGeneralChange()
+      if(spec.fromDraft) clearHandoff()
       navigate(generalProjectHref(project.id))
     } catch (failure) {
       if(failure instanceof GeneralApiError && failure.environment)setEnvironment(failure.environment)

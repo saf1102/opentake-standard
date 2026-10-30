@@ -36,3 +36,15 @@ export const cancelOpenScreenHostSession = (projectId: string, sessionId: string
 }).then((r) => json<OpenScreenHostSession>(r))
 
 export type OpenScreenDocumentResult={ref:OpenScreenDocumentRef;document:Record<string,unknown>;revision:number};
+
+export const saveAgentSettings = (settings: import('./agent-settings').AgentSettings) => fetch('/api/editor/agent-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }).then(r => json<import('./agent-settings').AgentSettingsView>(r))
+
+export const refreshAgentCatalog = (cliPath: string) => fetch('/api/editor/agent-settings/catalog', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliPath }) }).then(r => json<import('./agent-settings').AgentCatalog>(r))
+
+export const chooseAgentCli = () => fetch('/api/editor/agent-settings/choose-cli', { method: 'POST' }).then(r => json<{ path: string | null }>(r))
+
+export type AgentConnectionResult = { model:string; effort:string; ok:boolean; durationMs:number; checkedAt:string; error?:string }
+
+export const testAgentConnection = (input:{cliPath:string;model:string;effort:string}) => fetch('/api/editor/agent-settings/test', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)}).then(r=>json<AgentConnectionResult>(r))
+
+export const purgeProject = (id:string) => fetch(`/api/editor/projects/${id}/purge`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmProjectId:id})}).then(r=>json<void>(r));

@@ -1,3 +1,5 @@
+import {editionClient} from './client-edition'
+import type {ExportSettings,ExportCapabilities} from '../types/editor';
 import type {EnvironmentCheck} from '../../shared/creation-tools'
 /**
  * 通用剪辑: the pages' side of src/general/general-contract.ts. Every call goes to /api/general as the contract lists.
@@ -126,7 +128,7 @@ const httpClient: GeneralClient = {
   },
 }
 
-function client(){return Promise.resolve(httpClient)}
+function client(){return editionClient(httpClient)}
 
 export const generalApi = {
   list: () => client().then(c => c.list()),
@@ -173,7 +175,11 @@ export const generalEditorApi = {
   },
   saveEdited: (id: string, n: number, layers: GeneralLayers) => call<{ saved: boolean; at: string }>(`${projectPath(id)}/versions/${n}/edited`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(layers) }),
   /** Export version n with the person's edits (edited.json, else the agent's layers): a finished film or a 剪映 draft. Progress arrives as project.exportTask. */
-  export: (id: string, n: number, format: 'mp4' | 'jianying') => call<GeneralExport>(`${projectPath(id)}/versions/${n}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format }) }),
-  revealExport: (id: string) => call<{ revealed: boolean }>(`${projectPath(id)}/exports/reveal`, { method: 'POST' }),
+  export: (id: string, n: number, format: 'mp4' | 'jianying', settings?:ExportSettings) => call<GeneralExport>(`${projectPath(id)}/versions/${n}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format, settings }) }),
+  exportCapabilities: (id:string,n:number) => call<ExportCapabilities & {canvas:{width:number;height:number;fps:number}}>(`${projectPath(id)}/exports/capabilities?version=${n}`),
+  exportHistory: (id:string) => call<GeneralExport[]>(`${projectPath(id)}/exports/history`),
+  cancelExport: (id:string) => post<GeneralExport>(`${projectPath(id)}/exports/cancel`,{}),
+  chooseExportDestination: (id:string) => post<{path:string}>(`${projectPath(id)}/exports/destination`,{}).then(r=>r.path),
+  revealExport: (id: string, jobId?:string) => call<{ revealed: boolean }>(`${projectPath(id)}/exports/reveal`, { method: 'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:jobId}) }),
   fileUrl: (id: string, rel: string) => `${GENERAL_API}${projectPath(id)}/files/${rel.split('/').map(encodeURIComponent).join('/')}`,
 }

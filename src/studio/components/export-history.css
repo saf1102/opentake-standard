@@ -1,0 +1,26 @@
+.export-history{flex:0 0 auto;border-top:1px solid var(--studio-line,#bbb);padding:12px 20px;color:inherit}
+.export-history button{font:inherit;color:inherit;cursor:pointer}
+.export-history svg{width:16px;height:16px;flex:none}
+.export-history button:disabled{opacity:.5;cursor:default}
+.export-history__toggle{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;text-align:left;padding:6px 0;font-weight:600!important}
+.export-history__toggle[aria-expanded=true]>svg{transform:rotate(90deg)}
+.export-history__body{max-height:38vh;overflow:auto;padding:8px 0;overscroll-behavior:contain}
+.export-history p{margin:6px 0;font-size:12px}
+.export-history__table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}
+.export-history__table th{font-weight:600;padding:9px 12px;border-bottom:1px solid var(--studio-line,#bbb);white-space:nowrap}
+.export-history__table td{padding:12px;vertical-align:middle;border-bottom:1px solid var(--studio-line,#bbb)}
+.export-history__table tbody tr{background:color-mix(in srgb,currentColor 5%,transparent)}
+.export-history__table tbody tr:nth-child(even){background:color-mix(in srgb,currentColor 11%,transparent)}
+.export-history__table time{white-space:nowrap;font-variant-numeric:tabular-nums}
+.export-history__quality{min-width:140px;line-height:1.6}
+.export-history__actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px}
+.export-history__actions+.export-history__actions{margin-top:8px}
+.export-history__actions button{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid var(--studio-line,#bbb);border-radius:6px;background:transparent;white-space:nowrap}
+.export-history__actions button:hover:not(:disabled){background:color-mix(in srgb,currentColor 8%,transparent)}
+.export-history__filename{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.export-history button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.export-dialog:has(.export-history__body){overflow-y:auto;max-height:calc(100dvh - 160px)}
+.export-dialog:has(.export-history__body) .export-shell{min-height:240px}
+.export-history__kind{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-weight:600}
+.export-history .export-history__actions button.export-history__delete-confirm{background:#c62828;color:#fff;border-color:#c62828}
+.export-history .export-history__actions button.export-history__delete-confirm:hover:not(:disabled){background:#b71c1c}

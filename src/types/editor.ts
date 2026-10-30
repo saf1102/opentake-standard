@@ -234,7 +234,7 @@ export type OpenScreenHostSession = z.infer<typeof OpenScreenHostSessionSchema>
 export const OpenScreenBridgeMessageSchema = z.object({
   version: z.literal(1),
   id: z.string(),
-  type: z.enum(['ready', 'open', 'save-state', 'document-changed', 'recording-state', 'export-state', 'task-state', 'error']),
+  type: z.enum(['ready', 'open', 'save-state', 'document-changed', 'recording-state', 'export-state', 'export-dialog', 'task-state', 'error']),
   projectId: z.string(),
   documentId: z.string().optional(),
   payload: z.record(z.string(), z.unknown()).default({}),
@@ -255,6 +255,10 @@ export const OpenScreenExportJobSchema = z.object({
   currentFrame: z.number().int().nonnegative().optional(),
   totalFrames: z.number().int().positive().optional(),
   outputFile: z.string(),
+  outputDir: z.string().optional(),
+  exportSettings: z.unknown().optional(),
+  requestClientId: z.string().optional(),
+  savedDocumentRevision: z.number().int().nonnegative().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   startedAt: z.number().optional(),
@@ -266,3 +270,109 @@ export const OpenScreenExportJobSchema = z.object({
 export type OpenScreenExportJob = z.infer<typeof OpenScreenExportJobSchema>
 export const EditProjectSchema = z.object({schemaVersion:z.literal(5),id:z.string(),name:z.string(),createdAt:z.number(),updatedAt:z.number(),revision:z.number(),settings:ProjectSettingsSchema,media:z.array(MediaAssetSchema),timeline:TimelineSchema,transcript:z.array(SubtitleSegmentSchema).default([]),timelineVersions:z.array(z.object({id:z.string(),name:z.string(),timeline:TimelineSchema,createdAt:z.number()})),activeTimelineVersionId:z.string(),storageOffline:z.boolean().optional(),standardKind:z.literal('screen').optional(),deletedAt:z.number().optional(),archivedAt:z.number().optional(),openScreenDocuments:z.array(OpenScreenDocumentRefSchema).default([])});
 export type EditProject=z.infer<typeof EditProjectSchema>;
+
+export const ExportPresetSchema = z.enum(['quick', 'standard', 'jianying', 'motion', 'archive', 'custom'])
+export type ExportPreset = z.infer<typeof ExportPresetSchema>
+
+export const ExportSelectionSchema = z.object({
+  mixedVideo: z.boolean().default(true),
+  silentVideo: z.boolean().default(false),
+  subtitleSrt: z.boolean().default(true),
+  subtitleAss: z.boolean().default(false),
+  subtitleWords: z.boolean().default(false),
+  voiceStem: z.boolean().default(false),
+  sourceBedStem: z.boolean().default(false),
+  musicStem: z.boolean().default(false),
+  sfxStem: z.boolean().default(false),
+  cardTimeline: z.boolean().default(false),
+  cardIndividual: z.boolean().default(false),
+  projectSnapshot: z.boolean().default(false),
+  jianyingDraft: z.boolean().default(false),
+  jianyingMedia: z.boolean().default(false),
+})
+export type ExportSelection = z.infer<typeof ExportSelectionSchema>
+
+export const ExportVideoSettingsSchema = z.object({
+  container: z.enum(['mp4', 'mov']).default('mp4'),
+  codec: z.enum(['h264', 'h265', 'prores422']).default('h264'),
+  quality: z.enum(['fast', 'balanced', 'high']).default('fast'),
+  encoder: z.enum(['auto', 'hardware', 'software']).default('auto'),
+})
+export type ExportVideoSettings = z.infer<typeof ExportVideoSettingsSchema>
+
+export const ExportSettingsSchema = z.object({
+  resolution: z.enum(['original', '4k', '1080p', '720p']).optional(),
+  fps: z.union([z.literal('project'), z.literal(24), z.literal(60)]).optional(),
+  preset: ExportPresetSchema.default('quick'),
+  destinationDir: z.string().max(2_048).default(''),
+  folderName: z.string().max(80).default(''),
+  conflictPolicy: z.enum(['versioned', 'replace']).default('versioned'),
+  selection: ExportSelectionSchema.default({
+    mixedVideo: true,
+    silentVideo: false,
+    subtitleSrt: true,
+    subtitleAss: false,
+    subtitleWords: false,
+    voiceStem: false,
+    sourceBedStem: false,
+    musicStem: false,
+    sfxStem: false,
+    cardTimeline: false,
+    cardIndividual: false,
+    projectSnapshot: false,
+    jianyingDraft: false,
+    jianyingMedia: false,
+  }),
+  video: ExportVideoSettingsSchema.default({
+    container: 'mp4', codec: 'h264', quality: 'fast', encoder: 'auto',
+  }),
+  audioFormat: z.enum(['wav', 'aac']).default('wav'),
+  importToJianying: z.boolean().default(false),
+  revealWhenDone: z.boolean().default(false),
+})
+export type ExportSettings = z.infer<typeof ExportSettingsSchema>
+
+export const ExportPhaseSchema = z.enum([
+  'queued', 'preparing', 'reference', 'motion', 'compositing', 'audio',
+  'cards', 'jianying', 'finalizing', 'completed', 'failed', 'cancelled',
+])
+export type ExportPhase = z.infer<typeof ExportPhaseSchema>
+
+/** One closed interval per phase: when it started, when it ended, how long it took. */
+export const ExportStageSchema = z.object({
+  phase: ExportPhaseSchema,
+  startedAt: z.number(),
+  endedAt: z.number().optional(),
+  durationSeconds: z.number().optional(),
+})
+export type ExportStage = z.infer<typeof ExportStageSchema>
+
+export const ExportJobSchema = z.object({
+  id: z.string(), projectId: z.string(), status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  progress: z.number().min(0).max(100), createdAt: z.number(), updatedAt: z.number(), outputDir: z.string().optional(), error: z.string().optional(),
+  phase: ExportPhaseSchema.optional(), message: z.string().optional(), currentItem: z.number().int().nonnegative().optional(),
+  totalItems: z.number().int().nonnegative().optional(), settings: ExportSettingsSchema.optional(),
+  jianyingImportDir: z.string().optional(),
+  outputMedia: z.object({width:z.number().positive(),height:z.number().positive(),fps:z.number().positive()}).optional(),
+  estimatedRemainingSeconds: z.number().nonnegative().optional(),
+  warnings: z.array(z.string()).optional(),
+  /** Project revision the export snapshot was taken from. */
+  sourceRevision: z.number().int().nonnegative().optional(),
+  /** Per-phase timing log, recorded on phase transitions in updateJob. */
+  stages: z.array(ExportStageSchema).optional(),
+})
+export type ExportJob = z.infer<typeof ExportJobSchema>
+
+export const ExportCapabilitiesSchema = z.object({
+  defaults: z.object({preset:ExportPresetSchema,resolution:z.enum(['original','4k','1080p','720p']),revealWhenDone:z.boolean(),container:z.enum(['mp4','mov']),quality:z.enum(['fast','balanced','high'])}).optional(),
+  defaultDestination: z.string(),
+  freeBytes: z.number().nonnegative().optional(),
+  jianying: z.object({
+    available: z.boolean(),
+    draftDir: z.string().optional(),
+    appPath: z.string().optional(),
+    warning: z.string().optional(),
+  }),
+})
+export type ExportCapabilities = z.infer<typeof ExportCapabilitiesSchema>
+

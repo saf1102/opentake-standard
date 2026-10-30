@@ -1,4 +1,4 @@
-import platform from '../platform.ts';
+import {killProcessGroup} from './edition.ts';
 /**
  * 通用剪辑怎样调用 Codex：非交互的 `codex exec --json`。
  * - 出片：workspace-write 沙盒，只能写本工程的 work/；默认不联网；不加载用户的 config.toml、规则、技能目录；
@@ -41,13 +41,15 @@ export function reviewArgs(a: ReviewArgs): string[] {
 export type CodexProcess = { child: ChildProcess; done: Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }>; stop: () => void };
 
 /** Start Codex in its own process group so stopping it also stops the commands it started (renders, Chrome). */
-export function startCodex(executable: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; prompt: string; eventLog?: string; onEvent: (event: Record<string, unknown>) => void }): CodexProcess {
+export function startCodex(executable: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; prompt: string; eventLog?: string; redact?: (text:string)=>string; onEvent: (event: Record<string, unknown>) => void }): CodexProcess {
   const child = spawn(executable, args, { cwd: options.cwd, env: options.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
   let stderr = '';
+  const redact=options.redact || ((text:string)=>text);
   const log = options.eventLog ? fs.createWriteStream(options.eventLog, { flags: 'a' }) : undefined;
-  child.stderr!.on('data', chunk => { if (stderr.length < 200_000) stderr += chunk; });
+  child.stderr!.on('data', chunk => { if (stderr.length < 200_000) stderr += String(chunk); });
   const lines = createInterface({ input: child.stdout! });
   lines.on('line', line => {
+    line=redact(line);
     log?.write(`${line}\n`);
     if (!line.trim().startsWith('{')) return;
     try { options.onEvent(JSON.parse(line)); } catch { /* a malformed line is kept in the log, not fatal */ }
@@ -56,11 +58,11 @@ export function startCodex(executable: string, args: string[], options: { cwd: s
   child.stdin!.end(options.prompt);
   const done = new Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }>(resolve => {
     let settled = false;
-    const finish = (code: number | null, signal: NodeJS.Signals | null) => { if (settled) return; settled = true; lines.close(); log?.end(); resolve({ code, signal, stderr }); };
-    child.on('error', error => { stderr += `\n${error.message}`; finish(-1, null); });
+    const finish = (code: number | null, signal: NodeJS.Signals | null) => { if (settled) return; settled = true; lines.close(); log?.end(); resolve({ code, signal, stderr:redact(stderr) }); };
+    child.on('error', error => { stderr += `\n${redact(error.message)}`; finish(-1, null); });
     child.on('close', finish);
   });
-  const group = (signal: NodeJS.Signals) => { try { if (child.pid) platform.killTree(child.pid, signal); } catch { try { child.kill(signal); } catch { /* already gone */ } } };
+  const group = (signal: NodeJS.Signals) => { try { if (child.pid) killProcessGroup(child.pid, signal); } catch { try { child.kill(signal); } catch { /* already gone */ } } };
   // Commands run in a terminal get their own session, outside the group: note every descendant before Codex goes.
   const stop = () => {
     const tree = child.pid ? descendants(child.pid) : [];

@@ -1,0 +1,67 @@
+/* 一键部署（效果图 docs/界面改版/一键部署/效果图.html 定稿）。提醒色亮紫 #9869dc 不随主题；检查窗口始终是深色摄影棚。 */
+.ot-deploy-nav{position:relative;display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px 0 4px;border:0;border-radius:999px;background:#9869dc;color:#fff;font-weight:650;font-size:13px;white-space:nowrap;cursor:pointer;box-shadow:0 0 0 1px #9869dc88,0 6px 20px #9869dc55}
+.ot-deploy-nav::after{content:"";position:absolute;inset:-5px;border-radius:999px;border:1.5px solid #9869dc99;animation:ot-deploy-ring 2.4s ease-out infinite;pointer-events:none}
+@keyframes ot-deploy-ring{0%{opacity:.9;transform:scale(.96)}100%{opacity:0;transform:scale(1.12)}}
+.ot-deploy-ring{width:26px;height:26px;flex:none}
+.ot-deploy-nav.is-ready{height:30px;padding:0 12px 0 6px;background:transparent;color:inherit;opacity:.75;font-weight:500;box-shadow:none;border:1px solid color-mix(in srgb,currentColor 18%,transparent)}
+.ot-deploy-nav.is-ready::after{display:none}.ot-deploy-nav.is-ready:hover{opacity:1}
+.ot-deploy-tick{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#2fc6a4;color:#06201a;font-size:11px}
+
+.ot-deploy-strip{display:flex;align-items:center;gap:18px;width:min(var(--home-width,1180px),100%);margin:0 auto 14px;padding:14px 16px 14px 22px;border-radius:18px;border:1px solid #9869dc55;background:color-mix(in srgb,#9869dc 9%,transparent);backdrop-filter:blur(18px);animation:ot-deploy-in .55s cubic-bezier(.2,.8,.2,1) both}
+.ot-deploy-strip>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.ot-deploy-strip b{font-size:16px}.ot-deploy-strip span{opacity:.72;font-size:13px}
+@keyframes ot-deploy-in{from{opacity:0;transform:translateY(-8px)}}
+
+.ot-deploy-veil{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:#0009;backdrop-filter:blur(10px);animation:ot-deploy-fade .3s both}
+@keyframes ot-deploy-fade{from{opacity:0}}
+.ot-deploy{width:min(1180px,94vw);height:min(760px,90vh);border-radius:26px;overflow:hidden;display:grid;grid-template-columns:38% 1fr;background:#0c0d0f;border:1px solid #ffffff1c;box-shadow:0 40px 90px #000c;color:#f2f2f4;outline:none;animation:ot-deploy-pop .45s cubic-bezier(.2,.9,.2,1) both;font-size:14px;line-height:1.5}
+@keyframes ot-deploy-pop{from{opacity:0;transform:scale(.97) translateY(10px)}}
+.ot-deploy-left{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:30px;background:radial-gradient(60% 60% at 50% 45%,#2a220e 0,#0c0d0f 70%);perspective:700px}
+.ot-deploy-glow{position:absolute;width:240px;height:240px;border-radius:50%;background:radial-gradient(#f5b31630,#0000 65%);top:calc(50% - 170px);animation:ot-deploy-breathe 2.6s ease-in-out infinite}
+@keyframes ot-deploy-breathe{50%{transform:scale(1.15);opacity:.6}}
+.ot-deploy-mark{position:relative;width:104px;height:104px;border-radius:26px;background:url(/opentake-icon-512.png) center/cover;box-shadow:0 18px 50px #f5b31640;animation:ot-deploy-flip 2.6s cubic-bezier(.65,0,.35,1) infinite}
+.ot-deploy.is-ready .ot-deploy-mark{animation:none}
+@keyframes ot-deploy-flip{0%{transform:rotateY(0)}45%,50%{transform:rotateY(180deg)}95%,100%{transform:rotateY(360deg)}}
+.ot-deploy-left h2{margin:0;font-size:22px;text-align:center}.ot-deploy-left>p{margin:0;color:#c9cbd1aa;text-align:center;max-width:300px}
+.ot-deploy-meter{display:flex;gap:6px}.ot-deploy-meter i{width:26px;height:4px;border-radius:2px;background:#ffffff20;transition:background .4s}.ot-deploy-meter i.ok{background:#2fc6a4}.ot-deploy-meter i.act{background:#9869dc}
+.ot-deploy-left .ot-deploy-privacy{margin-top:8px;font-size:12px;line-height:1.7;color:#8b8e96;padding:10px 14px;border-radius:12px;border:1px solid #ffffff14;background:#ffffff06}
+.ot-deploy-go{height:44px;padding:0 26px;border-radius:12px;border:0;background:linear-gradient(180deg,#f7c548,#e0a20f);color:#1d1404;font-weight:700;opacity:0;pointer-events:none;transition:opacity .4s;cursor:pointer}
+.ot-deploy.is-ready .ot-deploy-go{opacity:1;pointer-events:auto}
+.ot-deploy-close{position:absolute;left:18px;top:16px;background:none;border:0;color:#8b8e96;cursor:pointer;font-size:13px}.ot-deploy-close:hover{color:#f2f2f4}
+
+.ot-deploy-list{overflow:auto;padding:26px 28px 30px;background:linear-gradient(180deg,#131417,#0f1012)}
+.ot-deploy-grp{display:flex;justify-content:space-between;margin:6px 4px 10px;font-size:12px;color:#8b8e96;letter-spacing:.5px}
+/* the list enters once; afterwards each row only changes its symbol and words in place */
+.ot-deploy-item{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:14px;padding:14px 16px;margin-bottom:10px;border-radius:16px;background:linear-gradient(180deg,#1f2025,#18191d);border:1px solid #ffffff14;box-shadow:inset 0 1px 0 #ffffff12;animation:ot-deploy-row .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i)*40ms);transition:border-color .4s,box-shadow .4s}
+@keyframes ot-deploy-row{from{opacity:0;transform:translateX(24px)}}
+.ot-deploy-st{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:14px;background:#ffffff0e;color:#8b8e96;transition:background .35s,color .35s}
+.ot-deploy-item[data-s=checking] .ot-deploy-st{border:2.5px solid #ffffff22;border-top-color:#f5b316;background:none;animation:ot-deploy-spin .9s linear infinite}
+@keyframes ot-deploy-spin{to{transform:rotate(360deg)}}
+.ot-deploy-item[data-s=ok] .ot-deploy-st{background:#2fc6a4;color:#06201a}
+.ot-deploy-item[data-s=warn] .ot-deploy-st{background:#f5b31633;color:#f5b316}
+.ot-deploy-item[data-s=act]{border-color:#9869dc88;box-shadow:inset 0 1px 0 #ffffff12,0 0 0 1px #9869dc33,0 10px 30px #9869dc22}.ot-deploy-item[data-s=act] .ot-deploy-st{background:#9869dc;color:#fff}
+.ot-deploy-item b{display:block;font-size:15px}.ot-deploy-item small{display:block;min-height:19px;margin-top:2px;color:#a5a9b1;font-size:12.5px}
+.ot-deploy-slot{min-width:1px}
+.ot-deploy-act{height:32px;padding:0 14px;border-radius:10px;border:1px solid #ffffff22;background:#ffffff0c;color:#f2f2f4;font-size:13px;white-space:nowrap;cursor:pointer}
+.ot-deploy-item[data-s=act] .ot-deploy-act{border:0;background:#9869dc;color:#fff;font-weight:700}
+.ot-deploy-tag{font-size:11.5px;color:#8b8e96;padding:2px 9px;border-radius:999px;border:1px solid #ffffff1c}
+.ot-deploy-chips{grid-column:2/4;display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}.ot-deploy-chips span{padding:4px 10px;border-radius:999px;background:#ffffff0a;border:1px solid #ffffff12;font-size:12px;color:#c9cbd1;transition:opacity .4s}
+.ot-deploy-chips.is-pending span{opacity:.25}
+.ot-deploy-agents{grid-column:2/4;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px}
+.ot-deploy-agent{position:relative;padding:10px 12px;border-radius:12px;background:#ffffff08;border:1px solid #ffffff12;font-size:12.5px;transition:opacity .4s,border-color .4s}
+.ot-deploy-agent.is-on{border-color:#2fc6a455}.ot-deploy-agent.is-off,.ot-deploy-agent.is-pending{opacity:.5}
+.ot-deploy-logo{position:absolute;right:8px;top:8px}.ot-deploy-agent.is-off .ot-deploy-logo,.ot-deploy-agent.is-pending .ot-deploy-logo{filter:grayscale(.7);opacity:.6}
+.ot-deploy-agent b{display:flex;align-items:center;gap:6px;padding-right:30px;font-size:13.5px}.ot-deploy-agent b i{width:7px;height:7px;border-radius:50%;background:#5e6169}
+.ot-deploy-agent.is-on b i{background:#2fc6a4;box-shadow:0 0 8px #2fc6a4}.ot-deploy-agent.is-off b i{background:transparent;border:1px solid #5e6169}
+.ot-deploy-agent small{display:block;min-height:1.45em;margin-top:2px;color:#8b8e96;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ot-deploy-agent>span:last-child{display:block;margin-top:6px;color:#c9cbd1}
+@media (max-width:820px){.ot-deploy{grid-template-columns:1fr;grid-template-rows:auto 1fr}.ot-deploy-left{padding:46px 20px 20px;gap:12px}.ot-deploy-mark{width:64px;height:64px;border-radius:16px}.ot-deploy-agents{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:reduce){.ot-deploy-nav::after,.ot-deploy-mark,.ot-deploy-glow{animation:none}.ot-deploy,.ot-deploy-item,.ot-deploy-veil,.ot-deploy-strip{animation-duration:.01ms}}
+/* the themes give every header button a material with !important (see usage-badge.css); the reminder keeps its purple */
+html[data-ui-theme] .workspace-global-actions button.ot-deploy-nav{height:32px;min-height:32px;padding:0 14px 0 4px;border:0 !important;border-radius:999px !important;background:#9869dc !important;color:#fff !important;box-shadow:0 0 0 1px #9869dc88,0 6px 20px #9869dc55 !important;backdrop-filter:none !important}
+html[data-ui-theme] .workspace-global-actions button.ot-deploy-nav:hover{background:#a67be6 !important}
+html[data-ui-theme] .workspace-global-actions button.ot-deploy-nav.is-ready{height:28px;min-height:28px;padding:0 10px 0 5px;background:transparent !important;border:1px solid transparent !important;box-shadow:none !important;color:var(--ed-muted) !important}
+html[data-ui-theme] .workspace-global-actions button.ot-deploy-nav.is-ready:hover{background:var(--ed-raise) !important;color:var(--ed-ink-2) !important}
+/* the check window is always the dark studio: the themes' shared dialog glass and heading inks do not apply to it */
+html[data-ui-theme] .ot-deploy{background:#0c0d0f !important;border:1px solid #ffffff1c !important;box-shadow:0 40px 90px #000c !important;backdrop-filter:none !important;color:#f2f2f4 !important}
+html[data-ui-theme] .ot-deploy :is(h2,b){color:#f2f2f4 !important}
+html[data-ui-theme] .ot-deploy :is(small,.ot-deploy-grp){color:#a5a9b1 !important}
