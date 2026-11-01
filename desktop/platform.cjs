@@ -28,10 +28,14 @@ function killTree(pid,signal='SIGTERM'){
  const action=termination(pid,signal);
  try{if(action.command)spawnSync(action.command,action.args,{windowsHide:true,stdio:'ignore',timeout:5000});else process.kill(action.pid,action.signal);}catch{/* already gone */}
 }
-function revealCommand(target,platform=process.platform){
+function revealCommand(target,platform=process.platform,env=process.env){
  const p=platform==='win32'?path.win32:path.posix;
  if(!p.isAbsolute(target)||target.includes('\0'))throw Error('文件路径必须是绝对路径');
- if(platform==='win32')return {command:'explorer.exe',args:['/select,',target]};
+ if(platform==='win32'){
+  const systemRoot=env[Object.keys(env).find(key=>/^systemroot$/i.test(key))]||env[Object.keys(env).find(key=>/^windir$/i.test(key))];
+  if(typeof systemRoot!=='string'||!p.isAbsolute(systemRoot)||systemRoot.includes('\0'))throw Error('Windows 系统目录无效，无法打开文件夹');
+  return {command:p.join(systemRoot,'explorer.exe'),args:['/select,',target]};
+ }
  if(platform==='darwin')return {command:'/usr/bin/open',args:['-R',target]};
  return {command:'xdg-open',args:[p.dirname(target)]};
 }

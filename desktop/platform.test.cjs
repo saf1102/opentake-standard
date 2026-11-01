@@ -13,7 +13,7 @@ function revealFixture(t){
 test('Windows Explorer handoff succeeds even when the dispatcher later exits with 1',async t=>{
  const {file}=revealFixture(t),original=cp.spawn;let worker,closed;
  t.mock.method(cp,'spawn',(command,args,options)=>{
-  assert.equal(command,'explorer.exe');assert.deepEqual(args,['/select,',file]);assert.equal(options.shell,undefined);
+  assert.equal(command,path.win32.join(process.env.SystemRoot,'explorer.exe'));assert.deepEqual(args,['/select,',file]);assert.equal(options.shell,undefined);
   worker=original(process.execPath,['-e','setTimeout(()=>process.exit(1),80)'],options);closed=once(worker,'close');return worker;
  });
  await revealPath(file,'win32');assert.equal(worker.exitCode,null);
@@ -62,7 +62,15 @@ test('owned process tree termination never uses executable-wide matching or a sh
 });
 test('reveal preserves spaces Chinese and shell metacharacters as one argument',()=>{
  const file='C:\\作品 & test\\成片.mp4';
- assert.deepEqual(revealCommand(file,'win32'),{command:'explorer.exe',args:['/select,',file]});
+ assert.deepEqual(revealCommand(file,'win32',{SystemRoot:'C:\\Windows'}),{command:'C:\\Windows\\explorer.exe',args:['/select,',file]});
  assert.deepEqual(revealCommand('/tmp/成片.mp4','darwin'),{command:'/usr/bin/open',args:['-R','/tmp/成片.mp4']});
  assert.throws(()=>revealCommand('relative.mp4','win32'));
+});
+
+test('Windows Explorer uses the system directory independently of PATH and environment key casing',()=>{
+ const file='C:\\作品 & test\\成片.mp4',root='D:\\Windows 安装';
+ for(const env of [{sYsTeMrOoT:root,PATH:'C:\\Windows\\System32'},{WINDIR:root,Path:''}]){
+  assert.deepEqual(revealCommand(file,'win32',env),{command:root+'\\explorer.exe',args:['/select,',file]});
+ }
+ for(const env of [{},{SystemRoot:'relative'},{SystemRoot:'C:\\Windows\0'}])assert.throws(()=>revealCommand(file,'win32',env),/Windows 系统目录无效/);
 });
