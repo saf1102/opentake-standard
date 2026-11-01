@@ -33,12 +33,13 @@ test('P08：只读导出拒绝过期 revision，不接受未保存设置覆盖',
 
 async function fixture() {
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'task20-export-'));
- const child=Object.assign(new EventEmitter(),{stdout:new EventEmitter(),stderr:new EventEmitter(),kill(){queueMicrotask(()=>child.emit('close',null,'SIGTERM'));return true;}});
+ const child=Object.assign(new EventEmitter(),{stdout:new EventEmitter(),stderr:new EventEmitter(),exitCode:null,signalCode:null,kill(){queueMicrotask(()=>child.emit('close',null,'SIGTERM'));return true;}});
  const data:any={root,child,project:{id:'p',settings:{fps:30},media:[],openScreenDocuments:[]},document:{document:{assets:[],legacyEditor:{}},revision:7,ref:{id:'d',title:'录屏',relativePath:'d.json',duration:2.5}},encode:async()=>{},args:[]};
  const key='__task20ExportFixture';(globalThis as any)[key]=data;
  const built=await build({entryPoints:['server/editor/openscreen-export.ts'],bundle:true,write:false,format:'cjs',platform:'node',packages:'external',plugins:[{name:'isolated-export',setup(b){
   b.onResolve({filter:/.*/},a=>{
    if(!a.importer)return;
+   if(a.path==='../file-ops.ts'||a.path==='../platform.ts')return {path:path.resolve('server/editor',a.path),external:true};
    if(a.path==='node:child_process')return {path:'child',namespace:'fixture'};
    if(a.path.endsWith('src/types/editor.ts'))return {path:path.resolve(path.dirname(a.importer),a.path),external:true};
    if(a.path.startsWith('.'))return {path:a.path,namespace:'fixture'};
@@ -79,8 +80,8 @@ test('T05：原生导出取消清理已写半成品，保留其他导出',async(
  const f=await fixture();try{
   const keep=path.join(f.data.root,'exports/已完成.mp4');fs.mkdirSync(path.dirname(keep));fs.writeFileSync(keep,'completed');
   const job=f.api.startOpenScreenExport('p','d',{settings:{}});
-  fs.writeFileSync(path.join(job.outputDir,'source.mp4'),'partial');
-  f.api.cancelOpenScreenExport('p','d',job.id);await tick();
+  fs.writeFileSync(f.data.args[f.data.args.indexOf('-o')+1],'partial');
+  await f.api.cancelOpenScreenExport('p','d',job.id);await tick();
   assert.equal(f.api.readOpenScreenExport('p','d',job.id).status,'cancelled');assert(!fs.existsSync(job.outputDir));assert.equal(fs.readFileSync(keep,'utf8'),'completed');
   assert.equal(f.api.activeOpenScreenExports(),0);
  }finally{f.close();}
@@ -93,8 +94,8 @@ test('T05：编码收尾阶段取消也清理目标，并终止编码信号',asy
     await new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('停止')),{once:true}));
   };
   const job=f.api.startOpenScreenExport('p','d',{settings:{video:{codec:'h265'}}});
-  fs.writeFileSync(path.join(job.outputDir,'source.mp4'),'native');f.data.child.emit('close',0,null);await tick();assert(encoding);
-  f.api.cancelOpenScreenExport('p','d',job.id);await tick();
+  fs.writeFileSync(f.data.args[f.data.args.indexOf('-o')+1],'native');f.data.child.emit('close',0,null);await tick();assert(encoding);
+  await f.api.cancelOpenScreenExport('p','d',job.id);await tick();
   assert.equal(f.api.readOpenScreenExport('p','d',job.id).status,'cancelled');assert(!fs.existsSync(job.outputDir));assert.equal(f.api.activeOpenScreenExports(),0);
  }finally{f.close();}
 });
@@ -112,7 +113,7 @@ test('P08：真实路由函数允许只读导出及取消自己的任务，保�
     :null;
    if(source)return {contents:`const f=globalThis.${key};`+source};
    // Unused route domains cannot start native work in this regression.
-   const names=a.path.includes('documents')?['archiveOpenScreenDocument','createOpenScreenDocument','duplicateOpenScreenDocument','listOpenScreenDocuments','readOpenScreenDocument','saveOpenScreenDocument']:a.path.includes('host')?['cancelOpenScreenHostSession','importOpenScreenHostCandidate','launchOpenScreenHud','listOpenScreenHostSessions','readOpenScreenHostSession']:['compactOpenScreenCodexSession','createOpenScreenCodexSession','deleteOpenScreenCodexSession','getOpenScreenCodexSession','listOpenScreenCodexSessions','openScreenCodexBudget','renameOpenScreenCodexSession','rewindOpenScreenCodexSession','runOpenScreenCodexTurn','translateOpenScreenCaptions'];
+   const names=a.path.includes('documents')?['archiveOpenScreenDocument','createOpenScreenDocument','duplicateOpenScreenDocument','listOpenScreenDocuments','readOpenScreenDocument','saveOpenScreenDocument']:a.path.includes('host')?['cancelOpenScreenHostSession','importOpenScreenHostCandidate','launchOpenScreenHud','listOpenScreenHostSessions','readOpenScreenHostSession','startNativeRecording','stopNativeRecording']:['compactOpenScreenCodexSession','createOpenScreenCodexSession','deleteOpenScreenCodexSession','getOpenScreenCodexSession','listOpenScreenCodexSessions','openScreenCodexBudget','renameOpenScreenCodexSession','rewindOpenScreenCodexSession','runOpenScreenCodexTurn','translateOpenScreenCaptions'];
    return {contents:names.map(n=>`export const ${n}=()=>{};`).join('')};
   });
  }}]});

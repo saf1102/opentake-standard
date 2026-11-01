@@ -14,7 +14,7 @@ test('旧口播 quick 默认保留原分辨率、原时钟、H264 和原音频�
  assert.equal(settings.fps,undefined);assert.equal(settings.resolution,'original');
  assert.deepEqual(settings.video,{container:'mp4',codec:'h264',quality:'fast',encoder:'auto'});
  assert.equal(settings.audioFormat,'aac');assert.equal(settings.selection.mixedVideo,true);assert.equal(settings.selection.subtitleSrt,true);
- assert.deepEqual(videoEncodeArgs(settings.video,{width:1920,height:1080,fps:30}),['-c:v','h264_videotoolbox','-b:v','6000000','-maxrate','6000000','-bufsize','12000000','-g','60','-prio_speed','1','-profile:v','high','-pix_fmt','yuv420p']);
+ assert.deepEqual(videoEncodeArgs(settings.video,{width:1920,height:1080,fps:30},'darwin'),['-c:v','h264_videotoolbox','-b:v','6000000','-maxrate','6000000','-bufsize','12000000','-g','60','-prio_speed','1','-profile:v','high','-pix_fmt','yuv420p']);
  const old=ExportSettingsSchema.parse({...settings,video:{container:'mov',codec:'prores422',quality:'high',encoder:'software'}});
  assert.equal(old.video.codec,'prores422');assert.equal(old.fps,undefined);
 });
@@ -34,7 +34,7 @@ test('三组选项的参数契约与纵横画幅上限',()=>{
  for(const resolution of ['original','4k','1080p','720p'] as const)for(const codec of ['h264','h265','prores422'] as const)for(const fps of ['project',24,60] as const) {
   const s=ExportSettingsSchema.parse({...exportSettingsForPreset('quick'),resolution,fps,video:{codec,container:codec==='prores422'?'mov':'mp4'}});
   const size=exportResolution({width:1080,height:1920},s.resolution);assert.ok(size.width<=1080&&size.height<=1920);assert.equal(size.width/size.height,9/16);
-  const args=videoEncodeArgs(s.video,{...size,fps:typeof s.fps==='number'?s.fps:30});assert.equal(args[1],codec==='prores422'?'prores_ks':codec==='h265'?'hevc_videotoolbox':'h264_videotoolbox');
+  const canvas={...size,fps:typeof s.fps==='number'?s.fps:30};const args=videoEncodeArgs(s.video,canvas,'darwin');if(codec==='h265')assert.throws(()=>videoEncodeArgs(s.video,canvas,'win32'),/Windows HEVC/);else assert.equal(videoEncodeArgs(s.video,canvas,'win32')[1],codec==='prores422'?'prores_ks':'h264_mf');assert.equal(args[1],codec==='prores422'?'prores_ks':codec==='h265'?'hevc_videotoolbox':'h264_videotoolbox');
  }
  for(const fps of [0,25,'60',120])assert.equal(ExportSettingsSchema.safeParse({fps}).success,false);
 });

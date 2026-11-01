@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --experimental-strip-types --test --test-concurrency=4 server/*.test.ts && npm run test:desktop && npm run test:openscreen",
     "build": "npm run build:native && npm run build:openscreen && vite build",
-    "build:native": "node scripts/build-windows-recording.mjs",
+    "build:native": "node scripts/build-windows-recording.mjs && node scripts/build-windows-compositor.mjs",
     "dev": "vite",
     "build:app": "npm run build:live && node desktop/build-app.mjs",
     "build:installer": "npm run build && node desktop/build-installer.mjs",

@@ -94,6 +94,7 @@ test('跟工程与显式帧率在原生渲染、统一编码中一致，不继�
  const {build}=await import('esbuild');const {createRequire}=await import('node:module');
  const require=createRequire(import.meta.url);
  const built=await build({entryPoints:['server/editor/openscreen-export.ts'],bundle:true,write:false,format:'cjs',platform:'node',packages:'external',plugins:[{name:'capture-final-encoding',setup(b){
+      b.onResolve({filter:/(?:platform|file-ops|media-tools|agent-installation|agent-settings|openscreen)\.ts$/},a=>({path:path.resolve(path.dirname(a.importer),a.path),external:true}));
   b.onResolve({filter:/^node:child_process$/},a=>a.importer.endsWith('openscreen-encode.ts')?{path:'capture',namespace:'encode'}:undefined);
   b.onLoad({filter:/.*/,namespace:'encode'},()=>({contents:`export function execFile(...args){globalThis.__task20ClockArgs=args[1];args.at(-1)(null,'','');}`}));
   b.onResolve({filter:/general\/export-media\.ts$/},()=>({path:'media',namespace:'probe'}));
@@ -108,6 +109,7 @@ test('跟工程与显式帧率在原生渲染、统一编码中一致，不继�
   const before=structuredClone(settings),fps=mod.exports.screenExportFrameRate(settings,30,doc);
   assert.equal(fps,typeof selected==='number'?selected:30);
   assert.deepEqual(mod.exports.mp4ExportArguments(fps,'h264'),['--fps',String(fps)]);
+  if(process.platform==='win32'&&codec==='h265'){await assert.rejects(()=>mod.exports.encodeScreenExportMedia('native.mp4','final',settings,fps,5),/Windows HEVC/);continue;}
   await mod.exports.encodeScreenExportMedia('native.mp4','final',settings,fps,5);
   const argv=(globalThis as any).__task20ClockArgs;
   assert.equal(argv[argv.indexOf('-r')+1],String(fps));assert.equal(argv[argv.indexOf('-fps_mode')+1],'cfr');

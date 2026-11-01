@@ -38,7 +38,7 @@ test('Claude execution is confined to explicit gated adapters',()=>{
  const found:string[]=[];
  const gated=new Set(['server/general/agent-adapter.ts','shared/agent-connections.ts','server/agent-connections.ts','desktop/agent-installation.cjs','scripts/standard/overlays/desktop/agent-installation.cjs']);
  for(const file of files){
-  const text=fs.readFileSync(file,'utf8'),name=path.relative(root,file),isTest=/\.test\.[cm]?[jt]s$/.test(name);
+  const text=fs.readFileSync(file,'utf8'),name=path.relative(root,file).split(path.sep).join('/'),isTest=/\.test\.[cm]?[jt]s$/.test(name);
   text.split('\n').forEach((line,i)=>{
    if(startsClaude.test(line))found.push(`${name}:${i+1} starts claude: ${line.trim().slice(0,120)}`);
    if(!isTest&&!gated.has(name)&&claudeOnly.test(line))found.push(`${name}:${i+1} Claude Code option: ${line.trim().slice(0,120)}`);
@@ -72,8 +72,8 @@ test('closed switch: settings, connectivity and film launch never start Claude C
  // The login shell OpenTake reads PATH from: a stand-in that answers at once, so no real shell profile runs.
  const shell=path.join(home,'login-shell');
  fs.writeFileSync(shell,`#!/bin/sh\nprintf '__CW_LOGIN_ENV_7B31__\\0PATH=${bin}:/usr/bin:/bin\\0'\n`,{mode:0o755});
- const saved={HOME:process.env.HOME,PATH:process.env.PATH,SHELL:process.env.SHELL,LINKREADER_AGENT_SETTINGS_FILE:process.env.LINKREADER_AGENT_SETTINGS_FILE,LINKREADER_CLAUDE_EXECUTABLE:process.env.LINKREADER_CLAUDE_EXECUTABLE,LINKREADER_CONNECTION_SETTINGS_FILE:process.env.LINKREADER_CONNECTION_SETTINGS_FILE};
- Object.assign(process.env,{HOME:home,PATH:`${bin}:${process.env.PATH}`,SHELL:shell,LINKREADER_AGENT_SETTINGS_FILE:path.join(settingsDir,'agent-settings.json'),LINKREADER_CLAUDE_EXECUTABLE:onPath,LINKREADER_CONNECTION_SETTINGS_FILE:path.join(settingsDir,'connections.json')});
+ const saved={USERPROFILE:process.env.USERPROFILE,HOME:process.env.HOME,PATH:process.env.PATH,SHELL:process.env.SHELL,LINKREADER_AGENT_SETTINGS_FILE:process.env.LINKREADER_AGENT_SETTINGS_FILE,LINKREADER_CLAUDE_EXECUTABLE:process.env.LINKREADER_CLAUDE_EXECUTABLE,LINKREADER_CONNECTION_SETTINGS_FILE:process.env.LINKREADER_CONNECTION_SETTINGS_FILE};
+ Object.assign(process.env,{HOME:home,USERPROFILE:home,PATH:`${bin}${path.delimiter}${process.env.PATH}`,SHELL:shell,LINKREADER_AGENT_SETTINGS_FILE:path.join(settingsDir,'agent-settings.json'),LINKREADER_CLAUDE_EXECUTABLE:onPath,LINKREADER_CONNECTION_SETTINGS_FILE:path.join(settingsDir,'connections.json')});
 
  // Watch every way child_process starts a program, before any workbench module captures it.
  const require=createRequire(import.meta.url);

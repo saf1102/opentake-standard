@@ -90,14 +90,14 @@ test('P07/P08：录屏实际挂载共用弹窗，选择编码帧率目录，显�
   }
 });
 
-test('P08：Mac 录屏窗口独立身份与锁，接管必须点击；Windows 保留原锁路径', async () => {
+test('P08：Mac/Windows 录屏窗口独立身份与锁，接管必须点击', async () => {
   const root = fileURLToPath(new URL('../', import.meta.url));
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'screen-window-lock-'));
   fs.symlinkSync(path.join(root, 'node_modules'), path.join(tmp, 'node_modules'), 'dir');
   const outfile = path.join(tmp, 'harness.mjs');
   await build({ stdin: { contents: `import React,{act} from 'react';import {createRoot} from 'react-dom/client';import Workspace from './src/pages/OpenScreenWorkspace';export {act,createRoot};export const element=<Workspace/>;`, resolveDir: root, loader: 'tsx' }, outfile, jsx: 'automatic', loader: { '.css': 'empty' }, bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent', plugins: [{ name: 'isolate-host-services', setup(plugin) {
     plugin.onResolve({ filter: /^(react-router|@\/workspace\/navigation-guard|@\/studio\/api|.*\.css\?inline)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
-    plugin.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'react-router' ? "export const useParams=()=>({id:'screen-fixture'});" : args.path.includes('navigation-guard') ? "export const useWorkspaceLeaveGuard=()=>{};export const WorkspaceLink=({children})=>children;" : args.path.endsWith('?inline') ? 'export default "";' : `export const getProject=async()=>({id:'screen-fixture',name:'锁测试',settings:{fps:30}});export const acquireLock=async(...args)=>{globalThis.__task20OldLock.push(args);return {acquired:false,lock:{clientName:'旧编辑器'}}};export const archiveLegacyScreenMotion=async()=>{};export const cancelOpenScreenHostSession=async()=>{},confirmOpenScreenHostCandidate=async()=>{},getOpenScreenHostSession=async()=>{},launchOpenScreenHost=async()=>{};` }));
+    plugin.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'react-router' ? "export const useParams=()=>({id:'screen-fixture'});" : args.path.includes('navigation-guard') ? "export const useWorkspaceLeaveGuard=()=>{};export const WorkspaceLink=({children})=>children;" : args.path.endsWith('?inline') ? 'export default "";' : `export const getProject=async()=>({id:'screen-fixture',name:'锁测试',settings:{fps:30}});export const acquireLock=async(...args)=>{globalThis.__task20OldLock.push(args);return {acquired:false,lock:{clientName:'旧编辑器'}}};export const archiveLegacyScreenMotion=async()=>{};export const cancelOpenScreenHostSession=async()=>{},confirmOpenScreenHostCandidate=async()=>{},getOpenScreenHostSession=async()=>{},launchOpenScreenHost=async()=>{};export const getOpenScreenHostSessions=async()=>[],getRecordingControlStatus=async()=>({}),stopNativeRecording=async()=>{},getRecordingSources=async()=>[],startNativeRecording=async()=>{};` }));
   } }] });
   const harness = await import(pathToFileURL(outfile).href);
   const ids: string[] = [];
@@ -120,7 +120,7 @@ test('P08：Mac 录屏窗口独立身份与锁，接管必须点击；Windows �
         await harness.act(async () => { app.render(harness.element); await new Promise(resolve => setTimeout(resolve, 20)); });
         await harness.act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
         assert.ok(document.querySelector('iframe')?.src.includes('linkreaderWritable=0'));
-        if (platform === 'MacIntel') {
+        {
           assert.equal(globals.__task20OldLock.length, 0);
           assert.equal(calls.length, 1); assert.equal(calls[0].takeover, false);
           assert.notEqual(calls[0].clientId, 'shared-koubo-client'); ids.push(calls[0].clientId);
@@ -130,10 +130,6 @@ test('P08：Mac 录屏窗口独立身份与锁，接管必须点击；Windows �
           assert.equal(calls.length, 2); assert.equal(calls[1].takeover, true); assert.equal(calls[1].clientId, calls[0].clientId);
           assert.ok(document.querySelector('iframe')?.src.includes('linkreaderWritable=1'));
           assert.equal(dom.window.localStorage.getItem('link-reader-editor-client'), 'shared-koubo-client');
-        } else {
-          assert.equal(calls.length, 0);
-          assert.deepEqual(globals.__task20OldLock, [['screen-fixture', 'shared-koubo-client', false]]);
-          assert.equal(dom.window.sessionStorage.getItem('opentake-screen-editor-client'), null);
         }
       } finally {
         await harness.act(async () => app.unmount()); dom.window.close();

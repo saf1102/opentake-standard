@@ -12,6 +12,6 @@
 
 运行库文件和来源见 `resources/runtimes/manifest.json`、provenance.json 与 WINDOWS-RUNTIME-NOTICES.md。完整源码另包提供，含原生采集器源码及许可证。科学计算运行模块、LGPL 动态库与对应源码归档保留；测试和开发资料不参与安装。
 
-开发重建见 BUILD-WINDOWS.md。此包用于本地模拟正式版验收，未数字签名、未公开发布；当前实测系统为 Win11 x64。Win10、macOS、其他硬件及未做的账号/音视频设备项目不得据此标为通过。遇到系统安全阻止请保留原提示，不关闭保护。
+开发重建见 BUILD-WINDOWS.md。此包用于本地模拟正式版验收，未数字签名、未公开发布；Win10 22H2 x64、Win11 x64 的实测范围及结果见随包验收报告。macOS、其他硬件及未做的账号/音视频设备项目不得据此标为通过。遇到系统安全阻止请保留原提示，不关闭保护。
 
 1.1.0 的更新详情见 README。Windows 使用 Ctrl/Alt 对应上游的 Command/Option 快捷键；账号登录在独立 PowerShell 终端由用户完成。API 密钥仅以当前用户 DPAPI 密文保存。升级不清空工程或配置，旧版 R8 Preview 使用自己的配置目录，未自动迁移。

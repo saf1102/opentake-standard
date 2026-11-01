@@ -53,11 +53,11 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   if(standardEdition && process.platform==='win32'){
     // Batch paths are quoted and percent expansion escaped; never turn an arbitrary path into a shell command.
     const quote=(value:string)=>{if(/["\r\n]/.test(value))throw Error('工具路径含不支持的字符');return '"'+value.replaceAll('%','%%')+'"';};
-    const command=(exe:string,args:string[]=[])=>'@echo off\r\nsetlocal DisableDelayedExpansion\r\n'+(electron?'set "ELECTRON_RUN_AS_NODE=1"\r\n':'')+[exe,...args].map(quote).join(' ')+' %*\r\n';
-    Object.assign(wrappers,{node:command(node),film:command(node,[path.join(KIT_DIR,'film.mjs')]),hfx:command(node,[path.join(KIT_DIR,'hfx.mjs')]),python3:command(pythonPath()),ffmpeg:command(ffmpegPath()),ffprobe:command(ffprobePath())});
+    const command=(exe:string,args:string[]=[])=>'@echo off\r\n'+quote(path.join(process.env.SystemRoot||'C:\\Windows','System32','chcp.com'))+' 65001 >nul\r\nsetlocal DisableDelayedExpansion\r\n'+(electron?'set "ELECTRON_RUN_AS_NODE=1"\r\n':'')+[exe,...args].map(quote).join(' ')+' %*\r\n';
+    Object.assign(wrappers,{node:command(node),film:command(node,[path.join(KIT_DIR,'film.mjs')]),hfx:command(node,[path.join(KIT_DIR,'hfx.mjs')]),python3:command(python),ffmpeg:command(ffmpeg),ffprobe:command(ffprobe),chromium:command(chrome)});
   }
   if(verified?.chromium) {
-    wrappers.chromium = process.platform==='win32'?'@echo off\r\nsetlocal DisableDelayedExpansion\r\n"'+chrome.replaceAll('%','%%')+'" %*\r\n':`#!/bin/sh\nexec ${shellQuote(chrome)} "$@"\n`;
+    if(process.platform!=='win32')wrappers.chromium = `#!/bin/sh\nexec ${shellQuote(chrome)} "$@"\n`;
     fs.writeFileSync(path.join(work,'.opentake','tools.json'),JSON.stringify(verified,null,2));
   }
   wrappers.python = wrappers.python3;

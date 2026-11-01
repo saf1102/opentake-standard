@@ -46,7 +46,7 @@ export type ScreenRouteContext={req:IncomingMessage;res:ServerResponse;parts:str
 export async function handleOpenScreenApi(ctx: ScreenRouteContext): Promise<boolean> {
   if(await handleScreenEditionApi(ctx))return true;
   const { req, res, parts, id, dir } = ctx;
-  if(process.platform==='darwin'&&parts[2]==='openscreen'&&parts[3]==='lock'&&parts.length===4&&req.method==='POST')
+  if(parts[2]==='openscreen'&&parts[3]==='lock'&&parts.length===4&&req.method==='POST')
     return handled(sendJson(res,200,{ok:true,result:acquireScreenLock(dir,await bodyJson(req))}));
   if (parts[2] === "openscreen" && parts[3] === "documents" && parts.length === 4) {
     if (req.method === "GET")

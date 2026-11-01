@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CircleStop, FileVideo2, MonitorUp, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useParams } from 'react-router'
 import type { EditProject, OpenScreenBridgeMessage, OpenScreenHostSession } from '@/types'
-import { acquireLock, cancelOpenScreenHostSession, confirmOpenScreenHostCandidate, getOpenScreenHostSession, getOpenScreenHostSessions, getProject, launchOpenScreenHost, getRecordingControlStatus, stopNativeRecording } from '@/studio/api'
+import { cancelOpenScreenHostSession, confirmOpenScreenHostCandidate, getOpenScreenHostSession, getOpenScreenHostSessions, getProject, launchOpenScreenHost, getRecordingControlStatus, stopNativeRecording } from '@/studio/api'
 import RecordingSetup from './RecordingSetup'
 import '@/screen-motion/openscreen-workspace.css'
 import embeddedGlass from '@/workspace/embedded-glass.css?inline'
@@ -21,24 +21,7 @@ function createClientId() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
-function getClientId() {
-  // The main editor and OpenScreen are two views of the same personal project,
-  // so they must renew one shared browser identity instead of locking each
-  // other out.
-  const key = 'link-reader-editor-client'
-  const existing = localStorage.getItem(key)
-  if (existing) return existing
-  const value = createClientId()
-  localStorage.setItem(key, value)
-  return value
-}
-
-function isMacScreenWorkspace() {
-  return /Mac/i.test(window.navigator.platform)
-}
-
 function getScreenClientId() {
-  if (!isMacScreenWorkspace()) return getClientId()
   // 录屏窗口使用独立身份；口播继续使用自己的旧身份和锁规则。
   const key = 'opentake-screen-editor-client'
   const existing = window.sessionStorage.getItem(key)
@@ -49,7 +32,6 @@ function getScreenClientId() {
 }
 
 async function acquireScreenWorkspaceLock(id: string, clientId: string, takeover: boolean) {
-  if (!isMacScreenWorkspace()) return acquireLock(id, clientId, takeover)
   const response = await fetch(`/api/editor/projects/${encodeURIComponent(id)}/openscreen/lock`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ clientId, clientName: '录屏窗口', takeover }),
@@ -218,7 +200,7 @@ export default function OpenScreenWorkspace() {
         </span>
       </div>
       <div className="openscreen-hostbar__actions">
-        {isMacScreenWorkspace()&&project&&<ProjectAgentChoice projectId={id} workspace="screen" clientId={clientId} disabled={!writable}/>}
+        {project&&<ProjectAgentChoice projectId={id} workspace="screen" clientId={clientId} disabled={!writable}/>}
         {!writable && <button type="button" onClick={() => void refreshLock(true)}>接管编辑</button>}
         <button type="button" onClick={() => iframeRef.current?.contentWindow?.location.reload()}><RefreshCw size={15} />重新载入</button>
         <button type="button" onClick={() => void launchHud()} disabled={!writable||recordingBusy}><MonitorUp size={15} />开始录屏</button>

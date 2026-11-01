@@ -193,6 +193,6 @@ node desktop/sign-local-app.cjs "$PWD/release/mac-arm64/OpenTake Standard.app"
 
 安装器包含离线 Electron、OpenScreen、WGC 采集组件、LGPL FFmpeg/ffprobe、Python 科学计算库、匹配 Chromium 和 Codex CLI。运行时从安装目录发现，不修改系统 PATH。录屏控制栏、鼠标时钟修复、生成页面异常预检及有界修复、导出取消等待进程结束、安装阶段与进度显示继续保留。录屏 MP4 导出仍使用 OpenScreen 原生运行库。
 
-Windows 10 22H2 x64 与 Windows 11 x64 使用同一安装器；Win10 虚拟机上此前已发现 OpenScreen D3D11 硬件解码初始化失败（hwdevice_ctx_init），本轮未重建该 compositor，不能把该环境的录屏导出写成已修复。H.264 是 Windows 验证编码；HEVC 在 Windows 返回明确未适配提示。Windows ARM64、32 位和 macOS 本轮不作为实测通过平台。
+Windows 10 22H2 x64 与 Windows 11 x64 使用同一安装器。本分支重建 OpenScreen 原生 compositor，在 D3D11 硬件解码初始化失败（hwdevice_ctx_init）时使用软件解码，继续通过原生合成器预览和导出；源码补丁、原始组件和构建回执随包保留。Win10、Win11 的实际录制、预览与导出结果见随包验收报告，不能仅据构建通过推断兼容性。H.264 是 Windows 验证编码；HEVC 在 Windows 返回明确未适配提示。Windows ARM64、32 位和 macOS 本轮不作为实测通过平台。
 
 升级使用新安装包，保留旧版安装包、工程与设置；没有实现 Windows 一键自动更新或数字签名。源码身份见 desktop/windows-version.json 与生成的 release-source.json；该分支不冒充未经修改的上游官方二进制。

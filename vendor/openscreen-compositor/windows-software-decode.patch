@@ -1,0 +1,100 @@
+diff --git a/crates/compositor/src/pipeline_windows.rs b/crates/compositor/src/pipeline_windows.rs
+index 28bcc4f..35be504 100644
+--- a/crates/compositor/src/pipeline_windows.rs
++++ b/crates/compositor/src/pipeline_windows.rs
+@@ -38,6 +38,7 @@ enum DecodeFrameTestFault {
+     CloneNull,
+     EofSendError,
+     AttachBufferRefNull,
++    HardwareDeviceInit,
+ }
+ 
+ #[cfg(test)]
+@@ -407,6 +408,11 @@ unsafe fn attach_d3d11va(dctx: *mut AVCodecContext, gpu: &Gpu) -> Result<*mut AV
+     if hwdev.is_null() {
+         bail!("av_hwdevice_ctx_alloc");
+     }
++    #[cfg(test)]
++    if decode_frame_test_fault_is(DecodeFrameTestFault::HardwareDeviceInit) {
++        av_buffer_unref(&mut hwdev);
++        bail!("injected hwdevice_ctx_init failure");
++    }
+     let hwdc = (*hwdev).data as *mut AVHWDeviceContext;
+     let d3dctx = (*hwdc).hwctx as *mut AVD3D11VADeviceContext;
+     let dev_clone = gpu.device.clone();
+@@ -850,20 +856,34 @@ impl Decoder {
+         // (`tests/warp_device_cannot_decode.rs`). AV1/VP9 (legacy WebMs, #554)
+         // take the same software CpuFrames axis as Backend::Cpu.
+         let want_hw = gpu.backend != Backend::Cpu && d3d11va_for_codec(codec_id);
+-        let cpu = if want_hw {
+-            None
++        let hardware = if want_hw {
++            let opened = attach_d3d11va(resources.dctx, gpu).and_then(|hwdev| {
++                resources.hwdev = hwdev;
++                averr(avcodec_open2(resources.dctx, dec, ptr::null_mut()), "avcodec_open2")
++            });
++            match opened {
++                Ok(()) => true,
++                Err(error) => {
++                    // A VM/RDP display device can create D3D11 successfully but lack
++                    // a video decoder. Keep the compositor and upload software-decoded
++                    // frames through the same CpuFrames contract as other CPU sources.
++                    eprintln!("[decode] D3D11VA unavailable ({error:#}); using software decoding");
++                    avcodec_free_context(&mut resources.dctx);
++                    av_buffer_unref(&mut resources.hwdev);
++                    let (software_decoder, software_context) = require_decoder(codecpar)?;
++                    resources.dctx = software_context;
++                    averr(avcodec_parameters_to_context(resources.dctx, codecpar), "software params_to_ctx")?;
++                    (*resources.dctx).thread_count = 0;
++                    averr(avcodec_open2(resources.dctx, software_decoder, ptr::null_mut()), "software avcodec_open2")?;
++                    false
++                }
++            }
+         } else {
+             (*resources.dctx).thread_count = 0;
+-            Some(CpuFrames::new(gpu)?)
++            averr(avcodec_open2(resources.dctx, dec, ptr::null_mut()), "avcodec_open2")?;
++            false
+         };
+-
+-        if want_hw {
+-            resources.hwdev = attach_d3d11va(resources.dctx, gpu)?;
+-        }
+-        averr(
+-            avcodec_open2(resources.dctx, dec, ptr::null_mut()),
+-            "avcodec_open2",
+-        )?;
++        let cpu = if hardware { None } else { Some(CpuFrames::new(gpu)?) };
+         let (fmt, dctx, hwdev) = resources.into_raw();
+ 
+         Ok(Decoder {
+@@ -2866,6 +2886,29 @@ mod tests {
+         println!("CORE_ASSERTIONS_COMPLETED:h264_opens_on_d3d11va");
+     }
+ 
++    #[test]
++    fn h264_device_init_failure_falls_back_to_software_and_keeps_seek_clock() {
++        let gpu = Gpu::create(false).expect("hardware device for injected failure test");
++        let path = encode_color(&["-c:v", "libopenh264", "-b:v", "200k"], "software-fallback.mp4");
++        {
++            let _fault = install_simple_decode_frame_fault(DecodeFrameTestFault::HardwareDeviceInit);
++            let mut decoder = unsafe { Decoder::open(path.to_str().unwrap(), &gpu) }
++                .expect("device initialization failure must fall back");
++            assert!(decoder.cpu.is_some());
++            assert!(decoder.hwdev.is_null(), "failed hardware context must be released");
++            let frame = unsafe { first_decoded_frame(&mut decoder) };
++            assert_eq!(unsafe { (*frame).width }, 64);
++            assert_eq!(unsafe { (*frame).height }, 64);
++            let frame = unsafe { decoder.seek_to(0.2) }.expect("software seek");
++            assert!(!frame.is_null());
++            assert!(unsafe { (*frame).best_effort_timestamp } as f64 * unsafe { decoder.tb_sec() } >= 0.2);
++        }
++        let decoder = unsafe { Decoder::open(path.to_str().unwrap(), &gpu) }
++            .expect("ordinary hardware decoder");
++        assert!(decoder.cpu.is_none(), "healthy hardware remains the default");
++        println!("CORE_ASSERTIONS_COMPLETED:h264_device_init_failure_falls_back_to_software_and_keeps_seek_clock");
++    }
++
+     #[test]
+     fn current_frame_requires_pixels_and_recovers_after_eof_seek() {
+         let Some(gpu) =

@@ -1,3 +1,5 @@
+import {windowsAgentScript} from './windows-agent-terminal.ts';
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAgentLoginManager,type LoginDependencies} from './agent-login.ts';
@@ -75,18 +77,18 @@ test('重新登录必须命令成功退出再探测；关闭、失败与取消�
 test('登录包装只记录真实退出码，带空格引号的程序路径也能恢复并清理临时目录',async()=>{
  const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
  const {execFile}=await import('node:child_process'),{promisify}=await import('node:util');
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-login-wrapper-')),executable=path.join(root,"Sa's fake kimi");
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-login-wrapper-')),executable=path.join(root,"Sa's fake kimi"+(process.platform==='win32'?'.exe':''));
  try{
   for(const code of [0,1]){
-   fs.writeFileSync(executable,`#!/bin/sh\nexit ${code}\n`,{mode:0o755});
+   fakeNodeCli(executable,`process.exit(${code});`);
    const f=fixture(),manager=createAgentLoginManager();let completed=0,resultPath='';
    const deps:LoginDependencies={...f.deps,detect:async()=>executable,complete:async id=>{completed++;f.setConnected();return f.deps.status!(id)},run:async script=>{
     if(!script.includes('do script'))return 'finished';
     const command=JSON.parse(script.match(/set loginTab to do script ("[^\n]+")/)![1]);
     resultPath=command.match(/> '([^']+exit-code)'$/)![1];
-    await promisify(execFile)('/bin/sh',['-c',command]);return '23:/dev/ttys023';
+    if(process.platform==='win32')await promisify(execFile)(path.join(process.env.SystemRoot!,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-Command',windowsAgentScript(executable,['login'],resultPath)]);else await promisify(execFile)('/bin/sh',['-c',command]);return '23:/dev/ttys023';
    }};
-   await manager.start('kimi',deps);assert.equal(fs.readFileSync(resultPath,'utf8'),String(code));
+   await manager.start('kimi',deps);assert.equal(fs.readFileSync(resultPath,'utf8').trim(),String(code));
    await manager.check('kimi',deps);assert.equal(completed,code===0?1:0);assert.equal(fs.existsSync(path.dirname(resultPath)),false);
   }
  }finally{fs.rmSync(root,{recursive:true,force:true})}

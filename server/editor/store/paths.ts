@@ -1,5 +1,6 @@
 import {defaultProjectRoot} from '../../system-settings.ts';
 import {processOwner,isProcessOwnerCancelled} from '../../proc.ts';
+import {atomicJsonSync} from '../../file-ops.ts';
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -28,10 +29,7 @@ export function projectFile(dir: string): string {
 /** 原子写入：先写临时文件再 rename，任何中途失败都不留下半个 JSON。 */
 export function atomicJson(file: string, value: unknown) {
   if(processOwner.getStore()?.startsWith('quick-edit:')&&isProcessOwnerCancelled())return;
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, file);
+  atomicJsonSync(file,value);
 }
 
 export function dirs(dir: string) {

@@ -8,6 +8,7 @@ const critical=new Set(['OpenTake Standard.exe','resources/app/package.json','re
  'resources/app/native/windows/wgc-capture.exe','resources/runtimes/manifest.json','resources/runtimes/python/python.exe',
  'resources/runtimes/ffmpeg/bin/ffmpeg.exe','resources/runtimes/ffmpeg/bin/ffprobe.exe','resources/runtimes/openscreen/Openscreen.exe',
  'resources/runtimes/openscreen/resources/electron/native/bin/win32-x64/wgc-capture.exe',
+ 'resources/runtimes/openscreen/resources/electron/native/bin/win32-x64/compositor_view.node',
  'resources/runtimes/browsers/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe',
  'resources/runtimes/codex/vendor/x86_64-pc-windows-msvc/bin/codex.exe']);
 async function writePayloadManifest(root){

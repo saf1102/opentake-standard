@@ -1,12 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {atomicJson,readLock as legacyReadLock} from './store.ts';
+import {atomicJson} from './store.ts';
 
 type ScreenLock={clientId:string;clientName:string;acquiredAt:number;heartbeatAt:number;expiresAt:number};
 export const screenLockFile=(dir:string)=>path.join(dir,'analysis','openscreen','editor-lock.json');
 /** Screen windows only. The speech editor continues using its revision checks. */
 export function readScreenLock(dir:string):ScreenLock|undefined {
- if(process.platform!=='darwin')return legacyReadLock(dir);
  const file=screenLockFile(dir);
  if(!fs.existsSync(file))return undefined;
  const lock=JSON.parse(fs.readFileSync(file,'utf8')) as ScreenLock;

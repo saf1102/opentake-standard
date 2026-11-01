@@ -1,3 +1,4 @@
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,6 +12,7 @@ import {quarantineSoftware} from './general/net-guard.ts';
 import {createGeneral,findGeneral,updateGeneral} from './general/store.ts';
 import {readSession,writeSession,setGeneralRuntime,resumeRun,isLive,missingCodexRollout} from './general/runner.ts';
 import {initialSteps,verifySelfCheck} from './general/events.ts';
+import {pythonPath as awaitPython} from './general/kit-env.ts';
 const checker=createRequire(import.meta.url)('../desktop/creation-tools.cjs');
 
 test('第14行：Pro 仅检查登录，不探测其他三项；失败不泄漏登录输出',async()=>{
@@ -32,10 +34,10 @@ test('P01：每个输出帧等待所有子 frame 的字体；失败拒绝交付'
 });
 
 test('P03：自己的逐字节匹配 ZIP 保留，伪装、篡改、穿越 ZIP 隔离',()=>{
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'task19-archive-'));const old=process.env.LINKREADER_PYTHON;process.env.LINKREADER_PYTHON='/usr/bin/python3';
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'task19-archive-'));const old=process.env.LINKREADER_PYTHON;process.env.LINKREADER_PYTHON=(awaitPython());
  try{
   const work=path.join(root,'work'),snapshot=path.join(root,'versions/v1/work');fs.mkdirSync(path.join(work,'versions'),{recursive:true});fs.mkdirSync(snapshot,{recursive:true});fs.writeFileSync(path.join(snapshot,'index.html'),'saved');
-  const zip=(name:string,body:string,entry='index.html')=>execFileSync('/usr/bin/python3',['-c','import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],"w") as z:z.writestr(sys.argv[3],sys.argv[2])',path.join(work,name),body,entry]);
+  const zip=(name:string,body:string,entry='index.html')=>execFileSync(awaitPython(),['-c','import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],"w") as z:z.writestr(sys.argv[3],sys.argv[2])',path.join(work,name),body,entry]);
   zip('versions/v1.zip','saved');zip('versions/v2.zip','saved');zip('download.zip','saved');assert.deepEqual(quarantineSoftware(work,path.join(root,'blocked')).sort(),['download.zip','versions/v2.zip']);
   zip('versions/v1.zip','wrong');assert.deepEqual(quarantineSoftware(work,path.join(root,'tampered')),['versions/v1.zip']);
   zip('versions/v1.zip','saved','../index.html');assert.deepEqual(quarantineSoftware(work,path.join(root,'traversal')),['versions/v1.zip']);
@@ -45,7 +47,7 @@ test('P03：自己的逐字节匹配 ZIP 保留，伪装、篡改、穿越 ZIP �
 test('P15：内容不变的每个包装脚本仍恢复 0755',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'task19-permissions-'));
  const tools={codex:process.execPath,python:process.execPath,ffmpeg:process.execPath,ffprobe:process.execPath,chromium:process.execPath};
- try{prepareWork(root,{},false,tools);const bin=path.join(root,'work/.opentake/bin');const before=new Map(fs.readdirSync(bin).map(name=>[name,fs.readFileSync(path.join(bin,name))]));for(const name of before.keys())fs.chmodSync(path.join(bin,name),0o644);prepareWork(root,{},false,tools);for(const [name,bytes]of before){assert.deepEqual(fs.readFileSync(path.join(bin,name)),bytes);assert.equal(fs.statSync(path.join(bin,name)).mode&0o777,0o755);}}finally{fs.rmSync(root,{recursive:true,force:true});}
+ try{prepareWork(root,{},false,tools);const bin=path.join(root,'work/.opentake/bin');const before=new Map(fs.readdirSync(bin).map(name=>[name,fs.readFileSync(path.join(bin,name))]));for(const name of before.keys())fs.chmodSync(path.join(bin,name),0o644);prepareWork(root,{},false,tools);for(const [name,bytes]of before){assert.deepEqual(fs.readFileSync(path.join(bin,name)),bytes);if(process.platform==='win32')assert.ok(name.endsWith('.cmd'));else assert.equal(fs.statSync(path.join(bin,name)).mode&0o777,0o755);}}finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
 test('P04：阶段完成不代表自查完成，缺样张时跳过且清掉缩略图',()=>{
@@ -58,11 +60,11 @@ for(const mode of ['recover','repeat','unrelated','empty-sheet','valid-sheet'] a
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'task19-runner-'));
  const keys=['LINK_READER_PROJECTS_DIR','LINKREADER_AGENT_SETTINGS_FILE'];const old=keys.map(k=>process.env[k]);
  process.env.LINK_READER_PROJECTS_DIR=path.join(root,'projects');process.env.LINKREADER_AGENT_SETTINGS_FILE=path.join(root,'settings/agent.json');fs.mkdirSync(process.env.LINK_READER_PROJECTS_DIR,{recursive:true});
- const fake=path.join(root,'codex');const calls=path.join(root,'calls.jsonl');let id='';let activity='';
+ let fake=path.join(root,'codex');const calls=path.join(root,'calls.jsonl');let id='';let activity='';
  try{
   const script=path.join(root,'fake.mjs');
   fs.writeFileSync(script,`import fs from 'node:fs';const args=process.argv.slice(2);let prompt='';for await(const x of process.stdin)prompt+=x;fs.appendFileSync(${JSON.stringify(calls)},JSON.stringify({args,prompt})+'\\n');const resume=args.includes('resume');if(${JSON.stringify(mode)}==='unrelated'||resume||${JSON.stringify(mode)}==='repeat'){console.error(${JSON.stringify(mode)}==='unrelated'?'network unavailable':'thread/resume: no rollout found for thread id old');process.exit(1)}console.log(JSON.stringify({type:'thread.started',thread_id:'new-thread'}));console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:12,output_tokens:3}}));fs.writeFileSync(args[args.indexOf('-o')+1],'完成测试');`);
-  fs.writeFileSync(fake,`#!/bin/sh\nexec '${process.execPath.replaceAll("'","'\\''")}' '${script.replaceAll("'","'\\''")}' "$@"\n`,{mode:0o755});
+  fake=fakeNodeCli(fake,fs.readFileSync(script,'utf8'),true);
   const tools={codex:fake,python:process.execPath,ffmpeg:process.execPath,ffprobe:process.execPath,chromium:process.execPath};
   setGeneralRuntime({creationTools:async()=>tools,resolveCodex:async()=>({executable:fake,model:'actual',effort:'low',requested:{model:'old-model',effort:'low'}}),baseEnv:()=>({...process.env}),agentReview:false,render:async(_work,_video,options)=>{options?.onActivity?.('正在抽取并解码测试素材');activity=findGeneral(id).project.run!.steps.find(s=>s.id==='render')!.detail!;throw Error('TEST_RENDER_BOUNDARY');}});
   const made=createGeneral({styleId:'whiteboard',settings:{aspect:'16:9',length:15},inputs:{kind:'topic',text:'保留文案'}},'测试');id=made.project.id;const {dir}=made;

@@ -5,7 +5,7 @@ import distribution from './distribution.cjs';
 import {prepareRuntimeManifest} from './prepare-runtimes.mjs';
 import windowsSource from './windows-source.cjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-if(process.platform!=='win32'||process.arch!=='x64')throw Error('此安装器仅用于 Windows x64；本轮验收系统为 Win11。');
+if(process.platform!=='win32'||process.arch!=='x64')throw Error('此安装器仅用于 Windows x64。');
 windowsSource.writeWindowsSourceReceipt(root);
 await prepareRuntimeManifest(root);
 const result=spawnSync(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/installer.builder.config.cjs','--win','nsis','--x64','--publish','never'],

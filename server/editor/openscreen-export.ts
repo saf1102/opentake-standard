@@ -359,8 +359,11 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   }
   const targetKey=(file:string)=>process.platform==='win32'?path.resolve(file).toLowerCase():path.resolve(file);
   if([...live.values()].some(item=>targetKey(item.job.outputFile)===targetKey(target)))throw Error('该目标正在导出，请等待完成或取消后重试。');
+  const createdOutputDirectory=!fs.existsSync(path.dirname(target));
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const outputDir=path.dirname(target);
+  // Release only this job's empty reservation; preserve existing output files.
+  const releaseEmptyOutputDirectory=()=>{if(createdOutputDirectory&&fs.existsSync(outputDir)&&fs.readdirSync(outputDir).length===0){try{fs.rmdirSync(outputDir)}catch(error){if(!['ENOENT','ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code||''))console.warn('[OpenScreen] empty output directory retained',error)}}};
   const resultFile=settings?path.join(outputDir,settings.preset==='jianying'?'剪映工程':`成片.${settings.video.codec==='prores422'?'mov':settings.video.container}`):target;
 
   const id = crypto.randomUUID();
@@ -401,7 +404,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   fs.writeFileSync(stagedProject, JSON.stringify(stagedDocument, null, 2));
   } catch(error) {
     job.status='failed';job.error=`准备导出失败：${error instanceof Error?error.message:String(error)}`;
-    persistFromProcess(job);throw error;
+    persistFromProcess(job);cleanupPathSync(stagingDir,{recursive:true});releaseEmptyOutputDirectory();throw error;
   }
 
   const workingOutput=path.join(stagingDir,`output.${format}`);
@@ -435,7 +438,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     stdio: ["ignore", "pipe", "pipe"],
   }); } catch (error) {
     job.status='failed';job.error=error instanceof Error?error.message:String(error);
-    persistFromProcess(job);throw error;
+    persistFromProcess(job);cleanupPathSync(stagingDir,{recursive:true});releaseEmptyOutputDirectory();throw error;
   }
   const controller=new AbortController();
   let finish!:()=>void;
@@ -495,8 +498,12 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
         job.completedAt = Date.now();
         job.wallS = job.wallS ?? Math.max(0, (job.completedAt - (job.startedAt || job.createdAt)) / 1000);
       } catch (error) {
-        job.status = "failed";
-        job.error = `成片已生成，但写入目标失败：${error instanceof Error ? error.message : String(error)}；临时成片保留：${workingOutput}`;
+        if(controller.signal.aborted||live.get(id)?.cancelling){
+          job.status='cancelled';job.completedAt=Date.now();preserveStaging=false;
+        }else{
+          job.status = "failed";
+          job.error = `成片已生成，但写入目标失败：${error instanceof Error ? error.message : String(error)}；临时成片保留：${workingOutput}`;
+        }
       }
     } else {
       job.status = "failed";
@@ -506,7 +513,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     }
     persistFromProcess(job);
     }catch(error){job.status='failed';job.error=`导出收尾失败：${error instanceof Error?error.message:String(error)}`;persistFromProcess(job);}
-    finally{live.delete(id);if(!preserveStaging)cleanupPathSync(stagingDir,{recursive:true});finish();}
+    finally{live.delete(id);if(!preserveStaging)cleanupPathSync(stagingDir,{recursive:true});if(job.status==='failed'||job.status==='cancelled')releaseEmptyOutputDirectory();finish();}
   });
 
   return job;

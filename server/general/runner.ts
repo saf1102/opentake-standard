@@ -289,7 +289,7 @@ const handoffs=new Set<string>();
 export async function switchRunAgent(id:string,input:unknown):Promise<GeneralProject>{
  if(handoffs.has(id))throw Object.assign(Error('正在检查新的智能体，请稍候'),{status:409});
  const choice=parseAgent(input);if(!choice?.agent)throw Object.assign(Error('请选择要接着做的智能体'),{status:400});
- const target=filmAgentId(choice);assertAgentExecutionAllowed(target);
+ assertAgentExecutionAllowed(choice.agent);const target=filmAgentId(choice);
  const {dir,project}=findGeneral(id),run=project.run;
  if(!run||!['failed','stopped'].includes(run.state)||isLive(id))throw Object.assign(Error('请等出片停止后再切换智能体'),{status:409});
  if(!readSession(dir).pending)throw Object.assign(Error('没有尚未完成的出片步骤'),{status:409});

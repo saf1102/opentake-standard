@@ -1,3 +1,4 @@
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -111,7 +112,7 @@ test('ACP 模型目录保留默认项，缺目录跟随默认，兼容 configOpt
 test('状态命令只返回归类；Cursor negative优先，OpenCode凭据列表不泄露账号',async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-status-test-'));
  try{
-  const executable=path.join(root,'fake-cli');
+  const executable=path.join(root,'fake-cli'+(process.platform==='win32'?'.exe':''));
   for(const [output,args,state] of [
    ['Logged in as private@example.com',['status'],'connected'],
    ['Not authenticated. Previously logged in as private@example.com',['status'],'needs-login'],
@@ -119,10 +120,10 @@ test('状态命令只返回归类；Cursor negative优先，OpenCode凭据列表
    ['provider-name OAuth\n└ 1 credentials',['auth','list'],'connected'],
    ['└ 0 credentials',['auth','list'],'needs-login'],
   ] as const){
-   fs.writeFileSync(executable,`#!/usr/bin/env node\nconsole.log(${JSON.stringify(output)});`,{mode:0o755});
+   fakeNodeCli(executable,`console.log(${JSON.stringify(output)});`);const files=fs.readdirSync(root);
    const result=await probeAgentStatusCommand(executable,args,{tempRoot:root});
    assert.equal(result.state,state);assert.doesNotMatch(JSON.stringify(result),/private@example|provider-name/);
-   assert.deepEqual(fs.readdirSync(root),['fake-cli']);
+   assert.deepEqual(fs.readdirSync(root),files);
   }
  }finally{fs.rmSync(root,{recursive:true,force:true})}
 });

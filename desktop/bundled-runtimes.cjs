@@ -4,6 +4,7 @@ const {environmentPath,environmentWithPath}=require('./platform.cjs');
 const RUNTIME_LAYOUT=Object.freeze({
  ffmpeg:'ffmpeg/bin/ffmpeg.exe',ffprobe:'ffmpeg/bin/ffprobe.exe',
  python:'python/python.exe',openscreen:'openscreen/Openscreen.exe',
+ compositor:'openscreen/resources/electron/native/bin/win32-x64/compositor_view.node',
  chromium:'browsers/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe',
  headless:'browsers/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe',
  codex:'codex/vendor/x86_64-pc-windows-msvc/bin/codex.exe',

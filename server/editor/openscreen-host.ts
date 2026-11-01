@@ -308,7 +308,7 @@ export function launchOpenScreenHud(projectId: string): OpenScreenHostSession {
   });
   persist(session);
   const profile = openScreenProjectProfile(projectId);
-  if (profile && process.platform !== "win32") fs.mkdirSync(profile, { recursive: true });
+  if (profile) fs.mkdirSync(profile, { recursive: true });
   const app = process.platform === "darwin" ? appBundleForExecutable(executable) : undefined;
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   const profileArgs = openScreenProfileArgs({ ...env, OPENSCREEN_USER_DATA_DIR: profile });
@@ -324,9 +324,7 @@ export function launchOpenScreenHud(projectId: string): OpenScreenHostSession {
     } catch { return false; }
   };
   child.once("close", (code, signal) => {
-    const failed = process.platform === "win32"
-      ? !oldWindows && code && !["completed", "cancelled"].includes(session.status)
-      : (code || signal) && !terminal();
+    const failed = (code || signal) && !terminal();
     if (failed) {
       session.status = "failed";
       session.error = `OpenScreen 启动失败（${signal || code}），请检查本机安装。`;
@@ -334,14 +332,14 @@ export function launchOpenScreenHud(projectId: string): OpenScreenHostSession {
     }
   });
   child.once("error", (error) => {
-    if (process.platform !== "win32" && terminal()) return;
+    if (terminal()) return;
     session.status = "failed";
     session.error = error.message;
     persistFromCallback(session);
   });
   child.once("spawn", () => {
     child.unref();
-    if (process.platform !== "win32" && terminal()) return;
+    if (terminal()) return;
     session.status = "waiting";
     persistFromCallback(session);
     child.unref();
