@@ -20,6 +20,20 @@ test('Windows Explorer handoff succeeds even when the dispatcher later exits wit
  const [code]=await closed;assert.equal(code,1);
 });
 
+test('Windows directory reveal launches a visible Explorer window for Chinese and spaced paths',async t=>{
+ const {dir}=revealFixture(t),target=path.join(dir,'工程 中文 空格'),original=cp.spawn;let closed;
+ fs.mkdirSync(target);
+ t.mock.method(cp,'spawn',(command,args,options)=>{
+  assert.equal(command,path.win32.join(process.env.SystemRoot,'explorer.exe'));
+  assert.deepEqual(args,['/select,',target]);
+  assert.equal(options.windowsHide,false,'Explorer must show the requested directory window');
+  assert.equal(options.shell,undefined);
+  const worker=original(process.execPath,['-e','process.exit(0)'],options);closed=once(worker,'close');return worker;
+ });
+ await revealPath(target,'win32');
+ assert.equal((await closed)[0],0);
+});
+
 test('file reveal still rejects missing targets and executable launch errors',async t=>{
  const {dir,file}=revealFixture(t),original=cp.spawn;
  await assert.rejects(revealPath(path.join(dir,'missing.mp4'),'win32'),{code:'ENOENT'});

@@ -42,7 +42,9 @@ function revealCommand(target,platform=process.platform,env=process.env){
 async function revealPath(target,platform=process.platform){
  const command=revealCommand(target,platform);
  fs.statSync(target);
- const child=childProcess.spawn(command.command,command.args,{detached:true,stdio:'ignore',windowsHide:true});
+ // This is a user-requested file manager window. Hiding Explorer can silently
+ // hide directory reveals even when the shell accepts the request.
+ const child=childProcess.spawn(command.command,command.args,{detached:true,stdio:'ignore',windowsHide:false});
  await new Promise((resolve,reject)=>{
   child.once('error',reject);
   // Explorer hands the request to the desktop shell and can then exit with 1,
