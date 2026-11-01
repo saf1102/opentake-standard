@@ -9,6 +9,7 @@ export const includeStyle = (id: string) => ids.includes(id);
 export const recordCodexUsage = () => {};
 export const styleError = '请选择 Standard 的 10 种风格之一';
 export const revealCommand = platform.revealCommand;
+export const revealPath = platform.revealPath;
 
 /** 保留 Standard 既有默认目录规则；只自动创建 home 内的旧默认目录。 */
 export const canCreateLegacyProjectRoot = (root: string) => root.startsWith(os.homedir() + path.sep);

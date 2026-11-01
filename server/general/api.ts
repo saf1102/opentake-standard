@@ -1,7 +1,7 @@
 import {chooseExportDestination} from '../editor/settings-host.ts';
 import {readExportPreferences,writeExportPreferences} from '../export-preferences.ts';
 import {requireCreationTools} from '../creation-tools.ts';
-import {extraStyle,styleError,revealCommand} from './edition.ts';
+import {extraStyle,styleError,revealPath} from './edition.ts';
 /** /api/general：通用剪辑的接口，照 src/general/general-contract.ts 实现。回应沿用工作台的 {ok, result} / {ok:false, error}。 */
 import { startExport, exportRunning, reconcileExports, generalExportSource, generalExportHistory, readGeneralExport, cancelGeneralExport, cancelExport } from './export.ts';
 import {renameWithRetrySync,removeWithRetrySync,cleanupPathSync} from '../file-ops.ts';
@@ -67,7 +67,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
     // 打开工程目录 in the editor's media column (S先生 10-31: it did nothing)
     if (action === 'reveal' && method === 'POST' && parts.length === 3) {
       const { dir } = findGeneral(id);
-      const cmd = revealCommand(dir); await exec(cmd.command, cmd.args);
+      await revealPath(dir);
       return ok(res, { revealed: true });
     }
     if (action === 'files' && (method === 'GET' || method === 'HEAD')) {
@@ -105,7 +105,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
         const body=await bodyJson(req);const task=body.id?readGeneralExport(dir,String(body.id)):project.exportTask;
         const target=task?.state==='done'?(task.folder||task.outputDir):undefined;
         if(!target||!fs.existsSync(target))throw Error('找不到导出文件夹');
-        const cmd=revealCommand(target);await exec(cmd.command,cmd.args);
+        await revealPath(target);
         return ok(res,{revealed:true});
       }
     }

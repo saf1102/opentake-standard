@@ -1,6 +1,8 @@
 const path = require('node:path');
 const os = require('node:os');
-const {spawnSync} = require('node:child_process');
+const childProcess = require('node:child_process');
+const {spawnSync} = childProcess;
+const fs = require('node:fs');
 function environmentPath(env=process.env,platform=process.platform){
  const key=platform==='win32'?Object.keys(env).find(name=>/^path$/i.test(name)):'PATH';
  return env.PATH??(key?env[key]:undefined)??'';
@@ -33,6 +35,19 @@ function revealCommand(target,platform=process.platform){
  if(platform==='darwin')return {command:'/usr/bin/open',args:['-R',target]};
  return {command:'xdg-open',args:[p.dirname(target)]};
 }
+async function revealPath(target,platform=process.platform){
+ const command=revealCommand(target,platform);
+ fs.statSync(target);
+ const child=childProcess.spawn(command.command,command.args,{detached:true,stdio:'ignore',windowsHide:true});
+ await new Promise((resolve,reject)=>{
+  child.once('error',reject);
+  // Explorer hands the request to the desktop shell and can then exit with 1,
+  // even after opening and selecting the requested item successfully.
+  if(platform==='win32')child.once('spawn',resolve);
+  else child.once('close',(code,signal)=>code===0?resolve():reject(Error(`文件管理器启动失败（${signal||code}）`)));
+ });
+ child.unref();
+}
 function buildTarget(platform=process.platform,arch=process.arch,release=os.release()){
  if(platform==='darwin')return 'mac';
  if(platform!=='win32'||arch!=='x64')throw Error('仅支持 macOS 和 Windows 10/11 x64 本机构建');
@@ -40,4 +55,4 @@ function buildTarget(platform=process.platform,arch=process.arch,release=os.rele
  if(major!==10||!Number.isInteger(build)||build<19045)throw Error('需要 Windows 10 22H2 或 Windows 11');
  return build>=22000?'win11':'win10';
 }
-module.exports={environmentPath,environmentWithPath,appDataRoot,standardDataRoot,projectsRoot,termination,killTree,revealCommand,buildTarget};
+module.exports={environmentPath,environmentWithPath,appDataRoot,standardDataRoot,projectsRoot,termination,killTree,revealCommand,revealPath,buildTarget};
