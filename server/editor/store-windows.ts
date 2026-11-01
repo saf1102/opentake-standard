@@ -1,7 +1,8 @@
+import {atomicJsonSync} from '../file-ops.ts';
 import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';
 import type {EditProject} from '../../src/types/editor.ts';
 import {defaultProjectRoot} from '../system-settings.ts';
-export function atomicJson(file:string,data:unknown){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+crypto.randomUUID()+'.tmp';fs.writeFileSync(tmp,JSON.stringify(data,null,2));fs.renameSync(tmp,file)}
+export function atomicJson(file:string,data:unknown){atomicJsonSync(file,data)}
 export function projectFolder(id:string){if(!/^[a-zA-Z0-9_-]{1,96}$/.test(id))throw Error('工程编号无效');const dir=path.join(defaultProjectRoot(),id);if(fs.existsSync(dir)&&fs.lstatSync(dir).isSymbolicLink())throw Error('工程不能是符号链接');return dir}
 export function findProject(id:string,_refresh=false){const dir=projectFolder(id);const p=JSON.parse(fs.readFileSync(path.join(dir,'project.json'),'utf8')) as EditProject & {standardKind?:string};if(p.id!==id||!(p.standardKind==='screen'||p.openScreenDocuments?.length||fs.existsSync(path.join(dir,'.opentake-screen.json'))||fs.existsSync(path.join(dir,'screen-project.json'))))throw Error('不是 Standard 录屏工程');return {dir,project:p}}
 export function save(dir:string,project:EditProject){atomicJson(path.join(dir,'project.json'),project)}

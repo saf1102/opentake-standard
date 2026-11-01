@@ -1,3 +1,4 @@
+import {startWindowsAgentTerminal,windowsAgentTerminalState} from './windows-agent-terminal.ts';
 /** 本机智能体管理：固定官方命令，账号切换按退出、关闭会话、登录顺序执行。 */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -76,7 +77,7 @@ export async function setAgentProgramPath(id:ConnectionId,cliPath:string,deps:Ag
 
 export type AgentManagementAction='install'|'logout'|'switch-account'|'upgrade';
 export type AgentManagementState={id:ConnectionId;action:AgentManagementAction;phase?:'logout'|'login';state:'waiting'|'complete'|'failed'|'cancelled';message:string;connection?:ConnectionView};
-type ManagedSession={resultDir?:string;state:AgentManagementState;windowId:number;tty:string;started:number;deps:AgentManagementDeps;timer?:ReturnType<typeof setTimeout>;checking?:Promise<AgentManagementState>};
+type ManagedSession={windowsPid?:number;resultDir?:string;state:AgentManagementState;windowId:number;tty:string;started:number;deps:AgentManagementDeps;timer?:ReturnType<typeof setTimeout>;checking?:Promise<AgentManagementState>};
 /** Only a fixed official command is sent to Terminal; output and account files are never read. */
 export function createAgentManagement(){
  const sessions=new Map<ConnectionId,ManagedSession>();
@@ -98,7 +99,7 @@ export function createAgentManagement(){
     if(result.waiting){schedule(id,session);return {...session.state};}
     return finish(session,result.connection.connected?'complete':'failed',result.connection.connected?'新账号已接通':'登录未完成，请重新登录');
    }
-   const terminalState=await (session.deps.terminal??terminal)(`if application "Terminal" is not running then return "closed"\ntell application "Terminal"\nrepeat with w in windows\nif id of w is ${session.windowId} then\nrepeat with t in tabs of w\nif tty of t is ${quoteApple(session.tty)} then\nif busy of t then return "waiting"\nreturn "finished"\nend if\nend repeat\nend if\nend repeat\nend tell\nreturn "closed"`);
+   const terminalState=session.windowsPid?windowsAgentTerminalState(session.windowsPid,session.resultDir!):await (session.deps.terminal??terminal)(`if application "Terminal" is not running then return "closed"\ntell application "Terminal"\nrepeat with w in windows\nif id of w is ${session.windowId} then\nrepeat with t in tabs of w\nif tty of t is ${quoteApple(session.tty)} then\nif busy of t then return "waiting"\nreturn "finished"\nend if\nend repeat\nend if\nend repeat\nend tell\nreturn "closed"`);
    if(session.state.state!=='waiting')return {...session.state};
    if(terminalState==='waiting'){schedule(id,session);return {...session.state};}
    if(!['closed','finished'].includes(terminalState))return finish(session,'failed','没查到终端状态，请重新检查');
@@ -130,10 +131,11 @@ export function createAgentManagement(){
   assertAgent(id);allowed(id,deps);
   if(!['install','logout','switch-account','upgrade'].includes(action))throw Error('未知管理操作');
   if(starts.has(id)||sessions.get(id)?.state.state==='waiting')throw Error('这家智能体还有操作未结束');
-  if((deps.platform??process.platform)!=='darwin')throw Error('终端管理操作目前只支持 macOS');
+  const host=deps.platform??process.platform;
+  if(host!=='darwin'&&host!=='win32')throw Error('此主机不支持终端管理');
   starts.add(id);
   try{
-   const definition=connectionDefinition(id);let command:string;
+   const definition=connectionDefinition(id);let command:string;let nativeCommand:{executable:string;args:string[]}|undefined;
    if(action==='install'){
     if(await detect(id,deps))throw Error('已经找到程序，无需再次安装');
     const official=definition.installCommand??ROSTER_AGENTS.find(item=>item.id===id)?.installer??(id==='codex'?CODEX_INSTALL_COMMAND:undefined);
@@ -149,7 +151,20 @@ export function createAgentManagement(){
     if(!definition.logoutArgs)throw Error('这家命令行退出登录待适配，请到它自己的 App 里换账号');
     const executable=await detect(id,deps);if(!executable||/[\r\n\0]/.test(executable))throw Error('没有找到可用的程序');
     if(id!=='claude'&&isClaudeExecutable(executable,process.env,getConnectionConfig('claude').cliPath))throw Error('程序路径不能指向 Claude Code');
-    command=[executable,...definition.logoutArgs].map(quoteShell).join(' ');
+    command=[executable,...definition.logoutArgs].map(quoteShell).join(' ');nativeCommand={executable,args:[...definition.logoutArgs]};
+   }
+   if(host==='win32'){
+    if(!nativeCommand){
+     if(!/^npm (?:install|update) -g [@a-zA-Z0-9_./-]+(?:@[a-zA-Z0-9_.-]+)?$/.test(command))throw Error('此安装或升级命令仅适用于 macOS，请使用这家智能体的 Windows 官方安装页');
+     const [executable,...args]=command.split(' ');nativeCommand={executable:executable+'.cmd',args};
+    }
+    allowed(id,deps);const resultDir=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-management-result-'));
+    try{
+     const pid=await startWindowsAgentTerminal(nativeCommand.executable,nativeCommand.args,resultDir);
+     const session:ManagedSession={windowsPid:pid,resultDir,state:{id,action,...(action==='switch-account'?{phase:'logout' as const}:{}),state:'waiting',message:action==='upgrade'?'等你升级，好了自动重新检查':action==='install'?'等你安装，好了自动查找':'正在退出旧账号'},windowId:pid,tty:'windows',started:(deps.now??Date.now)(),deps};
+     if(action==='switch-account'){(deps.rejectCredentials??(agent=>markAgentCredentialsRejected(agent,'cli')))(id);setAgentAccountChanging(id,true);}
+     sessions.set(id,session);schedule(id,session);return {...session.state};
+    }catch(error){fs.rmSync(resultDir,{recursive:true,force:true});throw error}
    }
    allowed(id,deps);
    const resultDir=action==='switch-account'||action==='upgrade'?fs.mkdtempSync(path.join(os.tmpdir(),'opentake-management-result-')):undefined;

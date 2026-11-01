@@ -1,3 +1,8 @@
+import {cleanupPathSync,renameWithRetrySync} from '../file-ops.ts';
+import {StringDecoder} from 'node:string_decoder';
+import {fileURLToPath} from 'node:url';
+import {staticAssetPath} from '../static-assets.ts';
+import platform from '../platform.ts';
 import {openScreenProjectProfile} from './openscreen-profile.ts';
 import {ExportSettingsSchema,type ExportSettings} from '../../src/types/editor.ts';
 import {probeExportMedia} from '../general/export-media.ts';
@@ -18,9 +23,10 @@ import { readOpenScreenDocument } from "./openscreen-documents.ts";
 import { atomicJson, findProject } from "./store.ts";
 
 type JsonObject = Record<string, unknown>;
-type LiveExport = { controller?:AbortController; cleanup:()=>void; child: ChildProcess; startedAt: number; job: OpenScreenExportJob };
+type LiveExport = { controller?:AbortController; finished:Promise<void>; cancelling?:boolean; child: ChildProcess; startedAt: number; job: OpenScreenExportJob };
 
 const live = new Map<string, LiveExport>();
+const unsaved = new Map<string, OpenScreenExportJob>();
 export const activeOpenScreenExports = () => live.size;
 
 /** Run the user's installed OpenScreen as a separate process. Its own Electron,
@@ -63,7 +69,18 @@ function persist(job: OpenScreenExportJob) {
   const { dir } = findProject(job.projectId, true);
   job.updatedAt = Date.now();
   atomicJson(jobFile(dir, job.documentId, job.id), job);
+  unsaved.delete(job.id);
   return job;
+}
+function persistFromProcess(job:OpenScreenExportJob) {
+  try{persist(job);return true}catch(error){
+    job.status='failed';job.error=`保存导出状态失败：${error instanceof Error?error.message:String(error)}；工程与已有文件保留。`;
+    unsaved.set(job.id,job);
+    if(unsaved.size>200)unsaved.delete(unsaved.keys().next().value!);
+    const worker=live.get(job.id)?.child;
+    try{if(worker?.pid&&worker.exitCode===null&&worker.signalCode===null)platform.killTree(worker.pid)}catch{}
+    return false;
+  }
 }
 
 function pad(value: number) {
@@ -158,7 +175,7 @@ function localizeString(
   }
   try {
     const parsed = new URL(value);
-    if (parsed.protocol === "file:") return decodeURIComponent(parsed.pathname);
+    if (parsed.protocol === "file:") return fileURLToPath(parsed);
     const match = parsed.pathname.match(/\/api\/editor\/projects\/[^/]+\/media\/([^/]+)\/file$/);
     if (match) {
       return assetLocalPath(
@@ -312,7 +329,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   savedEditor?: unknown;
 }) {
   const existing=[...live.values()].find(item=>item.job.projectId===projectId&&item.job.documentId===documentId&&['queued','running'].includes(item.job.status));
-  if(existing)throw Error('此录屏正在导出，请等待完成或取消后重试');
+  if(existing)throw Error('目标文件正在导出，请等待完成或取消后重试');
   const found = findProject(projectId, true);
   const current = readOpenScreenDocument(projectId, documentId);
   // Revision validation is read-only; staging failures below become persisted failed jobs.
@@ -340,7 +357,8 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     const destination=settings.destinationDir.trim()?validateDirectory(settings.destinationDir):path.join(found.dir,'exports');
     target=path.join(destination,crypto.randomUUID(),'source.mp4');
   }
-  if(fs.existsSync(target))throw Error('导出目标已存在，请选择新文件名');
+  const targetKey=(file:string)=>process.platform==='win32'?path.resolve(file).toLowerCase():path.resolve(file);
+  if([...live.values()].some(item=>targetKey(item.job.outputFile)===targetKey(target)))throw Error('该目标正在导出，请等待完成或取消后重试。');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const outputDir=path.dirname(target);
   const resultFile=settings?path.join(outputDir,settings.preset==='jianying'?'剪映工程':`成片.${settings.video.codec==='prores422'?'mov':settings.video.container}`):target;
@@ -369,13 +387,6 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   persist(job);
 
   const stagingDir = path.join(exportJobsDir(found.dir, documentId), `.staging-${id}`);
-  const cleanup = () => {
-    fs.rmSync(stagingDir, {recursive:true,force:true});
-    // These paths are allocated for this job; never erase a user's destination directory.
-    fs.rmSync(target, {force:true});
-    fs.rmSync(`${target}.cfr.mp4`, {force:true});
-    if(settings)fs.rmSync(outputDir, {recursive:true,force:true});
-  };
   const stagedProject = path.join(stagingDir, "project.openscreen");
   try {
   fs.mkdirSync(stagingDir, { recursive: true });
@@ -389,15 +400,18 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   const stagedDocument = stageCursorSidecars(localizedDocument, found.project, found.dir, stagingDir);
   fs.writeFileSync(stagedProject, JSON.stringify(stagedDocument, null, 2));
   } catch(error) {
-    job.status='failed';job.error=error instanceof Error?error.message:String(error);
-    cleanup();persist(job);throw error;
+    job.status='failed';job.error=`准备导出失败：${error instanceof Error?error.message:String(error)}`;
+    persistFromProcess(job);throw error;
   }
 
+  const workingOutput=path.join(stagingDir,`output.${format}`);
+  let preserveStaging=false;
+  job.status='running';job.startedAt=Date.now();job.progress=1;persist(job);
   const args = [
     ...runner.argsPrefix,
     stagedProject,
     "-o",
-    target,
+    workingOutput,
     "--format",
     format,
     "--quality",
@@ -421,69 +435,68 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     stdio: ["ignore", "pipe", "pipe"],
   }); } catch (error) {
     job.status='failed';job.error=error instanceof Error?error.message:String(error);
-    cleanup();persist(job);throw error;
+    persistFromProcess(job);throw error;
   }
   const controller=new AbortController();
-  live.set(id, { child, controller, cleanup, startedAt: Date.now(), job });
-  job.status = "running";
-  job.startedAt = Date.now();
-  job.progress = 1;
-  persist(job);
+  let finish!:()=>void;
+  const finished=new Promise<void>(resolve=>{finish=resolve});
+  live.set(id, { child, startedAt: Date.now(), job, finished, controller });
 
   const stdout = { pending: "" };
+  const decoder=new StringDecoder('utf8');
   const diagnostics: string[] = [];
   const stderr: string[] = [];
-  child.stdout!.on("data", (chunk) => readJsonLines(String(chunk), stdout, (event) => {
-    if (job.status === "cancelled") return;
+  const onExportEvent=(event:JsonObject)=>{
+    if (job.status !== "running"||live.get(id)?.cancelling) return;
     inferProgress(event, job);
+    if(event.type==='error'||event.event==='error'||event.event==='done'&&event.success===false){job.status='failed';job.error=String(event.error||event.message||'OpenScreen 报告导出失败');}
     if (event.error || event.message || event.type === "error") {
       diagnostics.push(JSON.stringify(event));
       if (diagnostics.length > 40) diagnostics.shift();
     }
-    persist(job);
-  }));
+    persistFromProcess(job);
+  };
+  child.stdout!.on('data',chunk=>readJsonLines(decoder.write(chunk),stdout,onExportEvent));
+  child.stdout!.once('end',()=>{const tail=decoder.end();if(stdout.pending||tail)readJsonLines(tail+'\n',stdout,onExportEvent)});
   child.stderr!.on("data", (chunk) => {
     stderr.push(String(chunk));
     if (stderr.length > 80) stderr.shift();
   });
   child.once("error", (error) => {
-    cleanup();
     live.delete(id);
     if (job.status === "cancelled") return;
     job.status = "failed";
     job.error = error.message;
-    persist(job);
+    persistFromProcess(job);
   });
   child.once("close", async (code, signal) => {
-    if (job.status === "cancelled") {
-      cleanup();
-      persist(job);live.delete(id);
+    const cancelled=live.get(id)?.cancelling;
+    try {
+    if (cancelled) {
+      job.status='cancelled';job.completedAt=Date.now();
+      persistFromProcess(job);
       return;
     }
-    if (code === 0 && fs.existsSync(target) && fs.statSync(target).size > 0) {
+    if(job.status==='failed'){persistFromProcess(job);return;}
+    if (code === 0 && fs.existsSync(workingOutput) && fs.statSync(workingOutput).size > 0) {
       try {
-        if(settings) {
-          job.progress=95;persist(job);
-          if(settings.preset==='jianying')await flatGeneralDraft(target,resultFile,current.ref.title,await probeExportMedia(target),controller.signal);
-          else await encodeScreenExportMedia(target,resultFile,settings,requestedFps,current.ref.duration,controller.signal);
-          if(controller.signal.aborted)throw Error('导出已停止');
-          fs.rmSync(target,{force:true});
+        preserveStaging=true;
+        let generated=workingOutput;
+        if(settings){
+          generated=path.join(stagingDir,settings.preset==='jianying'?'剪映工程':path.basename(resultFile));
+          if(settings.preset==='jianying')await flatGeneralDraft(workingOutput,generated,current.ref.title,await probeExportMedia(workingOutput),controller.signal);
+          else await encodeScreenExportMedia(workingOutput,generated,settings,requestedFps,current.ref.duration,controller.signal);
         }
-        if(!settings && format==='mp4' && purpose==='export' && process.platform==='darwin') {
-          const clockFps=typeof input.mp4Fps==='number'?input.mp4Fps:requestedFps;
-          const exactSettings=ExportSettingsSchema.parse({resolution:'original',video:{codec:'h264'}});
-          await encodeScreenExportMedia(target,`${target}.cfr.mp4`,exactSettings,clockFps,current.ref.duration,controller.signal);
-          if(controller.signal.aborted)throw Error('导出已停止');
-          fs.renameSync(`${target}.cfr.mp4`,target);
-        }
-        if(purpose==='publish'&&publishedAssetId&&publicationVersion)registerPublishedAsset({projectId,documentId,assetId:publishedAssetId,target,revision:current.revision,version:publicationVersion});
+        if(controller.signal.aborted||live.get(id)?.cancelling){job.status='cancelled';job.completedAt=Date.now();persistFromProcess(job);preserveStaging=false;return;}
+        renameWithRetrySync(generated,resultFile);
+        preserveStaging=false;
         job.status = "completed";
         job.progress = 100;
         job.completedAt = Date.now();
         job.wallS = job.wallS ?? Math.max(0, (job.completedAt - (job.startedAt || job.createdAt)) / 1000);
       } catch (error) {
         job.status = "failed";
-        job.error = `录屏导出收尾失败：${error instanceof Error ? error.message : String(error)}`;
+        job.error = `成片已生成，但写入目标失败：${error instanceof Error ? error.message : String(error)}；临时成片保留：${workingOutput}`;
       }
     } else {
       job.status = "failed";
@@ -491,11 +504,9 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
         || diagnostics.join("\n").trim().slice(-4_000)
         || `OpenScreen 导出退出（${code ?? "未知"}${signal ? `，${signal}` : ""}）`;
     }
-    if(controller.signal.aborted){job.status='cancelled';job.error=undefined;}
-    if(job.status==='cancelled'||job.status==='failed')cleanup();
-    live.delete(id);
-    persist(job);
-    fs.rmSync(stagingDir, { recursive: true, force: true });
+    persistFromProcess(job);
+    }catch(error){job.status='failed';job.error=`导出收尾失败：${error instanceof Error?error.message:String(error)}`;persistFromProcess(job);}
+    finally{live.delete(id);if(!preserveStaging)cleanupPathSync(stagingDir,{recursive:true});finish();}
   });
 
   return job;
@@ -504,8 +515,11 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
 export function readOpenScreenExport(projectId: string, documentId: string, jobId: string) {
   const { dir } = findProject(projectId, true);
   const file = jobFile(dir, documentId, jobId);
+  const current=unsaved.get(jobId)??live.get(jobId)?.job;
+  if(current&&current.projectId===projectId&&current.documentId===documentId)return {...current};
   if (!fs.existsSync(file)) throw new Error("OpenScreen 导出任务不存在");
   const job = OpenScreenExportJobSchema.parse(JSON.parse(fs.readFileSync(file, "utf8")));
+  if(job.projectId!==projectId||job.documentId!==documentId||job.id!==jobId)throw Error('导出任务不属于当前工程或文档，未操作其他任务。');
   if ((job.status === "queued" || job.status === "running") && !live.has(job.id)) {
     job.status = "interrupted";
     job.error = "LinkReader 服务重启导致导出中断，可以重新发起导出。";
@@ -514,32 +528,28 @@ export function readOpenScreenExport(projectId: string, documentId: string, jobI
   return job;
 }
 
-export function cancelOpenScreenExport(projectId: string, documentId: string, jobId: string) {
+export async function cancelOpenScreenExport(projectId: string, documentId: string, jobId: string) {
   const persisted = readOpenScreenExport(projectId, documentId, jobId);
   const job = live.get(jobId)?.job ?? persisted;
   if (job.status !== "running" && job.status !== "queued") return job;
-  job.status = "cancelled";
-  job.completedAt = Date.now();
-  live.get(job.id)?.controller?.abort();
-  stopScreenExport(live.get(job.id)?.child);
-  // The worker may still be writing. Cleanup belongs to its close/encode-finally
-  // handler so cancellation cannot unlink a file that the worker then recreates.
-  const worker=live.get(job.id)?.child;
-  if(worker && process.platform==='darwin') {
-    const timer=setTimeout(()=>{if(worker.exitCode===null&&worker.signalCode===null)worker.kill('SIGKILL');},3000);
-    timer.unref();worker.once('close',()=>clearTimeout(timer));
-  }
-  persist(job);
+  const active=live.get(job.id),worker=active?.child;
+  if(active){active.cancelling=true;active.controller?.abort();}
+  if(worker?.exitCode===null&&worker.signalCode===null){if(process.platform==="win32"&&worker.pid)platform.killTree(worker.pid);else worker.kill("SIGTERM");}
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  try{if(active)await Promise.race([active.finished,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('正在等待 OpenScreen 导出进程退出，请稍后重试取消')),10_000)})]);}
+  finally{clearTimeout(timer);}
+  if(!active){job.status='cancelled';job.completedAt=Date.now();persistFromProcess(job);}
   return job;
 }
 
-export function revealOpenScreenExport(projectId: string, value: unknown) {
+export async function revealOpenScreenExport(projectId: string, value: unknown) {
   const { dir } = findProject(projectId, true);
   const saved=listScreenExports(projectId).find(j=>j.status==='completed'&&(j.outputFile===value||j.outputDir===value));
   const target = saved ? String(value) : assertWithinExports(dir, value);
   if (!fs.existsSync(target)) throw new Error("导出文件不存在");
   const reveal=revealScreenCommand(target);
   const child = spawn(reveal.command, reveal.args, { detached: true, stdio: "ignore" });
+  await new Promise<void>((resolve,reject)=>{child.once('error',reject);child.once('spawn',resolve)});
   child.unref();
   return { path: target };
 }

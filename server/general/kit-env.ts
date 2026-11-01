@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 import type {CreationTools} from '../../shared/creation-tools.ts';
 import {standardEdition} from './edition.ts';
 import {supportBin,ffmpegPath,ffprobePath,chromePath,pythonPath,fontDirs} from './runtime-tools.ts';
@@ -56,7 +57,7 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
     Object.assign(wrappers,{node:command(node),film:command(node,[path.join(KIT_DIR,'film.mjs')]),hfx:command(node,[path.join(KIT_DIR,'hfx.mjs')]),python3:command(pythonPath()),ffmpeg:command(ffmpegPath()),ffprobe:command(ffprobePath())});
   }
   if(verified?.chromium) {
-    wrappers.chromium = `#!/bin/sh\nexec ${shellQuote(chrome)} "$@"\n`;
+    wrappers.chromium = process.platform==='win32'?'@echo off\r\nsetlocal DisableDelayedExpansion\r\n"'+chrome.replaceAll('%','%%')+'" %*\r\n':`#!/bin/sh\nexec ${shellQuote(chrome)} "$@"\n`;
     fs.writeFileSync(path.join(work,'.opentake','tools.json'),JSON.stringify(verified,null,2));
   }
   wrappers.python = wrappers.python3;
@@ -77,7 +78,7 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   const env: NodeJS.ProcessEnv = {
     ...base,
     ...(standardEdition && process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{ZDOTDIR:zdot}),
-    PATH: `${bin}${path.delimiter}${base.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'}`,
+    
     TMPDIR: tmp, TMPPREFIX: path.join(tmp, 'zsh', 'zsh'),
     CW_WORK: work, CW_MEDIA: path.join(projectDir, 'media'), CW_KIT: KIT_DIR, CW_BIN: bin,
     CW_FFMPEG: ffmpeg, CW_FFPROBE: ffprobe, CW_CHROME: chrome, ...(verified?.chromium?{CW_HFX_CHROME:chrome,PLAYWRIGHT_CHROMIUM_EXECUTABLE:chrome}:{}), CW_PYTHON: python, CW_NODE_MODULES: nodeModulesPath(),
@@ -90,5 +91,5 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
     ...(styleOf(projectDir) ? { CW_STYLE: styleOf(projectDir) } : {}),
   };
   delete env.CODEX_THREAD_ID;
-  return env;
+  return platform.environmentWithPath(env, `${bin}${path.delimiter}${platform.environmentPath(base)}`);
 }

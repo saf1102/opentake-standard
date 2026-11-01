@@ -119,7 +119,7 @@ async function connectionStatus(id:ConnectionId,deps:ConnectionDependencies,forc
  // Discard stale results if the user changed a path, mode or the Claude switch while a check was in flight.
  if(getConnectionConfig(id).revision!==config.revision)return connectionStatus(id,deps);
  connected=connected&&config.enabled&&(config.mode==='api'?config.hasKey:!!executable);
- return {...config,...definition,cliVersion,filmOutdated:filmVersionOutdated(cliVersion,definition.filmMinimumVersion),baseUrl:config.baseUrl,model:config.model,connected,cliInstalled:!!executable,executable,relay:isRelay(id,config.baseUrl),
+ return {...config,...definition,heavySupported:definition.heavySupported&&!(process.platform==='win32'&&id==='claude'),cliVersion,filmOutdated:filmVersionOutdated(cliVersion,definition.filmMinimumVersion),baseUrl:config.baseUrl,model:config.model,connected,cliInstalled:!!executable,executable,relay:isRelay(id,config.baseUrl),
   ...(config.mode==='cli'&&agentAcpArgs(id)?{models:auth?.models??[],acpModelSelection:auth?.acpModelSelection??false}:{}),
   ...(auth?{cliAuthState:auth.state,cliAuthMessage:auth.message,checkedAt:auth.checkedAt,message:auth.message}:{}),cliLoginAvailable:!!agentLoginArgs(id)&&!!executable&&config.enabled,
   state:!config.enabled?'disabled':connected?'connected':config.mode==='cli'?(auth?.state==='pending'?'pending':'unconfigured'):definition.protocol==='pending'?'pending':'unconfigured'};

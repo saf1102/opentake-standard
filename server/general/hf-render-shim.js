@@ -2,12 +2,29 @@
 // window.__hf, with every <video> painted by a stand-in picture of the exact source frame (extracted beforehand).
 (() => {
   const FPS = window.__otFps || 30;
+  let runtimeFailure;
+  let observedRuntime;
+  const observeRuntimeErrors = () => {
+    const runtime = window.__hf;
+    if (!runtime || observedRuntime === runtime) return;
+    observedRuntime = runtime;
+    const previous = runtime.onSwallowed;
+    runtime.onSwallowed = event => {
+      // HyperFrames catches animation-adapter exceptions internally. They must
+      // not produce a successful MP4 containing a frozen or incomplete picture.
+      if (/^runtime\.adapters\./.test(String(event?.label || '')) && !runtimeFailure)
+        runtimeFailure = event.error instanceof Error ? event.error : new Error(String(event.error || event.label));
+      if (typeof previous === 'function') { try { previous.call(runtime, event); } catch {} }
+    };
+  };
+  const assertRuntime = () => { if (runtimeFailure) throw runtimeFailure; };
   const style = document.createElement('style');
   style.textContent = 'video[data-ot-standin]{visibility:hidden!important}';
   document.head.append(style);
   const until = async (ok, ms = 45000) => { const t0 = Date.now(); while (!ok()) { if (Date.now() - t0 > ms) throw new Error('HyperFrames 运行时没有就绪'); await new Promise(r => setTimeout(r, 20)); } };
   const ready = async () => {
     await until(() => window.__hf && typeof window.__hf.seek === 'function' && window.__hf.duration > 0);
+    observeRuntimeErrors();
     const reg = (window.__hf && window.__hf.buildReady) || {};
     await Promise.all(Object.values(reg).map(p => Promise.resolve(p).catch(() => {})));
     await document.fonts.ready;
@@ -19,13 +36,17 @@
       await ready();
       // GSAP .from() records its start values on the first seek: every page starts at frame 0 (as HyperFrames does)
       window.__hf.seek(0, { suppressEvents: true });
+      assertRuntime();
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      assertRuntime();
       const root = document.querySelector('[data-composition-id]');
       return { id, width: +root.dataset.width || 1920, height: +root.dataset.height || 1080, fps: FPS, durationInFrames: Math.round(window.__hf.duration * FPS) };
     },
     async seek(frame) {
       const t = frame / FPS;
+      observeRuntimeErrors();
       window.__hf.seek(t, { suppressEvents: false });
+      assertRuntime();
       // the person's edits (hf-edit-bridge.js), in case the seek mounted something new
       window.__otApplyEdits?.();
       const waits = [];
@@ -53,6 +74,7 @@
       await Promise.all(waits);
       // rAF-driven updates (counters, canvas) land a tick after the seek
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      assertRuntime();
     },
   };
 })();

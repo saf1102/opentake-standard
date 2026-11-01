@@ -9,6 +9,8 @@
 
 ## OpenTake 的规则
 
+- **脚本作用域**：普通 `<script>` 的顶层 `function seek` 会成为 `window.seek`。不要用 `window.seek = t => seek(t)` 包装同名全局函数，否则赋值后会无限调用自己。内部绘制函数使用 `renderFilmAt` 等独立名称，或放入 IIFE/模块作用域，再把稳定的对外接口交给运行时。不要覆盖 `window.__hf`、`window.__otRender` 或运行时的其他入口。跳转检查必须包含开头、中间和结尾；页面异常必须修好，不能只忽略错误继续交付。
+
 - **根页面是 `index.html`**。根节点（`data-composition-id`）下面只放带时间的片段：
   - 用户的视频是 `<video>` 片段，要保留原声就写 `data-has-audio="true"`；
   - **每一次画面变化**（一组字、一张卡、一套色块编排、一个演示步骤）各是一个画面片段，做成子页面（`compositions/*.html`，用 `data-composition-src` 挂在根节点上，标 `data-track-kind="graphics"`）。不要把整片动效写在一个元素或一条时间线里，用户要能逐段改；

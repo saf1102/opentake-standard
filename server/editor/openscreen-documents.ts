@@ -1,9 +1,10 @@
 import { compatibleOpenScreenDocument } from "../../shared/openscreen-compat.ts";
 export { archiveLegacyScreenMotion } from "./openscreen-transcripts.ts";
+import {atomicJsonSync,atomicWriteFileSync,removeWithRetrySync} from '../file-ops.ts';
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { OpenScreenDocumentRef } from "../../src/types/editor.ts";
+import type { MediaAsset, OpenScreenDocumentRef } from "../../src/types/editor.ts";
 import {
   OpenScreenCompoundParamsSchema,
   OpenScreenDocumentRefSchema,
@@ -38,6 +39,27 @@ function validateDocument(value: unknown): JsonObject {
   const timeline = asObject(document.timeline, "OpenScreen 文档缺少 timeline");
   if (!Array.isArray(timeline.clips)) throw new Error("OpenScreen 时间线 clips 无效");
   if (!Array.isArray(document.assets)) throw new Error("OpenScreen 素材列表无效");
+  return document;
+}
+
+/** Official v8 saves can omit video metadata even after the media is loaded.
+ * Use dimensions already probed from the project-owned recording before
+ * freezing Auto geometry; keep the upstream file and input object intact. */
+function withImportedMediaMetadata(value: unknown, media: MediaAsset[]): unknown {
+  const document = structuredClone(value);
+  if (!document || typeof document !== "object" || Array.isArray(document)) return document;
+  const input = document as JsonObject;
+  if (input.schemaVersion !== 8 || !Array.isArray(input.assets)) return document;
+  for (const value of input.assets) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    const asset = value as JsonObject;
+    const source = media.find((item) => item.id === asset.id && item.type === "video" && item.status === "ready");
+    if (!source || !(Number(source.width) > 0 && Number(source.height) > 0)) continue;
+    const video = asset.video && typeof asset.video === "object" && !Array.isArray(asset.video)
+      ? asset.video as JsonObject : {};
+    asset.video = { ...video, width: source.width, height: source.height,
+      ...(Number(source.fps) > 0 ? { fps: source.fps } : {}) };
+  }
   return document;
 }
 
@@ -82,10 +104,27 @@ function metadataPath(projectDir: string, documentId: string) {
 }
 
 function writeDocumentFile(file: string, document: JsonObject) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const temp = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(document, null, 2));
-  fs.renameSync(temp, file);
+  atomicJsonSync(file, document);
+}
+
+/** A failed reference/project update must not leave new document bytes paired
+ * with the old revision. The project JSON is the final commit in updateRef. */
+function commitDocument(projectId:string,documentId:string,document:JsonObject,revision:number,createdAt?:number){
+  const {dir}=findProject(projectId,true),file=projectPath(dir,documentId),metadata=metadataPath(dir,documentId);
+  const before=[file,metadata].map(target=>({target,bytes:fs.existsSync(target)?fs.readFileSync(target):undefined}));
+  let documentWritten=false;
+  try{writeDocumentFile(file,document);documentWritten=true;return updateRef(projectId,documentId,document,revision,createdAt);}
+  catch(error){
+    const failures:string[]=[];
+    if(documentWritten)for(const item of before){
+      try{
+        if(item.bytes){if(!fs.existsSync(item.target)||!fs.readFileSync(item.target).equals(item.bytes))atomicWriteFileSync(item.target,item.bytes);}
+        else removeWithRetrySync(item.target,{force:true});
+      }catch(restore){failures.push(restore instanceof Error?restore.message:String(restore));}
+    }
+    if(failures.length)throw Error(`${error instanceof Error?error.message:String(error)}；恢复未完成，请保留工程及 backups：${failures.join('；')}`,{cause:error});
+    throw error;
+  }
 }
 
 function updateRef(
@@ -128,8 +167,8 @@ function updateRef(
   }
   // The OpenScreen document carries its own revision. Do not invalidate a
   // simultaneous main-editor timeline save for an unrelated subproject edit.
-  save(dir, project);
   atomicJson(metadataPath(dir, documentId), ref);
+  save(dir, project);
   return ref;
 }
 
@@ -164,8 +203,8 @@ export function createOpenScreenDocument(projectId: string, input: {
   document: unknown;
   documentId?: unknown;
 }) {
-  const { dir } = findProject(projectId, true);
-  const document = validateDocument(input.document);
+  const { dir, project: editProject } = findProject(projectId, true);
+  const document = validateDocument(withImportedMediaMetadata(input.document, editProject.media));
   const upstreamId = String(asObject(document.project, "OpenScreen 文档缺少 project").id || "");
   const documentId = safeId(input.documentId || upstreamId || crypto.randomUUID());
   if (fs.existsSync(projectPath(dir, documentId))) throw new Error("OpenScreen 文档已存在");
@@ -173,8 +212,7 @@ export function createOpenScreenDocument(projectId: string, input: {
     fs.mkdirSync(path.join(documentRoot(dir, documentId), rel), { recursive: true });
   if ((input.document as JsonObject)?.schemaVersion === 8)
     writeDocumentFile(path.join(documentRoot(dir, documentId), "native-source.openscreen"), input.document as JsonObject);
-  writeDocumentFile(projectPath(dir, documentId), document);
-  const ref = updateRef(projectId, documentId, document, 0);
+  const ref = commitDocument(projectId, documentId, document, 0);
   return { ref, document, revision: 0 };
 }
 
@@ -194,9 +232,8 @@ export function saveOpenScreenDocument(projectId: string, documentId: string, in
   const backups = path.join(documentRoot(dir, documentId), "backups");
   fs.mkdirSync(backups, { recursive: true });
   fs.copyFileSync(projectPath(dir, documentId), path.join(backups, `revision-${current.revision}.openscreen`));
-  writeDocumentFile(projectPath(dir, documentId), document);
   const revision = current.revision + 1;
-  const ref = updateRef(projectId, documentId, document, revision, current.ref.createdAt);
+  const ref = commitDocument(projectId, documentId, document, revision, current.ref.createdAt);
   return { ref, document, revision };
 }
 

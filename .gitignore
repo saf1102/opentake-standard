@@ -11,3 +11,5 @@ release/
 /release-source.json
 
 /.setup-state.json
+.build/
+native/windows/

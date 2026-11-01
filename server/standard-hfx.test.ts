@@ -51,15 +51,19 @@ test('sample fails for rejected fonts rather than reporting fallback text as suc
     if(previous)Object.defineProperty(globalThis,'document',previous);else Reflect.deleteProperty(globalThis,'document');
   }
 });
-test('prepareWork restores executable bits stripped by ZIP even for unchanged wrappers', () => {
+test('prepareWork preserves platform wrappers and restores POSIX executable bits', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfx-wrapper-'));
   const names = ['LINKREADER_BIN_DIR','LINKREADER_PYTHON','CW_CHROME'];
   const previous = names.map(name => process.env[name]);
   try {
-    for (const name of ['ffmpeg','ffprobe']) fs.writeFileSync(path.join(dir,name), '#!/bin/sh\nexit 0\n', {mode:0o755});
+    for (const name of ['ffmpeg','ffprobe']) fs.writeFileSync(path.join(dir,name+(process.platform==='win32'?'.exe':'')), '#!/bin/sh\nexit 0\n', {mode:0o755});
     process.env.LINKREADER_BIN_DIR=dir; process.env.LINKREADER_PYTHON=process.execPath; process.env.CW_CHROME=process.execPath;
-    prepareWork(dir, {}, false);
-    const wrapper=path.join(dir,'work/.opentake/bin/hfx');
+    const inheritedPath=process.platform==='win32'?'C:\\Windows\\System32':'/usr/bin';
+    const base=process.platform==='win32'?{Path:inheritedPath}:{PATH:inheritedPath};
+    const env=prepareWork(dir, base, false);
+    assert.equal(env.PATH,path.join(dir,'work','.opentake','bin')+path.delimiter+inheritedPath);
+    if(process.platform==='win32')assert.deepEqual(Object.keys(env).filter(key=>/^path$/i.test(key)),['PATH']);
+    const wrapper=path.join(dir,'work','.opentake','bin','hfx'+(process.platform==='win32'?'.cmd':''));
     const content=fs.readFileSync(wrapper,'utf8');
     fs.chmodSync(wrapper,0o644);
     prepareWork(dir, {}, false);

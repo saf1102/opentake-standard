@@ -147,7 +147,7 @@ Standard editing requires no account. Upgrade checks fetch public configuration 
 
 ## 支持平台
 
-仅支持 macOS（Apple 芯片）。Windows：适配中，暂不支持。
+官方上游支持 macOS（Apple 芯片）。此 Windows 分支同步官方 v1.1.0（786d226），并保留本地 Windows 离线安装、原生采集与 RenderFix 修复。Windows 构建与使用见 [BUILD-WINDOWS.md](BUILD-WINDOWS.md) 和 [WINDOWS-INSTALLER.md](WINDOWS-INSTALLER.md)。
 
 ### FFmpeg 环境检查
 
@@ -185,3 +185,14 @@ node desktop/sign-local-app.cjs "$PWD/release/mac-arm64/OpenTake Standard.app"
 修复工具仅处理指定的 Standard App：先 `xattr -cr` 清理产物，再由 Electron 签名工具从内到外签名，最后执行 `codesign --verify --deep --strict` 并确认没有 `com.apple.quarantine`。它不修改源码、工程或系统安全策略。旧源码没有此脚本时，先取得包含修正的官方源码并重新构建，不跳过错误。`doctor` 默认检查本目录 `release/` 中的产物；检查其他明确的 Standard 测试副本可设置 `OPENTAKE_STANDARD_CHECK_APP` 为其绝对路径。
 
 这只是本机临时签名，不是 Developer ID 签名或苹果公证；`spctl -a -vv` 的分发策略结果要单独记录，不能把清理隔离标记写成“公证通过”。安装验收仍须实际打开 App，确认没有「已损坏」提示、窗口和本机服务正常；仅 `open` 返回0不算成功。
+
+
+## Windows 1.1.0 分支
+
+本分支合入官方 1.1.0 的智能体选择与失败切换、素材圆盘、0.1×–100× 变速、预览倍速和缩放、通用时间线编辑、独立音效与波形、剪映原生字幕。Windows 使用 Ctrl 点击素材、Alt 拖动动效卡边缘。Windows 的统一接入页面、PowerShell 登录与换账号、程序和目录选择器已接入；API 密钥以当前 Windows 用户的 DPAPI 加密保存，不写明文设置。真实 API 连通仍需用户自行输入密钥后检验。Claude Code 默认关闭，其 Windows 出片沙盒尚未适配，不列为可出片接入。
+
+安装器包含离线 Electron、OpenScreen、WGC 采集组件、LGPL FFmpeg/ffprobe、Python 科学计算库、匹配 Chromium 和 Codex CLI。运行时从安装目录发现，不修改系统 PATH。录屏控制栏、鼠标时钟修复、生成页面异常预检及有界修复、导出取消等待进程结束、安装阶段与进度显示继续保留。录屏 MP4 导出仍使用 OpenScreen 原生运行库。
+
+Windows 10 22H2 x64 与 Windows 11 x64 使用同一安装器；Win10 虚拟机上此前已发现 OpenScreen D3D11 硬件解码初始化失败（hwdevice_ctx_init），本轮未重建该 compositor，不能把该环境的录屏导出写成已修复。H.264 是 Windows 验证编码；HEVC 在 Windows 返回明确未适配提示。Windows ARM64、32 位和 macOS 本轮不作为实测通过平台。
+
+升级使用新安装包，保留旧版安装包、工程与设置；没有实现 Windows 一键自动更新或数字签名。源码身份见 desktop/windows-version.json 与生成的 release-source.json；该分支不冒充未经修改的上游官方二进制。

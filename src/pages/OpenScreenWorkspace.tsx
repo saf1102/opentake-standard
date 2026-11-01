@@ -6,7 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CircleStop, FileVideo2, MonitorUp, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useParams } from 'react-router'
 import type { EditProject, OpenScreenBridgeMessage, OpenScreenHostSession } from '@/types'
-import { acquireLock, cancelOpenScreenHostSession, confirmOpenScreenHostCandidate, getOpenScreenHostSession, getProject, launchOpenScreenHost } from '@/studio/api'
+import { acquireLock, cancelOpenScreenHostSession, confirmOpenScreenHostCandidate, getOpenScreenHostSession, getOpenScreenHostSessions, getProject, launchOpenScreenHost, getRecordingControlStatus, stopNativeRecording } from '@/studio/api'
+import RecordingSetup from './RecordingSetup'
 import '@/screen-motion/openscreen-workspace.css'
 import embeddedGlass from '@/workspace/embedded-glass.css?inline'
 
@@ -68,7 +69,9 @@ export default function OpenScreenWorkspace() {
   const [importingCandidate, setImportingCandidate] = useState('')
   const [error, setError] = useState('')
   const [exportRequest, setExportRequest] = useState<ScreenExportRequest>()
+  const [recordingSetup,setRecordingSetup]=useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  useEffect(()=>{setHostSession(null);setRecordingSetup(false);setProject(null)},[id])
   useEffect(() => {
     const sync = () => { const doc = iframeRef.current?.contentDocument; if (doc) doc.documentElement.dataset.uiTheme = document.documentElement.dataset.uiTheme || 'original'; };
     window.addEventListener('linkreader-ui-theme', sync);
@@ -116,11 +119,21 @@ export default function OpenScreenWorkspace() {
         setStatus(writable ? String(event.data.payload.label || '已保存') : 'OpenScreen 只读模式')
       }
       if (event.data.type === 'error') setError(String(event.data.payload.message || 'OpenScreen 编辑器发生错误'))
+      if (event.data.type === 'recording-state' && event.data.payload.request) setRecordingSetup(true)
       if (event.data.type === 'recording-state' && event.data.payload.session) setHostSession(event.data.payload.session as OpenScreenHostSession)
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
   }, [id, writable])
+
+  useEffect(()=>{
+    let disposed=false
+    getRecordingControlStatus().then(async control=>{
+      const pending=control.active?.projectId===id?control.active:(await getOpenScreenHostSessions(id)).find(s=>!['completed','cancelled','failed'].includes(s.status))
+      if(pending){const session=await getOpenScreenHostSession(id,pending.id);if(!disposed)setHostSession(session)}
+    }).catch(()=>undefined)
+    return()=>{disposed=true}
+  },[id])
 
   useEffect(() => {
     if (!hostSession || ['completed', 'cancelled', 'failed'].includes(hostSession.status)) return
@@ -128,7 +141,7 @@ export default function OpenScreenWorkspace() {
       void getOpenScreenHostSession(id, hostSession.id).then(setHostSession).catch(() => undefined)
     }, 2_000)
     return () => window.clearInterval(timer)
-  }, [hostSession, id])
+  }, [hostSession?.id, hostSession?.status, id])
 
   const editorUrl = useMemo(() => {
     const query = new URLSearchParams({
@@ -141,6 +154,8 @@ export default function OpenScreenWorkspace() {
   const launchHud = async () => {
     try {
       setError('')
+      const control=await getRecordingControlStatus()
+      if(control.supported){setRecordingSetup(true);return}
       const session = await launchOpenScreenHost(id, clientId)
       setHostSession(session)
       setStatus('已打开 OpenScreen，等待导入录制视频')
@@ -175,10 +190,17 @@ export default function OpenScreenWorkspace() {
     }
   }
 
+  const stopRecording = async()=>{
+    if(!hostSession)return
+    try{setError('');setHostSession(await stopNativeRecording(id,hostSession.id,clientId))}
+    catch(reason){setError(reason instanceof Error?reason.message:String(reason))}
+  }
+  const recordingBusy=Boolean(hostSession?.mode==='cli'&&['launching','recording','stopping','processing'].includes(hostSession.status))
   const hostStatusLabel = hostSession ? {
     launching: '正在启动 OpenScreen…',
     waiting: '等待 OpenScreen 开始录制',
-    recording: '宿主 Mac 正在录制',
+    recording: '本机 OpenScreen 正在录制',
+    stopping: '正在停止并保存录制，请稍候…',
     processing: '录制已停止，正在等待 OpenScreen 写入工程',
     selecting: `检测到 ${hostSession.candidates.length || hostSession.candidateFiles.length} 个本次录制结果`,
     completed: '录制结果已导入当前工程',
@@ -192,14 +214,14 @@ export default function OpenScreenWorkspace() {
         <Link to="/screen-motion" className="openscreen-icon-button" title="录屏工程列表"><ArrowLeft size={17} /></Link>
         <strong>{project?.name || '录屏运镜'}</strong>
         <span className={writable ? 'openscreen-save openscreen-save--active' : 'openscreen-save'}>
-          <ShieldCheck size={14} />{status}
+          <ShieldCheck size={14} />{hostSession?.mode==='cli'&&!['completed','cancelled'].includes(hostSession.status)?hostStatusLabel:status}
         </span>
       </div>
       <div className="openscreen-hostbar__actions">
         {isMacScreenWorkspace()&&project&&<ProjectAgentChoice projectId={id} workspace="screen" clientId={clientId} disabled={!writable}/>}
         {!writable && <button type="button" onClick={() => void refreshLock(true)}>接管编辑</button>}
         <button type="button" onClick={() => iframeRef.current?.contentWindow?.location.reload()}><RefreshCw size={15} />重新载入</button>
-        <button type="button" onClick={() => void launchHud()} disabled={!writable}><MonitorUp size={15} />开始录屏</button>
+        <button type="button" onClick={() => void launchHud()} disabled={!writable||recordingBusy}><MonitorUp size={15} />开始录屏</button>
         <ScreenWorkspaceExtraActions id={id} />
       </div>
     </header>
@@ -208,9 +230,9 @@ export default function OpenScreenWorkspace() {
       <span className="openscreen-host-session__pulse" />
       <div>
         <strong>{hostStatusLabel}</strong>
-        <small>录制对象是当前宿主 Mac；OpenTake 只接收本次会话新增的 OpenScreen 工程。</small>
+            <small>{hostSession.mode==='cli'?`${hostSession.sourceName||'本机录制'} · 可从 OpenTake 录制控制栏和托盘停止并保存`:'录制对象是当前运行 OpenScreen 的主机；OpenTake Standard 只接收本次会话新增的 OpenScreen 工程。'}</small>
       </div>
-      {hostSession.status !== 'failed' && <button type="button" onClick={() => void cancelHudReceive()} disabled={!writable}>
+      {recordingBusy?<button type="button" onClick={()=>void stopRecording()} disabled={!writable||hostSession.status==='stopping'}><CircleStop size={15}/>{hostSession.status==='stopping'?'正在保存…':'停止并保存'}</button>:hostSession.status !== 'failed' && <button type="button" onClick={() => void cancelHudReceive()} disabled={!writable}>
         <CircleStop size={15} />停止接收
       </button>}
     </div>}
@@ -234,6 +256,7 @@ export default function OpenScreenWorkspace() {
       </div>
     </div>}
     {exportRequest && project && <ScreenExportDialog id={id} name={project.name} clientId={clientId} input={{ ...exportRequest, canvas: { ...exportRequest.canvas, fps: Number(project.settings.fps) || 30 } }} onClose={() => setExportRequest(undefined)} />}
+    {recordingSetup&&<RecordingSetup projectId={id} clientId={clientId} onClose={()=>setRecordingSetup(false)} onStarted={session=>{setHostSession(session);setRecordingSetup(false);setStatus('正在准备录制，停止时将保存工程')}}/>}
     <iframe
       key={editorUrl}
       ref={iframeRef}

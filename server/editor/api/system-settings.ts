@@ -1,3 +1,4 @@
+import platform from '../../platform.ts';
 import {handleSettingsMigrations} from './system-settings-migrations.ts';
 import {acquireExportCacheLease} from '../render-cache-policy.ts';
 import fs from 'node:fs';
@@ -23,7 +24,7 @@ export async function handleSystemSettingsApi(req:IncomingMessage,res:ServerResp
  if(req.method==='POST'&&parts[1]==='libraries'){const body=await bodyJson(req);assertStorageIdle();registerProjectLibrary(String(body.path||''));return reply(settingsView());}
  if(req.method==='POST'&&parts[1]==='choose-folder')return reply({path:await chooseExportDestination('选择系统设置文件夹')});
  if(req.method==='POST'&&parts[1]==='check-path'){const body=await bodyJson(req);return reply(pathStatus(String(body.path||'')));}
- if(req.method==='POST'&&parts[1]==='reveal'){const body=await bodyJson(req);const s=readSystemSettings();const allowed=[...Object.values(s.preferences.paths),...s.libraries,...s.cacheRoots,...s.backupRoots,path.dirname(settingsFile())].filter(Boolean);if(!allowed.includes(body.path as string))throw Error('只能打开已保存的设置目录');await execFileAsync('/usr/bin/open',[String(body.path)]);return reply(null);}
+ if(req.method==='POST'&&parts[1]==='reveal'){const body=await bodyJson(req);const s=readSystemSettings();const allowed=[...Object.values(s.preferences.paths),...s.libraries,...s.cacheRoots,...s.backupRoots,path.dirname(settingsFile())].filter(Boolean);if(!allowed.includes(body.path as string))throw Error('只能打开已保存的设置目录');const reveal=platform.revealCommand(String(body.path));await execFileAsync(reveal.command,reveal.args);return reply(null);}
  if(req.method==='GET'&&parts[1]==='backups')return reply({items:listBackups(),failures:backupFailures()});
  if(req.method==='POST'&&parts[1]==='backup-now'){assertStorageIdle();let count=0;for(const {dir} of scan()){backupProjectFile(dir,true);count++;}return reply({count});}
  if(req.method==='POST'&&parts[1]==='restore-backup'){assertStorageIdle();const body=await bodyJson(req);return reply(await restoreBackup(String(body.id||'')));}

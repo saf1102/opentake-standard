@@ -11,14 +11,16 @@
     "start": "electron .",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --experimental-strip-types --test --test-concurrency=4 server/*.test.ts && npm run test:desktop && npm run test:openscreen",
-    "build": "npm run build:openscreen && vite build",
+    "build": "npm run build:native && npm run build:openscreen && vite build",
+    "build:native": "node scripts/build-windows-recording.mjs",
     "dev": "vite",
     "build:app": "npm run build:live && node desktop/build-app.mjs",
+    "build:installer": "npm run build && node desktop/build-installer.mjs",
     "test:desktop": "node --test desktop/*.test.cjs",
     "build:openscreen": "npm --prefix vendor/openscreen run build:linkreader",
     "test:openscreen": "npm --prefix vendor/openscreen run test:standard",
     "doctor": "node scripts/doctor.cjs",
-    "build:live": "npm --prefix vendor/openscreen run build:linkreader -- --emptyOutDir false && vite build --emptyOutDir false",
+    "build:live": "npm run build:native && npm --prefix vendor/openscreen run build:linkreader -- --emptyOutDir false && vite build --emptyOutDir false",
     "setup": "node scripts/setup.mjs"
   },
   "dependencies": {

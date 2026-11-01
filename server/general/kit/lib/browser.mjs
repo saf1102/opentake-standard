@@ -46,7 +46,7 @@ function findFont(dir, name) {
     const map = new Map(), walk = (d, depth) => { if (depth > 6) return; for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       if (e.name.startsWith('.')) continue;
       const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p, depth + 1); else if (/\.(ttf|otf|woff2?)$/i.test(e.name) && !map.has(e.name)) map.set(e.name, p);
+      if (e.isDirectory()) walk(p, depth + 1); else if (/\.(ttf|otf|ttc|woff2?)$/i.test(e.name) && !map.has(e.name)) map.set(e.name, p);
     } };
     try { walk(dir, 0); } catch { /* unreadable font folder: skip */ }
     fontIndex.set(dir, map);

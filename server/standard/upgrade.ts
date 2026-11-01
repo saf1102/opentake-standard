@@ -1,5 +1,6 @@
 import {clientHeaders,updateView,dismissUpdate} from './client-update.ts';
 import platform from '../platform.ts';
+import {atomicJsonSync} from '../file-ops.ts';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import type {IncomingMessage,ServerResponse} from 'node:http';import {bodyJson,sendJson} from '../http.ts';
 import upgradeConfig from '../../upgrade.json' with {type:'json'};
 export const UPGRADE_URL=upgradeConfig.endpoint;
@@ -12,7 +13,7 @@ const origin=local||new URL(UPGRADE_URL).origin;
 const root=platform.standardDataRoot();
 const file=path.join(root,'upgrade-session.json');
 type Saved={token?:string;daily?:boolean;checkedDay?:string};let saved:Saved={};try{saved=JSON.parse(fs.readFileSync(file,'utf8'))}catch{/* fresh profile */}
-function save(){fs.mkdirSync(root,{recursive:true,mode:0o700});fs.writeFileSync(file+'.tmp',JSON.stringify(saved),{mode:0o600});fs.chmodSync(file+'.tmp',0o600);fs.renameSync(file+'.tmp',file)}
+function save(){fs.mkdirSync(root,{recursive:true,mode:0o700});atomicJsonSync(file,saved,{mode:0o600})}
 async function remote(route:string,method='GET',body?:unknown){const r=await fetch(origin+route,{method,headers:{...clientHeaders(),'Content-Type':'application/json',...(saved.token?{Authorization:`Bearer ${saved.token}`}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(10000)});const value=await r.json();if(!r.ok){if(r.status===401){delete saved.token;save()}throw Object.assign(Error(value.error||'操作失败'),{status:r.status})}return value}
 async function config(){for(const url of [local?local+'/standard/upgrade.json':UPGRADE_URL,fallback]){if(!url)continue;try{const r=await fetch(url,{headers:url===fallback?undefined:clientHeaders(true),credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(5000)});if(!r.ok)continue;const v=await r.json();if(v.mode==='beta'||v.mode==='paid'&&Array.isArray(v.plans)&&v.plans.length===3)return v}catch{/* offline default */}}return {mode:'beta',notice:'',offline:true}}
 function publicView(value:Record<string,unknown>){const {token:_token,...rest}=value;return rest}

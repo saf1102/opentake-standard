@@ -10,7 +10,7 @@ OpenScreen 由用户从官方发布页 https://github.com/getopenscreen/openscre
 
 本机 App 用 npm run build:app 构建，在 release 中验收；构建包含无需证书或私钥的本机临时签名；没有公开发布或苹果公证动作。默认用户工程位置与 Pro 共用；测试设置独立 OPENTAKE_STANDARD_USER_DATA 和 LINK_READER_PROJECTS_DIR。
 
-仅支持 macOS（Apple 芯片）。Windows：适配中，暂不支持；不在本版本运行 Windows 构建、安装或更新。
+官方上游的安装流程以 macOS 为主。本 Windows 分支在用户授权下同步官方 v1.1.0 并构建离线 Windows x64 安装包，流程与限制见 BUILD-WINDOWS.md 和 WINDOWS-INSTALLER.md；必须以实际 Windows 验收结果为准，不能把构建通过当作录制、出片或跨系统验收通过。
 
 ## 更新到最新版
 
@@ -66,3 +66,5 @@ node desktop/sign-local-app.cjs "$PWD/release/mac-arm64/OpenTake Standard.app"
 修复工具仅处理指定的 Standard App：先 `xattr -cr` 清理产物，再由 Electron 签名工具从内到外签名，最后执行 `codesign --verify --deep --strict` 并确认没有 `com.apple.quarantine`。它不修改源码、工程或系统安全策略。旧源码没有此脚本时，先取得包含修正的官方源码并重新构建，不跳过错误。`doctor` 默认检查本目录 `release/` 中的产物；检查其他明确的 Standard 测试副本可设置 `OPENTAKE_STANDARD_CHECK_APP` 为其绝对路径。
 
 这只是本机临时签名，不是 Developer ID 签名或苹果公证；`spctl -a -vv` 的分发策略结果要单独记录，不能把清理隔离标记写成“公证通过”。安装验收仍须实际打开 App，确认没有「已损坏」提示、窗口和本机服务正常；仅 `open` 返回0不算成功。
+
+Windows API 密钥使用当前用户 DPAPI 加密；只对合成密钥做存取回归，不代读用户密钥。真实智能体登录和系统授权仍由用户操作。

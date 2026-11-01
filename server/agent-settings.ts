@@ -1,5 +1,6 @@
 import {AGENT_CONNECTION_IDS,LIGHT_AGENT_MODULES,connectionReadyForLight,connectionReadyForFilm} from '../shared/agent-connections.ts';
 import platform from './platform.ts';
+import {atomicJsonSync} from './file-ops.ts';
 import installations from './agent-installation.ts';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,10 +14,7 @@ import { execFileAsync } from './proc.ts';
 
 export const agentSettingsFile = () => process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(platform.standardDataRoot(),'agent-settings.json');
 export function atomicAgentJson(file: string, value: unknown) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${crypto.randomUUID()}.tmp`;
-  try { fs.writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: 0o600 }); fs.renameSync(tmp, file); }
-  finally { fs.rmSync(tmp, { force: true }); }
+  atomicJsonSync(file, value, {mode:0o600});
 }
 const choiceSchema = z.object({ agent:z.enum(AGENT_CONNECTION_IDS).optional(), model: z.string().regex(/^[a-zA-Z0-9._\/:,-]+$/), effort: z.enum(['none','minimal','low','medium','high','xhigh','max','ultra']) }).strict();
 const settingsSchema = z.object({ version: z.literal(1), allowRemoteAi: z.boolean().default(false), cliPath: z.string().trim(), modules: z.record(z.enum(AGENT_MODULES.map(m => m.id)), choiceSchema) }).strict();
@@ -53,7 +51,7 @@ const catalogs = new Map<string, AgentCatalog>();
 const pending = new Map<string, Promise<AgentCatalog>>();
 /** Read the selected binary's real account model catalog, not a hardcoded UI list. */
 export async function getAgentCatalog(configured: string, refresh = false): Promise<AgentCatalog> {
-  const connection=process.platform==='darwin'?(await import('./agent-connections.ts')).getConnectionConfig('codex'):undefined;
+  const connection=(process.platform==='darwin'||process.platform==='win32')?(await import('./agent-connections.ts')).getConnectionConfig('codex'):undefined;
   if(connection?.mode==='api'){
     if(!connection.connected||!connection.models.length)throw Error('Codex API 接入还没有读取模型，请先测试连接');
     let executable='';try{executable=resolveCliPath(configured)}catch{/* API only can serve light work. */}
@@ -113,12 +111,12 @@ export function validateAgentChoice(module: AgentModule, settings: AgentSettings
 }
 export async function saveAgentSettings(value: unknown) {
   const settings = settingsSchema.parse(value);
-  const hasCodex=process.platform!=='darwin'||AGENT_MODULES.some(m=>!settings.modules[m.id].agent||settings.modules[m.id].agent==='codex');
+  const hasCodex=AGENT_MODULES.some(m=>!settings.modules[m.id].agent||settings.modules[m.id].agent==='codex');
   const catalog = hasCodex ? await getAgentCatalog(settings.cliPath, true) : null;
   for (const module of AGENT_MODULES) {
     // A model this Codex lacks is kept (it runs on the default); an effort the chosen model rejects is a mistake to fix now.
     const agentId=settings.modules[module.id].agent||'codex';
-    if(process.platform==='darwin'&&agentId!=='codex'){
+    if(agentId!=='codex'){
       const {getConnectionStatus}=await import('./agent-connections.ts');const connection=await getConnectionStatus(agentId);
       if(!connection.enabled||!connection.connected)throw Error(`${module.name}：所选智能体未接通`);
       if(module.id!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module.id)||!connectionReadyForLight(connection)))throw Error(`${module.name}：所选智能体暂不支持这项工作`);
@@ -147,6 +145,7 @@ export async function agentSettingsView(): Promise<AgentSettingsView> {
   catch (error) { return { settings, catalog: null, catalogError: error instanceof Error ? error.message : String(error), runs: recentAgentRuns() }; }
 }
 export async function chooseAgentCli() {
+  if(process.platform==='win32'){const {createRequire}=await import('node:module');const {requestFileDialog}=createRequire(import.meta.url)('../desktop/file-dialogs.cjs');return {path:await requestFileDialog('executable')};}
   if (process.platform !== 'darwin') throw new Error('此主机不支持文件选择器，请输入 CLI 的绝对路径');
   try {
     const { stdout } = await execFileAsync('osascript', ['-e', 'POSIX path of (choose file with prompt "选择 Codex CLI 可执行文件" with invisibles)'], { timeout: 120_000 });

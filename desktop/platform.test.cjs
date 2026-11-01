@@ -1,5 +1,15 @@
 const test=require('node:test');const assert=require('node:assert/strict');
 const {appDataRoot,termination,revealCommand,buildTarget}=require('./platform.cjs');
+test('Windows inherited Path remains available and child environments contain one PATH key',()=>{
+ const {environmentPath,environmentWithPath}=require('./platform.cjs');
+ const original={Path:'C:\\Windows\\System32;C:\\Tools',OTHER:'keep'};
+ assert.equal(environmentPath(original,'win32'),original.Path);
+ assert.equal(environmentPath({pAtH:original.Path},'win32'),original.Path);
+ const next=environmentWithPath(original,'C:\\QA\\bin;'+environmentPath(original,'win32'),'win32');
+ assert.deepEqual(Object.keys(next).filter(key=>/^path$/i.test(key)),['PATH']);
+ assert.equal(next.PATH,'C:\\QA\\bin;'+original.Path);assert.equal(next.OTHER,'keep');assert.equal(original.Path,'C:\\Windows\\System32;C:\\Tools');
+ assert.equal(environmentPath({Path:'not Unix PATH'},'darwin'),'');
+});
 test('Windows 10 and 11 use one platform implementation but separate local build directories',()=>{
  assert.equal(buildTarget('win32','x64','10.0.19045'),'win10');
  assert.equal(buildTarget('win32','x64','10.0.22631'),'win11');

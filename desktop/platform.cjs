@@ -1,6 +1,16 @@
 const path = require('node:path');
 const os = require('node:os');
 const {spawnSync} = require('node:child_process');
+function environmentPath(env=process.env,platform=process.platform){
+ const key=platform==='win32'?Object.keys(env).find(name=>/^path$/i.test(name)):'PATH';
+ return env.PATH??(key?env[key]:undefined)??'';
+}
+function environmentWithPath(env,value,platform=process.platform){
+ const result={...env};
+ // Node forwards only one case-insensitive Windows environment key to children.
+ if(platform==='win32')for(const key of Object.keys(result))if(/^path$/i.test(key))delete result[key];
+ result.PATH=value;return result;
+}
 function appDataRoot(platform=process.platform, env=process.env, home=os.homedir()) {
  const p=platform==='win32'?path.win32:path.posix;
  return platform==='win32' ? env.APPDATA||p.join(home,'AppData','Roaming') : platform==='darwin'?p.join(home,'Library','Application Support'):env.XDG_CONFIG_HOME||p.join(home,'.config');
@@ -30,4 +40,4 @@ function buildTarget(platform=process.platform,arch=process.arch,release=os.rele
  if(major!==10||!Number.isInteger(build)||build<19045)throw Error('需要 Windows 10 22H2 或 Windows 11');
  return build>=22000?'win11':'win10';
 }
-module.exports={appDataRoot,standardDataRoot,projectsRoot,termination,killTree,revealCommand,buildTarget};
+module.exports={environmentPath,environmentWithPath,appDataRoot,standardDataRoot,projectsRoot,termination,killTree,revealCommand,buildTarget};

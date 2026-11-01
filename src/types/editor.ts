@@ -216,7 +216,7 @@ export type OpenScreenHostCandidate = z.infer<typeof OpenScreenHostCandidateSche
 export const OpenScreenHostSessionSchema = z.object({
   id: z.string(),
   projectId: z.string(),
-  status: z.enum(['launching', 'waiting', 'recording', 'processing', 'selecting', 'completed', 'cancelled', 'failed']),
+  status: z.enum(['launching', 'waiting', 'recording', 'stopping', 'processing', 'selecting', 'completed', 'cancelled', 'failed']),
   mode: z.enum(['native-hud', 'cli']),
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -225,6 +225,9 @@ export const OpenScreenHostSessionSchema = z.object({
   baselineFingerprints: z.record(z.string(), z.string()).default({}),
   observedArtifacts: z.record(z.string(), z.string()).default({}),
   lastActivityAt: z.number().optional(),
+  recordingStartedAt: z.number().optional(),
+  sourceName: z.string().optional(),
+  durationSeconds: z.number().int().positive().optional(),
   selectedFile: z.string().optional(),
   documentId: z.string().optional(),
   error: z.string().optional(),

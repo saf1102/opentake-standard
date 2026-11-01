@@ -32,12 +32,13 @@ async function probeSandbox(codex,file,env) {
  const tmp=path.join(root,'tmp');fs.mkdirSync(tmp);
  try {
   const result=await exec(codex,['sandbox',
+   ...(process.platform==='win32'?['-c','windows.sandbox="elevated"']:[]),
    '-c','sandbox_mode="workspace-write"',
    '-c','sandbox_workspace_write.network_access=false',
    '-c','sandbox_workspace_write.exclude_slash_tmp=true',
    '-c','sandbox_workspace_write.exclude_tmpdir_env_var=true',
    '--',process.execPath,path.join(__dirname,'probe-creation-browser.cjs'),file],
-   {cwd:root,env:{...env,TMPDIR:tmp,...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{})},timeout:40000,maxBuffer:65536});
+   {cwd:root,env:{...env,TMPDIR:tmp,...(process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{}),...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{})},timeout:40000,maxBuffer:65536});
   if(!result.stdout.includes('OPENTAKE_BROWSER_READY'))throw Error('未完成截图');
  } finally { fs.rmSync(root,{recursive:true,force:true}); }
 }
@@ -66,8 +67,8 @@ async function doctor(options = {}) {
  await check('python','Python 3 + numpy',async()=>{
   const configured = env.LINKREADER_PYTHON;
   const candidates = configured ? [configured] : [...new Set([
-   path.join(env.HOME || require('node:os').homedir(),'.opentake-venv/bin/python3'),
-   ...(env.PATH || '').split(':').filter(path.isAbsolute).map(dir=>path.join(dir,'python3')),
+   path.join(env.HOME || require('node:os').homedir(),'.opentake-venv',process.platform==='win32'?'Scripts/python.exe':'bin/python3'),
+   ...(env.PATH || env.Path || '').split(path.delimiter).filter(path.isAbsolute).flatMap(dir=>(process.platform==='win32'?['python.exe','python3.exe']:['python3']).map(name=>path.join(dir,name))),
    '/opt/homebrew/bin/python3','/usr/local/bin/python3','/usr/bin/python3'
   ])];
   const failures = [];

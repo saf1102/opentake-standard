@@ -1,5 +1,8 @@
 import {AGENT_CONNECTION_IDS} from '../../shared/agent-connections.ts';
 import {canCreateLegacyProjectRoot} from './edition.ts';
+import {renameWithRetrySync} from '../file-ops.ts';
+import os from 'node:os';
+import {atomicJsonSync} from '../file-ops.ts';
 /**
  * 通用剪辑工程的存储。每个工程是共享工程根目录下的一个文件夹，里面放 general-project.json：
  *   general-project.json  工程（src/general/general-contract.ts 的 GeneralProject）
@@ -38,10 +41,7 @@ function readStored(dir: string): Stored | undefined {
   } catch { return undefined; }
 }
 function writeAtomic(file: string, value: unknown) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  try { fs.writeFileSync(tmp, JSON.stringify(value, null, 2)); fs.renameSync(tmp, file); }
-  finally { fs.rmSync(tmp, { force: true }); }
+  atomicJsonSync(file, value);
 }
 const publicProject = (stored: Stored): GeneralProject => { const { deletedAt: _deleted, ...project } = stored; void _deleted; return project; };
 
@@ -186,7 +186,7 @@ export function trashGeneral(id: string) {
   let target = path.join(trash, path.basename(dir));
   for (let i = 2; fs.existsSync(target); i++) target = path.join(trash, `${path.basename(dir)} ${i}`);
   writeAtomic(path.join(dir, GENERAL_FILE), { ...stored, deletedAt: now() });
-  fs.renameSync(dir, target);
+  renameWithRetrySync(dir, target);
   locations.set(id, target);
   return target;
 }
@@ -196,7 +196,7 @@ export function restoreGeneral(id: string): GeneralProject {
   const library = path.dirname(path.dirname(dir));
   let target = path.join(library, path.basename(dir));
   for (let i = 2; fs.existsSync(target); i++) target = path.join(library, `${path.basename(dir)} ${i}`);
-  fs.renameSync(dir, target);
+  renameWithRetrySync(dir, target);
   return saveGeneral(target, publicProject(stored), { restoring: true });
 }
 /** Permanently delete, only from inside the trash (like purgeProjectDirectory for spoken projects). */

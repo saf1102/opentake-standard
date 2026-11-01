@@ -1,6 +1,12 @@
 import path from 'node:path';
 import {deflateSync} from 'node:zlib';
 
+/** HTML may legally omit its body end tag. The renderer bridge must still run. */
+export function injectPageScripts(html, scripts) {
+  const close = /<\/body\s*>/i;
+  return close.test(html) ? html.replace(close, () => `${scripts}</body>`) : `${html}\n${scripts}`;
+}
+
 // Full Chrome requires macOS app services denied by the offline agent sandbox.
 // Leave executablePath unset to use Playwright's installed headless shell.
 export function sampleBrowser(env) {

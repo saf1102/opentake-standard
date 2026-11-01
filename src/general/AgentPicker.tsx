@@ -11,7 +11,7 @@ import { getAgentSettings } from '@/studio/api'
 import { EFFORT_LABELS, FOLLOW_DEFAULT, effectiveChoice, type AgentModel } from '@/studio/agent-settings'
 import {connectionRequest, connectionReadyForFilm, type ConnectionView} from '@/studio/connections'
 import type { GeneralAgentChoice } from './general-contract'
-import { IS_MAC } from './platform'
+import { UNIFIED_AGENTS } from './platform'
 
 type Catalog = { models: AgentModel[]; standard: GeneralAgentChoice; connections:ConnectionView[] }
 /** Refresh on settings changes and every menu open: a disabled Claude must immediately disappear. */
@@ -183,12 +183,12 @@ function LegacyCodexPicker({ value, onChange, compact, up, disabled }: {
 
 /** Connections are a Mac-only rollout; other platforms keep their existing Codex settings/catalog path. */
 export function AgentPicker(props: Parameters<typeof ConnectedAgentPicker>[0]) {
-  return IS_MAC ? <ConnectedAgentPicker {...props} /> : <LegacyCodexPicker {...props} />
+  return UNIFIED_AGENTS ? <ConnectedAgentPicker {...props} /> : <LegacyCodexPicker {...props} />
 }
 
 /** 联网: off by default; on, Codex may go online to find material (pictures, sound, music, data). */
 export function NetworkToggle({ on, onChange, compact, disabled }: { on: boolean; onChange: (next: boolean) => void; compact?: boolean; disabled?: boolean }) {
-  const agentName = IS_MAC ? '智能体' : 'Codex'
+  const agentName = UNIFIED_AGENTS ? '智能体' : 'Codex'
   return <span className="ge ge-model">
     <button type="button" className="ge-model-pick ge-net" role="switch" aria-checked={on} data-on={on || undefined} disabled={disabled}
       title={on ? `已联网：${agentName} 可以上网找素材（只用可免费使用的，来源写在报告里）` : `没联网：只用你给的素材。打开后 ${agentName} 可以上网找素材`}

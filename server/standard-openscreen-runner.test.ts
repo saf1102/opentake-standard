@@ -9,11 +9,15 @@ test('export uses installed OpenScreen process for v7 and legacy; never mixes na
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'standard-installed-screen-'));
  const old=process.env.ELECTRON_RUN_AS_NODE;
  try {
-  const executable=path.join(root,'openscreen');
+  const executable=path.join(root,process.platform==='win32'?'Openscreen.exe':'openscreen');
   const lookup={env:{PATH:'',OPENSCREEN_BIN:executable},home:root,binDirs:[],applicationDirs:[]};
   assert.throws(()=>resolveOpenScreenExportRunner({schemaVersion:7},lookup),/未检测到用户安装/);
-  fs.writeFileSync(executable,'#!/bin/sh\nexit 0\n');fs.chmodSync(executable,0o644);
+  fs.mkdirSync(executable);
   assert.throws(()=>resolveOpenScreenExportRunner({schemaVersion:7},lookup),/未检测到用户安装/);
+  fs.rmdirSync(executable);
+  fs.writeFileSync(executable,'#!/bin/sh\nexit 0\n');fs.chmodSync(executable,0o644);
+  // Windows has no POSIX executable bit; keep the permission rejection on Unix.
+  if(process.platform!=='win32')assert.throws(()=>resolveOpenScreenExportRunner({schemaVersion:7},lookup),/未检测到用户安装/);
   fs.chmodSync(executable,0o755);process.env.ELECTRON_RUN_AS_NODE='1';
   for(const schemaVersion of [6,7]){
    const runner=resolveOpenScreenExportRunner({schemaVersion},lookup);
@@ -43,6 +47,9 @@ test('external export freezes preview defaults and wallpaper without mutating so
   assert.deepEqual(staged.legacyEditor,{wallpaper:path.join(folder,'wallpaper1.jpg'),padding:50,borderRadius:40});
   assert.deepEqual(staged.zoomRanges,doc.zoomRanges);assert.equal(doc.legacyEditor,null);
   assert.throws(()=>stageEditorSettings(doc,{wallpaper:'/wallpapers/wallpaper2.jpg'},root),/背景资源缺失/);
+  const built=path.join(root,'dist/openscreen/wallpapers');fs.mkdirSync(built,{recursive:true});fs.copyFileSync(path.join(folder,'wallpaper1.jpg'),path.join(built,'wallpaper1.jpg'));
+  fs.rmSync(path.join(root,'public'),{recursive:true});
+  assert.equal((stageEditorSettings(doc,{wallpaper:'/wallpapers/wallpaper1.jpg'},root).legacyEditor as any).wallpaper,path.join(built,'wallpaper1.jpg'));
  }
  finally{fs.rmSync(root,{recursive:true,force:true});}
 });
@@ -64,7 +71,8 @@ test('isolated OpenScreen profile requires an absolute path and passes it to nat
  assert.equal(openScreenProfile({}),undefined);
  assert.deepEqual(openScreenProfileArgs({}),[]);
  assert.throws(()=>openScreenProfile({OPENSCREEN_USER_DATA_DIR:'relative'}),/绝对路径/);
- assert.deepEqual(openScreenProfileArgs({OPENSCREEN_USER_DATA_DIR:'/tmp/isolated screen'}),['--user-data-dir=/tmp/isolated screen']);
+ const profile=path.join(os.tmpdir(),'isolated screen');
+ assert.deepEqual(openScreenProfileArgs({OPENSCREEN_USER_DATA_DIR:profile}),[`--user-data-dir=${profile}`]);
 });
 
 test('cursor sidecar accompanies staged video without mutating original media',async()=>{

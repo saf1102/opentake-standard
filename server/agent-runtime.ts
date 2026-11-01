@@ -20,7 +20,7 @@ export function withAgentChoiceScope<T>(choices:Partial<Record<AgentModule,Agent
 export function currentAgentChoice(module:AgentModule,settings:AgentSettings=readAgentSettings()):AgentChoice{return choiceScope.getStore()?.[module]||settings.modules[module];}
 export type ResolvedAgent = Readonly<{ agent?: AgentConnectionId; method?:ConnectionMode;transport?:'acp'; module: AgentModule; executable: string; cliVersion: string; model: string; effort: string; requested?: { model: string; effort: string } }>;
 export async function resolveAgent(module: AgentModule, settings: AgentSettings = readAgentSettings()): Promise<ResolvedAgent> {
-  const unified=process.platform==='darwin';
+  const unified=process.platform==='darwin'||process.platform==='win32';
   const choice=unified?currentAgentChoice(module,settings):settings.modules[module];settings={...settings,modules:{...settings.modules,[module]:choice}};
   const id=unified?(choice.agent||'codex'):'codex';
   if(unified)assertAgentExecutionAllowed(id);
@@ -58,7 +58,7 @@ export function agentExecArgs(agent: ResolvedAgent, args: string[]) {
 /** One immutable choice per job. CLI failure is surfaced; a fallback model is never silent — `requested` stays on the run record. */
 export type AgentProcessOptions=ClosedStdinProcessOptions&{signal?:AbortSignal};
 export async function runAgent(agent: ResolvedAgent, args: string[], options: AgentProcessOptions = {}, purpose?: 'connectivity', connectionDeps:ConnectionDependencies={}) {
-  const unified=process.platform==='darwin';
+  const unified=process.platform==='darwin'||process.platform==='win32';
   if(unified)assertAgentWorkAllowed(agent.agent||'codex');
   const argv = agentExecArgs(agent, args);
   const id = crypto.randomUUID(), started = Date.now();

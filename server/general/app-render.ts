@@ -1,3 +1,4 @@
+import {renameWithRetrySync,removeWithRetrySync} from '../file-ops.ts';
 /** App export adapter. The kit retains its standalone renderer; only its scene and audio specification are shared. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -52,9 +53,9 @@ export async function renderAppFilm(film:Film2,work:string,options:{pageId?:stri
   await renderVideo({serveUrl:work,entryPath:pageUrl,assetResolver,resourcePaintFrames:single&&!text?2:0,composition:comp,codec:alpha?'prores':'h264',imageFormat:alpha?'png':'jpeg',jpegQuality:95,videoQuality:70,proResQuality:alpha?9:undefined,outputLocation:raw,concurrency:options.concurrency??6,cancelSignal:options.cancelSignal,onProgress:p=>options.onProgress?.(p.progress)});
   const captured=performance.now();
   fs.mkdirSync(path.dirname(output),{recursive:true});
-  if(single)fs.renameSync(raw,output);else await lib.finishPicture(film,raw,output,[...h264Encode({fps:film.fps,quality:70,allowSoftware:true}),'-r',String(film.fps)]);
+  if(single)renameWithRetrySync(raw,output);else await lib.finishPicture(film,raw,output,[...h264Encode({fps:film.fps,quality:70,allowSoftware:true}),'-r',String(film.fps)]);
   options.cancelSignal?.throwIfAborted();
   if(process.env.CW_RENDER_TRACE)console.log(JSON.stringify({prepareMs:prepared-started,captureEncodeMs:captured-prepared,finishMs:performance.now()-captured}));
   return output;
- }catch(e){fs.rmSync(output,{force:true});throw e;}finally{fs.rmSync(scratch,{recursive:true,force:true});}
+ }catch(e){removeWithRetrySync(output,{force:true});throw e;}finally{removeWithRetrySync(scratch,{recursive:true,force:true});}
 }

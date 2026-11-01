@@ -1,3 +1,5 @@
+import {createRequire} from 'node:module';
+const {requestFileDialog}=createRequire(import.meta.url)('../../desktop/file-dialogs.cjs') as {requestFileDialog:(kind:string)=>Promise<string|null>};
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -22,6 +24,7 @@ export function findJianyingApp() {
 }
 
 export async function chooseExportDestination(prompt="选择 Creative Workspace 导出位置") {
+  if(process.platform==='win32'){const selected=await requestFileDialog('folder');if(!selected)throw Error('未选择导出位置');return selected;}
   if (process.platform !== 'darwin') throw new Error('当前系统暂不支持原生文件夹选择器，请直接填写绝对路径')
   const { stdout } = await execFileAsync('/usr/bin/osascript', [
     '-e',
