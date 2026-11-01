@@ -16,7 +16,7 @@ export function compositorBuildInputs(root=defaultRoot){
 export function verifyWindowsCompositor(root=defaultRoot){
  const input=compositorBuildInputs(root),out=path.join(root,'native/windows/compositor');
  const receipt=JSON.parse(fs.readFileSync(path.join(out,'build.json'),'utf8'));
- if(receipt.kind!=='opentake-compositor-software-decode-v1'||receipt.upstreamCommit!==input.upstream.commit||receipt.sourceSha256!==input.sourceSha256||receipt.binarySha256!==sha(fs.readFileSync(path.join(out,'compositor_view.node'))))throw Error('原生合成器与固定源码或构建回执不一致，请重新构建。');
+ if(receipt.kind!=='opentake-compositor-software-video-v2'||receipt.upstreamCommit!==input.upstream.commit||receipt.sourceSha256!==input.sourceSha256||receipt.binarySha256!==sha(fs.readFileSync(path.join(out,'compositor_view.node'))))throw Error('原生合成器与固定源码或构建回执不一致，请重新构建。');
  return receipt;
 }
 function run(file,args,options={}){
@@ -60,7 +60,7 @@ async function build(){
  const out=path.join(defaultRoot,'native/windows/compositor');fs.mkdirSync(out,{recursive:true});
  const binary=path.join(out,'compositor_view.node');fs.copyFileSync(path.join(checkout,'crates/target/release/compositor_view.dll'),binary);
  fs.copyFileSync(path.join(vendor,'LICENSE'),path.join(out,'LICENSE'));
- fs.writeFileSync(path.join(out,'build.json'),JSON.stringify({kind:'opentake-compositor-software-decode-v1',upstreamCommit:upstream.commit,sourceSha256,binarySha256:sha(fs.readFileSync(binary)),ffmpegSdkSha256:upstream.sdkSha256},null,2)+'\n');
- verifyWindowsCompositor();console.log('Windows 原生合成器已构建，支持硬件初始化失败后的软件解码回退。');
+ fs.writeFileSync(path.join(out,'build.json'),JSON.stringify({kind:'opentake-compositor-software-video-v2',upstreamCommit:upstream.commit,sourceSha256,binarySha256:sha(fs.readFileSync(binary)),ffmpegSdkSha256:upstream.sdkSha256},null,2)+'\n');
+ verifyWindowsCompositor();console.log('Windows 原生合成器已构建，支持视频硬件初始化失败后的软件解码及编码回退。');
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await build();

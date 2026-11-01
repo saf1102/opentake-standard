@@ -37,7 +37,7 @@ export async function prepareRuntimeManifest(source){
   else {const data=await fs.readFile(file);files.push({path:path.relative(root,file).split(path.sep).join('/'),bytes:data.length,sha256:digest(data)})}
  }}
  await visit(root);files.sort((a,b)=>a.path.localeCompare(b.path));
- const manifest={schema:1,platform:'win32-x64',components:origins.components,modifications:[{component:'OpenScreen WGC helper',reason:'原生 MP4 时钟修复',source:'vendor/openscreen-wgc',originalPreserved:true,officialAppAsarUnchanged:true},{component:'OpenScreen native compositor',reason:'D3D11VA 初始化失败时回退软件解码，沿用原生合成器',source:'vendor/openscreen-compositor',binarySha256:compositor.binarySha256,originalPreserved:true,officialAppAsarUnchanged:true},{component:'runtime packaging',reason:'Exclude Python test suites and FFmpeg development-only files; preserve runtime libraries, licenses and corresponding source archives.'}],files};
+ const manifest={schema:1,platform:'win32-x64',components:origins.components,modifications:[{component:'OpenScreen WGC helper',reason:'原生 MP4 时钟修复',source:'vendor/openscreen-wgc',originalPreserved:true,officialAppAsarUnchanged:true},{component:'OpenScreen native compositor',reason:'D3D11VA 初始化失败时回退软件解码；编码帧池不可用时改用系统内存帧，沿用原生合成器',source:'vendor/openscreen-compositor',binarySha256:compositor.binarySha256,originalPreserved:true,officialAppAsarUnchanged:true},{component:'runtime packaging',reason:'Exclude Python test suites and FFmpeg development-only files; preserve runtime libraries, licenses and corresponding source archives.'}],files};
  await fs.writeFile(path.join(root,'manifest.json'),JSON.stringify(manifest,null,2));
  console.log(`内置运行库：${origins.components.length} 个组件，${files.length} 个文件，${files.reduce((sum,row)=>sum+row.bytes,0)} 字节。`);
  return manifest;

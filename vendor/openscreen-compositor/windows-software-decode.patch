@@ -1,16 +1,29 @@
 diff --git a/crates/compositor/src/pipeline_windows.rs b/crates/compositor/src/pipeline_windows.rs
-index 28bcc4f..35be504 100644
+index 28bcc4f..658b340 100644
 --- a/crates/compositor/src/pipeline_windows.rs
 +++ b/crates/compositor/src/pipeline_windows.rs
-@@ -38,6 +38,7 @@ enum DecodeFrameTestFault {
+@@ -38,10 +38,20 @@ enum DecodeFrameTestFault {
      CloneNull,
      EofSendError,
      AttachBufferRefNull,
 +    HardwareDeviceInit,
++}
++
++#[cfg(test)]
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum EncodeFrameTestFault {
++    DeviceInit,
++    FramesInit,
  }
  
  #[cfg(test)]
-@@ -407,6 +408,11 @@ unsafe fn attach_d3d11va(dctx: *mut AVCodecContext, gpu: &Gpu) -> Result<*mut AV
+ thread_local! {
++    static ENCODE_FRAME_TEST_FAULT: std::cell::Cell<Option<EncodeFrameTestFault>> =
++        const { std::cell::Cell::new(None) };
+     static DECODE_FRAME_TEST_FAULT: std::cell::Cell<Option<DecodeFrameTestFault>> =
+         const { std::cell::Cell::new(None) };
+     static DECODE_FRAME_TEST_PACKET_RELEASED: std::cell::RefCell<
+@@ -407,6 +417,11 @@ unsafe fn attach_d3d11va(dctx: *mut AVCodecContext, gpu: &Gpu) -> Result<*mut AV
      if hwdev.is_null() {
          bail!("av_hwdevice_ctx_alloc");
      }
@@ -22,7 +35,7 @@ index 28bcc4f..35be504 100644
      let hwdc = (*hwdev).data as *mut AVHWDeviceContext;
      let d3dctx = (*hwdc).hwctx as *mut AVD3D11VADeviceContext;
      let dev_clone = gpu.device.clone();
-@@ -850,20 +856,34 @@ impl Decoder {
+@@ -850,20 +865,34 @@ impl Decoder {
          // (`tests/warp_device_cannot_decode.rs`). AV1/VP9 (legacy WebMs, #554)
          // take the same software CpuFrames axis as Backend::Cpu.
          let want_hw = gpu.backend != Backend::Cpu && d3d11va_for_codec(codec_id);
@@ -68,7 +81,114 @@ index 28bcc4f..35be504 100644
          let (fmt, dctx, hwdev) = resources.into_raw();
  
          Ok(Decoder {
-@@ -2866,6 +2886,29 @@ mod tests {
+@@ -1175,16 +1204,26 @@ impl Drop for Decoder {
+ const SEEK_FORWARD_MAX_SEC: f64 = 0.5;
+ 
+ unsafe fn make_enc_frames(gpu: &Gpu, w: i32, h: i32) -> Result<(*mut AVBufferRef, *mut AVBufferRef)> {
+-    let hwdev = av_hwdevice_ctx_alloc(AVHWDeviceType::AV_HWDEVICE_TYPE_D3D11VA);
+-    let hwdc = (*hwdev).data as *mut AVHWDeviceContext;
++    let mut hwdev = BufferGuard(av_hwdevice_ctx_alloc(AVHWDeviceType::AV_HWDEVICE_TYPE_D3D11VA));
++    if hwdev.0.is_null() {
++        bail!("enc av_hwdevice_ctx_alloc");
++    }
++    let hwdc = (*hwdev.0).data as *mut AVHWDeviceContext;
+     let d3dctx = (*hwdc).hwctx as *mut AVD3D11VADeviceContext;
+     let dev_clone = gpu.device.clone();
+     (*d3dctx).device = dev_clone.as_raw() as *mut ID3D11Device;
+     std::mem::forget(dev_clone);
+-    averr(av_hwdevice_ctx_init(hwdev), "enc hwdevice init")?;
++    #[cfg(test)]
++    if ENCODE_FRAME_TEST_FAULT.with(|fault| fault.get() == Some(EncodeFrameTestFault::DeviceInit)) {
++        bail!("injected enc hwdevice init failure");
++    }
++    averr(av_hwdevice_ctx_init(hwdev.0), "enc hwdevice init")?;
+ 
+-    let frames = av_hwframe_ctx_alloc(hwdev);
+-    let fc = (*frames).data as *mut AVHWFramesContext;
++    let mut frames = BufferGuard(av_hwframe_ctx_alloc(hwdev.0));
++    if frames.0.is_null() {
++        bail!("enc av_hwframe_ctx_alloc");
++    }
++    let fc = (*frames.0).data as *mut AVHWFramesContext;
+     (*fc).format = AVPixelFormat::AV_PIX_FMT_D3D11;
+     (*fc).sw_format = AVPixelFormat::AV_PIX_FMT_NV12;
+     (*fc).width = w;
+@@ -1195,8 +1234,27 @@ unsafe fn make_enc_frames(gpu: &Gpu, w: i32, h: i32) -> Result<(*mut AVBufferRef
+     // notre propre NV12 simple (RT) puis CopySubresourceRegion vers ce pool. GPU->GPU.
+     let d3dfc = (*fc).hwctx as *mut AVD3D11VAFramesContext;
+     (*d3dfc).BindFlags = D3D11_BIND_DECODER | D3D11_BIND_SHADER_RESOURCE;
+-    averr(av_hwframe_ctx_init(frames), "enc frames init")?;
+-    Ok((hwdev, frames))
++    #[cfg(test)]
++    if ENCODE_FRAME_TEST_FAULT.with(|fault| fault.get() == Some(EncodeFrameTestFault::FramesInit)) {
++        bail!("injected enc frames init failure");
++    }
++    averr(av_hwframe_ctx_init(frames.0), "enc frames init")?;
++    // Transfer both references only after the complete pool is usable. Every failure
++    // above releases the frames, device and cloned COM reference through the guards.
++    Ok((std::mem::replace(&mut hwdev.0, ptr::null_mut()),
++        std::mem::replace(&mut frames.0, ptr::null_mut())))
++}
++
++unsafe fn make_export_frames(gpu: &Gpu, w: i32, h: i32) -> (*mut AVBufferRef, *mut AVBufferRef) {
++    if gpu.backend != Backend::Cpu {
++        match make_enc_frames(gpu, w, h) {
++            Ok(pool) => return pool,
++            Err(error) => eprintln!("[pipeline] D3D11 encoder pool unavailable; using system frames: {error:#}"),
++        }
++    }
++    // A D3D11 rendering device may work without ID3D11VideoDevice (VM/RDP).
++    // Keep composition on that device and read its NV12 output into system memory.
++    (ptr::null_mut(), ptr::null_mut())
+ }
+ 
+ /// C1..C8 (§9) : composite 2 sources → encode, effets gatés par `cfg`. Mesuré au plus extérieur (§10).
+@@ -1593,7 +1651,7 @@ impl VideoEncoder {
+         h: u32,
+         pts: i64,
+     ) -> Result<()> {
+-        debug_assert!(!self.sw.is_null(), "backend CPU : aucun candidat D3D11 ne doit gagner");
++        debug_assert!(!self.sw.is_null(), "system-frame export must not select a D3D11 encoder");
+         averr(av_frame_make_writable(self.sw), "frame_make_writable")?;
+         let landing = if self.nv12.is_null() { self.sw } else { self.nv12 };
+         comp.read_nv12_scaled(
+@@ -1723,16 +1781,10 @@ unsafe fn run_multi_inner(
+         .unwrap_or_default();
+ 
+     // ---- encodeur (choisi à l'exécution, cf. ExportCodec::candidates) + mux ----
+-    // Backend CPU : pas de pool D3D11 du tout. `av_hwdevice_ctx_init(D3D11VA)` échoue sur
+-    // WARP (pas d'`ID3D11VideoDevice`), donc on n'essaie même pas — `VideoEncoder::open`
+-    // écarte alors les candidats zéro-copie et le compositeur alimente l'encodeur en
+-    // mémoire système via `send_composited`.
+-    let software_frames = gpu.backend == Backend::Cpu;
+-    let (enc_hwdev, enc_frames) = if software_frames {
+-        (ptr::null_mut(), ptr::null_mut())
+-    } else {
+-        make_enc_frames(gpu, out_w as i32, out_h as i32)?
+-    };
++    // WARP and rendering-only VM/RDP devices cannot provide a D3D11 video pool.
++    // Select system-frame encoders and feed the composed NV12 through readback.
++    let (enc_hwdev, enc_frames) = make_export_frames(gpu, out_w as i32, out_h as i32);
++    let software_frames = enc_frames.is_null();
+     // Libérés en fin de portée sur toutes les sorties : une annulation qui les laisserait fuir
+     // coûterait 32 surfaces NV12 à chaque fois. `enc` garde sa propre référence sur le pool.
+     let _enc_pool = (BufferGuard(enc_frames), BufferGuard(enc_hwdev));
+@@ -1884,6 +1936,14 @@ unsafe fn run_multi_inner(
+ mod tests {
+     use super::*;
+ 
++    struct EncodeFrameFaultReset;
++
++    impl Drop for EncodeFrameFaultReset {
++        fn drop(&mut self) {
++            ENCODE_FRAME_TEST_FAULT.with(|fault| fault.set(None));
++        }
++    }
++
+     struct DecodeFrameFaultReset;
+ 
+     impl Drop for DecodeFrameFaultReset {
+@@ -2866,6 +2926,73 @@ mod tests {
          println!("CORE_ASSERTIONS_COMPLETED:h264_opens_on_d3d11va");
      }
  
@@ -93,6 +213,50 @@ index 28bcc4f..35be504 100644
 +            .expect("ordinary hardware decoder");
 +        assert!(decoder.cpu.is_none(), "healthy hardware remains the default");
 +        println!("CORE_ASSERTIONS_COMPLETED:h264_device_init_failure_falls_back_to_software_and_keeps_seek_clock");
++    }
++
++    #[test]
++    fn h264_encoder_pool_failure_falls_back_and_exports_decodable_frames() {
++        let gpu = Gpu::create(false).expect("hardware device for encoder fault injection");
++        let path = encode_color_for_duration(
++            &["-c:v", "libopenh264", "-b:v", "200k"], "encoder-fallback-source.mp4", "0.5",
++        );
++        let params = ExportParams {
++            width: 64, height: 64, fps: Some(24), codec: ExportCodec::H264,
++            bit_rate: Some(200_000),
++        };
++        let comp = Compositor::new_sized(&gpu, 64, 64).expect("compositor");
++        for fault in [EncodeFrameTestFault::DeviceInit, EncodeFrameTestFault::FramesInit] {
++            let out = path.with_file_name(format!("encoder-fallback-{fault:?}.mp4"));
++            {
++                let _reset = EncodeFrameFaultReset;
++                ENCODE_FRAME_TEST_FAULT.with(|slot| slot.set(Some(fault)));
++                let _decoder_fault = install_simple_decode_frame_fault(DecodeFrameTestFault::HardwareDeviceInit);
++                let (device, frames) = unsafe { make_export_frames(&gpu, 64, 64) };
++                assert!(device.is_null() && frames.is_null(), "unusable pool must select system frames");
++                let stats = run_composited_multi(
++                    &[ClipSource {
++                        screen: path.to_string_lossy().into_owned(), webcam: String::new(),
++                        source_start_sec: 0.0, source_end_sec: 0.5, webcam_offset_sec: 0.0,
++                        has_audio: false,
++                    }], &out.to_string_lossy(), &gpu, &comp, &Cfg::c8(), &params, &mut |_| {},
++                ).expect("pool initialization failure must still export");
++                assert_eq!(stats.frames, 12);
++            }
++            assert_eq!(probe_frame_count(&out.to_string_lossy()).expect("muxed frame count"), 12);
++            let decoded = std::process::Command::new(ffmpeg_exe())
++                .args(["-v", "error", "-xerror", "-i"]).arg(&out)
++                .args(["-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
++                .output().expect("strict decode exported MP4");
++            assert!(decoded.status.success(), "{}", String::from_utf8_lossy(&decoded.stderr));
++            assert_eq!(decoded.stdout.len(), 12 * 64 * 64 * 3);
++            assert!(decoded.stdout.chunks_exact(3).any(|p| p[0] > p[2].saturating_add(50)),
++                "export must contain the red source, not blank frames");
++        }
++        let (device, frames) = unsafe { make_export_frames(&gpu, 64, 64) };
++        let _healthy_pool = (BufferGuard(frames), BufferGuard(device));
++        assert!(!frames.is_null(), "healthy encoder pool remains enabled");
++        println!("CORE_ASSERTIONS_COMPLETED:h264_encoder_pool_failure_falls_back_and_exports_decodable_frames");
 +    }
 +
      #[test]
