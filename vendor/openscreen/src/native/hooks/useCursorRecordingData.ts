@@ -10,6 +10,7 @@ interface UseCursorRecordingDataResult {
 
 export function useCursorRecordingData(videoPath: string | null): UseCursorRecordingDataResult {
 	const [data, setData] = useState<CursorRecordingData | null>(null);
+	const [loadedPath, setLoadedPath] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +32,7 @@ export function useCursorRecordingData(videoPath: string | null): UseCursorRecor
 				const nextData = await nativeBridgeClient.cursor.getRecordingData(videoPath);
 				if (!cancelled) {
 					setData(nextData);
+					setLoadedPath(videoPath);
 				}
 			} catch (nextError) {
 				if (!cancelled) {
@@ -54,7 +56,7 @@ export function useCursorRecordingData(videoPath: string | null): UseCursorRecor
 	}, [videoPath]);
 
 	return {
-		data,
+		data: loadedPath === videoPath ? data : null,
 		loading,
 		error,
 	};

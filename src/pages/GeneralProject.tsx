@@ -151,8 +151,9 @@ const EXPORT_LABEL = { mp4: '成片', jianying: '剪映草稿' } as const
 /** 导出 for a layered version: the film or a 剪映 draft, with the person's edits. Progress comes back on the project (SSE). */
 function ExportMenu({ project, version }: { project: Project; version: number }) {
   const task = project.exportTask
-  const running = task?.state === 'running'
+  const running = task?.state === 'running' || task?.state === 'cancelling'
   const [starting, setStarting] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   // say when an export finishes or fails (once, when its state changes while this page is open)
   const seen = useRef(task ? `${task.id}:${task.state}` : '')
   useEffect(() => {
@@ -163,13 +164,22 @@ function ExportMenu({ project, version }: { project: Project; version: number })
     if (task.state === 'done' && task.downloadUrl) toast.success(`${EXPORT_LABEL[task.format]}导出好了`, { action: { label: '下载', onClick: () => download(task.downloadUrl!) }, duration: 15000 })
     if (task.state === 'done' && task.folder) toast.success('剪映工程做好了，双击里面的「导入剪映」就能放进剪映草稿箱', { action: { label: '在访达中显示', onClick: () => void generalEditorApi.revealExport(project.id).catch(failure => toast.error(errorText(failure))) }, duration: 15000 })
     if (task.state === 'failed') toast.error(`导出没成功：${task.error || '原因不明'}`)
+    if (task.state === 'cancelled') toast.info('导出已取消，可以重新导出')
   }, [task, project.id])
   const reveal = () => generalEditorApi.revealExport(project.id).catch(failure => toast.error(errorText(failure)))
   const start = async (format: 'mp4' | 'jianying') => {
     setStarting(true)
     try { await generalEditorApi.export(project.id, version, format) } catch (failure) { toast.error(`导出没开始：${errorText(failure)}`) } finally { setStarting(false) }
   }
-  if (running) return <span className="ge-export" role="status" aria-disabled="true" title={task.step}><Download aria-hidden="true" />{`导出 ${Math.round(task.progress * 100)}%`}</span>
+  const cancel = async () => {
+    if (!task || cancelling || task.state !== 'running') return
+    setCancelling(true)
+    try { await generalEditorApi.cancelExport(project.id, task.id) } catch (failure) { toast.error(`取消未完成：${errorText(failure)}`) } finally { setCancelling(false) }
+  }
+  if (running) return <>
+    <span className="ge-export" role="status" title={task.step}><Download aria-hidden="true" />{task.state === 'cancelling' ? '正在取消…' : `导出 ${Math.round(task.progress * 100)}%`}</span>
+    <button type="button" className="ge-soft" disabled={cancelling || task.state === 'cancelling'} onClick={() => void cancel()}>取消导出</button>
+  </>
   const last = task?.state === 'done' && task.version === version && (task.downloadUrl || task.folder) ? task : undefined
   return <><DropdownMenu>
     <DropdownMenuTrigger asChild>

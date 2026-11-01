@@ -6,3 +6,5 @@ dist/
 ._*
 release/
 .venv/
+.build/
+native/windows/

@@ -1,6 +1,6 @@
 {
   "name": "opentake-standard",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
@@ -11,9 +11,11 @@
     "start": "electron .",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --experimental-strip-types --test --test-concurrency=4 server/*.test.ts && npm run test:desktop && npm run test:openscreen",
-    "build": "npm run build:openscreen && vite build",
+    "build": "npm run build:native && npm run build:openscreen && vite build",
+    "build:native": "node scripts/build-windows-recording.mjs",
     "dev": "vite",
     "build:app": "npm run build && node desktop/build-app.mjs",
+    "build:installer": "npm run build && node desktop/build-installer.mjs",
     "test:desktop": "node --test desktop/*.test.cjs",
     "build:openscreen": "npm --prefix vendor/openscreen run build:linkreader",
     "test:openscreen": "npm --prefix vendor/openscreen run test:standard"

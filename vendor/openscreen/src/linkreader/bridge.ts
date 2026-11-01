@@ -236,7 +236,6 @@ async function cursorRecordingData(videoPath?: string) {
 	const assetId = assetIdFromMediaPath(videoPath);
 	if (!assetId) return { version: 2, provider: "none", samples: [], assets: [] };
 	const response = await fetch(mediaUrl(assetId, "cursor"), { cache: "no-store" });
-	if (response.status === 404) return { version: 2, provider: "none", samples: [], assets: [] };
 	if (!response.ok) throw new Error(`鼠标轨迹读取失败（${response.status}）`);
 	const value = (await response.json()) as Record<string, unknown> | unknown[];
 	if (Array.isArray(value)) return { version: 2, provider: "none", samples: value, assets: [] };
@@ -1157,6 +1156,8 @@ export async function installLinkReaderBridge() {
 	};
 	electron.startNewRecording = async () => {
 		if (!writable) return { success: false, error: "当前工程为只读" };
+		const control = await api<{supported:boolean}>(`/api/editor/openscreen/recording-control`);
+		if(control.supported) {bridgeMessage('recording-state',{request:true});return {success:true};}
 		const session = await api(`/api/editor/projects/${projectId}/openscreen/host-sessions`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },

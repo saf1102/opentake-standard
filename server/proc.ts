@@ -1,3 +1,4 @@
+import platform from './platform.ts'
 import { execFile, spawn, type ChildProcess, type ExecFileOptions, type ExecFileOptionsWithStringEncoding } from 'node:child_process'
 import { AsyncLocalStorage } from 'node:async_hooks'
 
@@ -41,6 +42,7 @@ export function isProcessOwnerCancelled() {
  * Export chains like 服务→准备 worker→FFmpeg must die as a tree, not one link.
  */
 function signalProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+  if(child.pid && process.platform==='win32'){platform.killTree(child.pid,signal);return;}
   try {
     if (child.pid && process.platform !== 'win32') {
       process.kill(-child.pid, signal)

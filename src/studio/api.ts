@@ -28,6 +28,17 @@ export const launchOpenScreenHost = (projectId: string, clientId: string) => fet
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId }),
 }).then((r) => json<OpenScreenHostSession>(r))
 export const getOpenScreenHostSession = (projectId: string, sessionId: string) => fetch(`/api/editor/projects/${projectId}/openscreen/host-sessions/${sessionId}`, { cache: 'no-store' }).then((r) => json<OpenScreenHostSession>(r))
+export const getOpenScreenHostSessions = (projectId:string) => fetch(`/api/editor/projects/${projectId}/openscreen/host-sessions`,{cache:'no-store'}).then(r=>json<OpenScreenHostSession[]>(r))
+export type RecordingControlStatus = {supported:boolean;active:null|{projectId:string;id:string;phase:string;sourceName:string;startedAt?:number}}
+export const getRecordingControlStatus = () => fetch('/api/editor/openscreen/recording-control',{cache:'no-store'}).then(r=>json<RecordingControlStatus>(r))
+export const getRecordingSources = () => fetch('/api/editor/openscreen/sources',{cache:'no-store'}).then(r=>json<import('../types').CaptureSource[]>(r))
+export type NativeRecordingOptions = {sourceId:string;sourceType:'window'|'display';durationSeconds:number;systemAudio:boolean;microphone:boolean}
+export const startNativeRecording = (projectId:string,clientId:string,options:NativeRecordingOptions) => fetch(`/api/editor/projects/${projectId}/openscreen/host-sessions`,{
+ method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...options,clientId,mode:'cli'}),
+}).then(r=>json<OpenScreenHostSession>(r))
+export const stopNativeRecording = (projectId:string,id:string,clientId:string) => fetch(`/api/editor/projects/${projectId}/openscreen/host-sessions/${id}/stop`,{
+ method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId}),
+}).then(r=>json<OpenScreenHostSession>(r))
 export const confirmOpenScreenHostCandidate = (projectId: string, sessionId: string, file: string, clientId: string) => fetch(`/api/editor/projects/${projectId}/openscreen/host-sessions/${sessionId}/confirm`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file, clientId }),
 }).then((r) => json<{ session: OpenScreenHostSession; document: OpenScreenDocumentResult }>(r))

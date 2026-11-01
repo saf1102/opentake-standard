@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import {removeWithRetrySync} from '../file-ops.ts';
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
@@ -326,7 +327,7 @@ export function renameOpenScreenCodexSession(linkReaderProjectId: string, docume
 
 export function deleteOpenScreenCodexSession(linkReaderProjectId: string, documentId: string, sessionId: string) {
   const file = sessionFile(linkReaderProjectId, documentId, sessionId);
-  if (fs.existsSync(file)) fs.unlinkSync(file);
+  removeWithRetrySync(file,{force:true});
   return { success: true };
 }
 

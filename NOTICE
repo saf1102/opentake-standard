@@ -2,6 +2,10 @@ OpenTake Standard — Third-party notices
 
 OpenTake original code: AGPL-3.0-only, see LICENSE. OpenTake name and T mark are excluded; see TRADEMARK.md.
 
+R9 FULL WINDOWS INSTALLER ADDENDUM: this local preview additionally bundles application-local OpenScreen, LGPL shared FFmpeg/ffprobe, Python scientific packages, Chromium Headless Shell and Codex CLI. Their exact versions, original notices, binary/source provenance and modifications are documented in WINDOWS-RUNTIME-NOTICES.md and resources/runtimes/manifest.json. The source-only export statements below describe the source archive, not the R9 full runtime payload. R9 also replaces only its bundled OpenScreen WGC helper with the included MIT native-clock fix; it does not change any separately installed application.
+
+Windows recording helper: built locally from the pinned MIT OpenScreen v2.1.2 WGC source in vendor/openscreen-wgc, with OpenTake's per-frame clock sidecar and native MP4 finalization changes. Full upstream license and source attribution are retained there. The Windows directory app includes this source-built helper and its LICENSE; it does not include the OpenScreen desktop app or native compositor. The additional native mp4_clock source files carry the MIT license. Container timing correction keeps the original capture and cursor data.
+
 lemo-opuscar, copyright 2026 LemoLab, MIT; upstream https://github.com/lemomo-ai/lemo-opuscar (3961ddb3d24d8876e0e2754f7790d66908acee51). Standard includes ten style guides and common authoring helpers. Full MIT text: server/general/kit/LICENSE.lemo-opuscar. Attribution: server/general/kit/ATTRIBUTION.md.
 Style preview images and videos: copyright LemoLab, CC BY 4.0, excerpts cropped for preview; individual credits and other included material are listed in src/workspace/style-library/style-library.json and displayed in the style detail.
 
@@ -22,7 +26,7 @@ Electron: MIT, copyright Electron contributors, https://github.com/electron/elec
 
 OpenScreen: MIT, Siddharth Vaddem and contributors. Complete upstream notices: vendor/openscreen/LICENSE and vendor/openscreen/THIRD-PARTY-NOTICES.md. OpenTake modifications are AGPL-3.0.
 
-Default cursor PNG artwork and normalized hotspots are synchronized from the locally installed official OpenScreen 2.1.2 distribution (MIT), copyright 2025 Siddharth Vaddem and 2025–2026 OpenScreen contributors. The browser zoom transition adapter follows that version's compositor behavior. Full license: vendor/openscreen/LICENSE. No OpenScreen executable is included.
+Default cursor PNG artwork and normalized hotspots are synchronized from the locally installed official OpenScreen 2.1.2 distribution (MIT), copyright 2025 Siddharth Vaddem and 2025–2026 OpenScreen contributors. The browser zoom transition adapter follows that version's compositor behavior. Full license: vendor/openscreen/LICENSE. The separate OpenScreen desktop executable and compositor are not included.
 
 
 ## OpenScreen upstream notices

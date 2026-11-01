@@ -1,0 +1,125 @@
+{
+  "upstream": "https://github.com/getopenscreen/openscreen",
+  "ref": "v2.1.2",
+  "commit": "d8889c626f859e0be8f4f87fdffc7362629550bc",
+  "license": "MIT",
+  "localChanges": [
+    "mf_encoder.h/.cpp: verify native MP4 timing before successful finalization and write exact per-sample clock sidecar",
+    "mp4_clock.h/.cpp and mp4_clock_test.cpp: bounded metadata-only native clock correction, raw backup, atomic publication, and regression checks (MIT)",
+    "main.cpp: capture recording end clock before shutdown work"
+  ],
+  "note": "Original desktop app and compositor are not modified.",
+  "files": [
+    {
+      "path": "electron/native/wgc-capture/src/audio_sample_utils.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/audio_sample_utils.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/audio_sample_utils_test.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/cursor-sampler.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/desktop_icon_cover.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/desktop_icon_cover.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/dpi_awareness.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/dshow_webcam_capture.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/dshow_webcam_capture.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/frame_slot_clock.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/frame_slot_clock_test.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/frame_visibility.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/frame_visibility.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/frame_visibility_test.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/main.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/mf_encoder.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/mf_encoder.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/mf_encoder_color_test.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/monitor_utils.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/monitor_utils.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/realtime_scheduling.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/wasapi_device_watcher.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/wasapi_device_watcher.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/wasapi_loopback_capture.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/wasapi_loopback_capture.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/wasapi_render_keepalive.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/wasapi_render_keepalive.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/webcam_capture.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/webcam_capture.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/webcam_format.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/webcam_format.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/webcam_format_test.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/webcam_snapshot_test.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/wgc_session.cpp"
+    },
+    {
+      "path": "electron/native/wgc-capture/src/wgc_session.h"
+    },
+    {
+      "path": "electron/native/wgc-capture/CMakeLists.txt"
+    },
+    {
+      "path": "LICENSE"
+    }
+  ]
+}

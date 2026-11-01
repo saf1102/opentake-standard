@@ -1,3 +1,5 @@
+import platform from './platform.ts';
+import {atomicJsonSync} from './file-ops.ts';
 import installations from './agent-installation.ts';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,12 +11,9 @@ import { z } from 'zod';
 import { AGENT_MODULES, defaultAgentSettings, type AgentCatalog, type AgentModule, type AgentSettings, type AgentRun, type AgentSettingsView } from '../src/studio/agent-settings.ts';
 import { execFileAsync } from './proc.ts';
 
-export const agentSettingsFile = () => process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(os.homedir(), 'Library', 'Application Support', 'OpenTake Standard', 'agent-settings.json');
+export const agentSettingsFile = () => process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(platform.standardDataRoot(),'agent-settings.json');
 export function atomicAgentJson(file: string, value: unknown) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${crypto.randomUUID()}.tmp`;
-  try { fs.writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: 0o600 }); fs.renameSync(tmp, file); }
-  finally { fs.rmSync(tmp, { force: true }); }
+  atomicJsonSync(file, value, {mode:0o600});
 }
 const choiceSchema = z.object({ model: z.string().regex(/^[a-zA-Z0-9._-]+$/), effort: z.enum(['none','minimal','low','medium','high','xhigh','max','ultra']) }).strict();
 const settingsSchema = z.object({ version: z.literal(1), allowRemoteAi: z.boolean().default(false), cliPath: z.string().trim(), modules: z.record(z.enum(AGENT_MODULES.map(m => m.id)), choiceSchema) }).strict();

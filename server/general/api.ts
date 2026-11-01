@@ -1,5 +1,8 @@
+import {renameWithRetrySync,removeWithRetrySync} from '../file-ops.ts';
+import {cleanupPathSync} from '../file-ops.ts';
+import platform from '../platform.ts';
 /** /api/general：通用剪辑的接口，照 src/general/general-contract.ts 实现。回应沿用工作台的 {ok, result} / {ok:false, error}。 */
-import { startExport, exportRunning, reconcileExports } from './export.ts';
+import { startExport, cancelExport, exportRunning, reconcileExports } from './export.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -11,7 +14,7 @@ import { bodyJson, sendJson } from '../http.ts';
 import { assertFreeSpace } from '../system-settings.ts';
 import { serveProjectFile } from './files.ts';
 import { pageHostPort } from './page-host.ts';
-import { saveEdited, stylePresets } from './layers.ts';
+import { readGeneralLayers, saveEdited, stylePresets } from './layers.ts';
 import { ffmpegPath, ffprobePath } from './kit-env.ts';
 import { answerNetwork, isLive, mediaFile, postMessage, reconcile, resumeRun, startFirst, stopForDelete, stopRun, styleLibrary, readSession, writeSession } from './runner.ts';
 import { createGeneral, fileUrl, findGeneral, generalChanges, patchGeneral, scanGeneral, summarize, trashGeneral, updateGeneral } from './store.ts';
@@ -65,13 +68,15 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
       return serveProjectFile(req, res, dir, rel, version ? `${project.name} 第${version}版.mp4` : undefined);
     }
     if (action === 'versions' && parts[4] === 'export' && parts.length === 5 && method === 'POST') return ok(res, startExport(id, Number(parts[3]), (await bodyJson(req)).format));
+    if (action === 'versions' && parts[4] === 'layers' && parts.length === 5 && method === 'GET') return ok(res, readGeneralLayers(id, Number(parts[3])));
+    if (action === 'exports' && parts[4] === 'cancel' && parts.length === 5 && method === 'POST') return ok(res, await cancelExport(id, parts[3]));
     // the last 剪映 export's folder, selected in Finder (only a folder inside this project's exports/)
     if (action === 'exports' && parts[3] === 'reveal' && parts.length === 4 && method === 'POST') {
       const { dir, project } = findGeneral(id);
       const folder = project.exportTask?.state === 'done' ? project.exportTask.folder : undefined;
       const inside = folder && path.resolve(folder).startsWith(path.join(dir, 'exports') + path.sep) && fs.existsSync(folder);
       if (!inside) return sendJson(res, 404, { ok: false, error: '找不到上次导出的剪映工程，请重新导出' });
-      await exec('/usr/bin/open', ['-R', folder]);
+      const reveal=platform.revealCommand(folder);await exec(reveal.command,reveal.args);
       return ok(res, { revealed: true });
     }
     if (action === 'text-presets' && method === 'GET') return ok(res, await stylePresets(findGeneral(id).project.styleId));
@@ -130,12 +135,12 @@ async function addMedia(req: IncomingMessage, id: string): Promise<GeneralMedia>
     const out = fs.createWriteStream(tmp);
     req.on('error', reject); out.on('error', reject); out.on('finish', () => resolve());
     req.pipe(out);
-  }).catch(error => { fs.rmSync(tmp, { force: true }); throw error; });
-  if (!fs.statSync(tmp).size) { fs.rmSync(tmp, { force: true }); throw Object.assign(new Error('上传的文件是空的'), { status: 400 }); }
-  fs.renameSync(tmp, file);
+  }).catch(error => { cleanupPathSync(tmp); throw error; });
+  if (!fs.statSync(tmp).size) { removeWithRetrySync(tmp, { force: true }); throw Object.assign(new Error('上传的文件是空的'), { status: 400 }); }
+  renameWithRetrySync(tmp, file);
   let info: { duration: number; width: number; height: number };
   try { info = await probe(file); }
-  catch (error) { fs.rmSync(file, { force: true }); throw Object.assign(new Error(`读不出这个文件：${error instanceof Error ? error.message : error}`), { status: 415 }); }
+  catch (error) { cleanupPathSync(file); throw Object.assign(new Error(`读不出这个文件：${error instanceof Error ? error.message : error}`), { status: 415 }); }
   const posterFile = path.join(folder, `${mediaId}.poster.jpg`);
   let poster: string | undefined;
   if (info.width > 0) {
@@ -160,7 +165,7 @@ function removeMedia(id: string, mediaId: string): GeneralProject {
   if (project.run && ['running', 'stopping', 'needs-network'].includes(project.run.state) && isLive(id)) throw Object.assign(new Error('出片时不能改素材，请先停止'), { status: 409 });
   if (!project.inputs.media.some(m => m.id === mediaId)) throw Object.assign(new Error('素材不存在'), { status: 404 });
   const file = mediaFile(dir, mediaId);
-  if (file) fs.rmSync(file, { force: true });
-  fs.rmSync(path.join(dir, 'media', `${mediaId}.poster.jpg`), { force: true });
+  if (file) removeWithRetrySync(file, { force: true });
+  removeWithRetrySync(path.join(dir, 'media', `${mediaId}.poster.jpg`), { force: true });
   return updateGeneral(id, p => { p.inputs.media = p.inputs.media.filter(m => m.id !== mediaId); });
 }

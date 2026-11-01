@@ -9,3 +9,5 @@ OpenScreen 由用户从官方发布页 https://github.com/getopenscreen/openscre
 不使用 sudo、不修改系统设置、不覆盖同名 App 或用户工程、不安装无关工具。缺运行库按 README 处理并说明影响。先用隔离工程验证保存、重开与导出；任何失败都保留工程和日志，说明下一步，不能声称全部完成。
 
 本机 App 用 npm run build:app 构建，在 release 中验收；没有发布、签名或公证授权。默认用户工程位置与 Pro 共用；测试设置独立 OPENTAKE_STANDARD_USER_DATA 和 LINK_READER_PROJECTS_DIR。
+
+Windows 适配处于本地预览阶段：完整阅读 README 的 Windows 小节。Win10 22H2 x64 与 Win11 x64 必须分别验收，不能把 Mac 单测或跨平台构建当成 Windows 安装、录制及导出成功。不要自动发布或上传测试程序。

@@ -1,0 +1,127 @@
+#pragma once
+
+#include <Windows.h>
+
+#include <atomic>
+#include <cstdint>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
+
+struct WebcamFrameSnapshot {
+    std::vector<BYTE> data;
+    int width = 0;
+    int height = 0;
+    uint64_t sequence = 0;
+};
+
+/**
+ * Copies the latest camera frame into `destination`, unless the caller already has it.
+ *
+ * The video writer asks on every screen tick, 60 times a second, while a camera
+ * delivers 30: copying first and comparing sequences after cost a full frame
+ * copied for nothing on every other tick. Returns false, leaving `destination`
+ * untouched, when there is no frame yet or its sequence is `lastSeenSequence`.
+ * Both capture backends route `copyLatestFrame` through this.
+ */
+inline bool snapshotWebcamFrame(
+    const std::vector<BYTE>& frame,
+    int width,
+    int height,
+    uint64_t sequence,
+    uint64_t lastSeenSequence,
+    WebcamFrameSnapshot& destination) {
+    if (frame.empty() || width <= 0 || height <= 0 || sequence == lastSeenSequence) {
+        return false;
+    }
+
+    destination.data = frame;
+    destination.width = width;
+    destination.height = height;
+    destination.sequence = sequence;
+    return true;
+}
+
+class DirectShowWebcamCapture {
+public:
+    DirectShowWebcamCapture() = default;
+    ~DirectShowWebcamCapture();
+
+    DirectShowWebcamCapture(const DirectShowWebcamCapture&) = delete;
+    DirectShowWebcamCapture& operator=(const DirectShowWebcamCapture&) = delete;
+
+    bool initialize(
+        const std::wstring& deviceId,
+        const std::wstring& deviceName,
+        const std::wstring& directShowClsid,
+        int requestedWidth,
+        int requestedHeight,
+        int requestedFps);
+    bool start();
+    void stop();
+    bool copyLatestFrame(WebcamFrameSnapshot& destination, uint64_t lastSeenSequence);
+
+    int width() const;
+    int height() const;
+    int fps() const;
+    const std::wstring& selectedDeviceName() const;
+    void storeFrame(const BYTE* buffer, long length);
+
+private:
+    enum class PixelFormat {
+        Bgra,
+        Nv12,
+        Yuy2,
+    };
+
+    struct Impl;
+    void captureLoop();
+    /**
+     * Builds source -> sample grabber -> null renderer and connects it.
+     *
+     * `preferredSubtype` is what the grabber will accept: pass a concrete one
+     * (RGB32) to make DirectShow's intelligent connect insert a colour converter,
+     * or nullptr to accept whatever the camera offers natively. Returns false
+     * without leaving the graph half-built, so the caller can retry with a
+     * different constraint.
+     */
+    bool buildGraph(
+        const CLSID& sourceClsid,
+        const GUID* preferredSubtype,
+        int preferredWidth,
+        int preferredHeight);
+    /**
+     * Pins the capture pin to the best format the device offers, before the
+     * graph is rendered.
+     *
+     * Skipped, RenderStream's intelligent connect takes the pin's default
+     * format, which on a UVC camera is the first one it enumerates -- 640x480
+     * on hardware that can do far better. Best-effort: a device without
+     * IAMStreamConfig, or one that rejects the format, still gets a graph.
+     */
+    void applyPreferredFormat(int requestedWidth, int requestedHeight, int requestedFps);
+    /**
+     * Reads back what the graph actually negotiated and records how to unpack it.
+     *
+     * Returns false for a subtype this class cannot decode, which is a retryable
+     * outcome rather than a failure — `reportUnsupported` is what tells it apart
+     * from the last attempt, whose rejection is worth logging.
+     */
+    bool resolveConnectedFormat(int requestedWidth, int requestedHeight, bool reportUnsupported);
+
+    Impl* impl_ = nullptr;
+    std::thread thread_;
+    std::atomic<bool> stopRequested_ = false;
+    std::mutex frameMutex_;
+    std::vector<BYTE> latestFrame_;
+    uint64_t latestFrameSequence_ = 0;
+    int width_ = 0;
+    int height_ = 0;
+    int fps_ = 30;
+    int sourceStride_ = 0;
+    bool sourceTopDown_ = false;
+    PixelFormat pixelFormat_ = PixelFormat::Bgra;
+    std::wstring selectedDeviceName_;
+};
+

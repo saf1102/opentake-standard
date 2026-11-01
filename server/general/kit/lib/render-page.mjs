@@ -1,3 +1,4 @@
+import {cleanupPathSync} from '../../../../desktop/file-ops.cjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { WORK } from './env.mjs';
@@ -39,6 +40,6 @@ export async function renderPage(film, id) {
     const encode = alpha ? ['-c:v','prores_ks','-profile:v','4','-pix_fmt','yuva444p10le','-alpha_bits','8','-qscale:v','9'] : await videoEncoder(film.fps);
     await ffmpeg(['-framerate',String(film.fps),'-i',path.join(temp,'%06d.png'),'-an',...encode,output]);
     return output;
-  } catch (error) { fs.rmSync(output, { force: true }); throw error; }
-  finally { await browser?.close(); fs.rmSync(temp, { recursive: true, force: true }); }
+  } catch (error) { cleanupPathSync(output); throw error; }
+  finally { await browser?.close(); cleanupPathSync(temp, { recursive: true }); }
 }

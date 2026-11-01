@@ -1,3 +1,5 @@
+import {renameWithRetrySync,removeWithRetrySync,atomicJsonSync} from '../file-ops.ts';
+import {cleanupPathSync} from '../file-ops.ts';
 /**
  * Export B for a HyperFrames film: OpenTake's own frame renderer (the one 口播 exports with) draws every frame of the
  * page under HyperFrames' runtime, then OpenTake mixes the sound. HyperFrames only serves the page (its file server
@@ -12,7 +14,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { renderVideo } from '../frame-render/index.ts';
+import { renderVideo, preflightRenderPage } from '../frame-render/index.ts';
+import { PageExecutionError } from '../frame-render/page-execution.ts';
+import { injectPageScripts } from './kit/hfx-support.mjs';
 import { HF_ENTRY, readHyperframes } from './hf-project.ts';
 import type { HfPageEdits } from '../../src/general/general-contract.ts';
 import { ffmpegPath, ffprobePath } from './kit-env.ts';
@@ -26,7 +30,7 @@ const TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf',
 };
 
-export type HfRenderOptions = { fps?: number; concurrency?: number; cancelSignal?: AbortSignal; onProgress?: (progress: number) => void; cacheDir?: string; edits?: HfPageEdits };
+export type HfRenderOptions = { fps?: number; concurrency?: number; cancelSignal?: AbortSignal; onProgress?: (progress: number) => void; cacheDir?: string; edits?: HfPageEdits; diagnosticFile?: string };
 
 /** Every video the film uses, once, on its own frame grid: JPEG frames on disk and their timestamps. */
 async function extractVideos(work: string, srcs: string[], cacheDir: string) {
@@ -34,7 +38,7 @@ async function extractVideos(work: string, srcs: string[], cacheDir: string) {
   await Promise.all([...new Set(srcs)].map(async (src, i) => {
     const file = path.join(work, decodeURIComponent(src)), key = `v${i}`, dir = path.join(cacheDir, key);
     if (!fs.existsSync(file)) return;
-    fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
+    removeWithRetrySync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
     await exec(ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-i', file, '-an', '-fps_mode', 'passthrough', '-q:v', '2', '-start_number', '0', path.join(dir, '%d.jpg')], { maxBuffer: 8 << 20 });
     const { stdout } = await exec(ffprobePath(), ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'csv=p=0', file], { maxBuffer: 64 << 20 });
     const times = stdout.trim().split('\n').map(line => parseFloat(line)).filter(Number.isFinite);
@@ -84,22 +88,30 @@ export async function renderHyperframes(work: string, output: string, options: H
       const res = await fetch(server.url + pathname);
       if (!res.ok) throw new Error(`${res.status} ${pathname}`);
       let body = Buffer.from(await res.arrayBuffer());
-      if (pathname === '/' || pathname === `/${HF_ENTRY}`) body = Buffer.from(String(body).replace(/<\/body>/i, `${inject}</body>`));
+      if (pathname === '/' || pathname === `/${HF_ENTRY}`) body = Buffer.from(injectPageScripts(String(body), inject));
       return { body, contentType: res.headers.get('content-type') || 'text/html' };
     };
     const total = Math.round(film.duration * fps);
-    await renderVideo({
-      serveUrl: work, entryPath: `/${HF_ENTRY}`, assetResolver, concurrency: options.concurrency ?? 4, imageFormat: 'jpeg', jpegQuality: 92, outputLocation: silent,
+    const renderOptions = {
+      serveUrl: work, entryPath: `/${HF_ENTRY}`, assetResolver, concurrency: options.concurrency ?? 4, imageFormat: 'jpeg' as const, jpegQuality: 92, outputLocation: silent,
       composition: { id: 'main', width: film.width, height: film.height, fps, durationInFrames: total },
-      ...(options.cancelSignal ? { cancelSignal: options.cancelSignal } : {}), onProgress: ({ progress }) => options.onProgress?.(progress),
-    });
+      ...(options.cancelSignal ? { cancelSignal: options.cancelSignal } : {}), onProgress: ({ progress }: {progress: number}) => options.onProgress?.(progress),
+    };
+    await preflightRenderPage(renderOptions, [...new Set([0, Math.floor(total / 2), total - 1])]);
+    await renderVideo(renderOptions);
     if (await mixSound(work, film.clips, film.duration, sound)) {
       await exec(ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-y', '-i', silent, '-i', sound, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', output]);
-    } else fs.renameSync(silent, output);
+    } else renameWithRetrySync(silent, output);
+  } catch (error) {
+    if (error instanceof PageExecutionError) {
+      try { const file = options.diagnosticFile ?? path.join(work, '.opentake', `page-execution-${Date.now()}.json`); atomicJsonSync(file, {version: 1, at: new Date().toISOString(), ...error.diagnostic}); error.diagnosticFile = file; }
+      catch { /* Keep the original page failure if diagnostic storage is unavailable. */ }
+    }
+    throw error;
   } finally {
     server.close();
-    for (const f of [silent, sound]) fs.rmSync(f, { force: true });
-    if (!options.cacheDir) fs.rmSync(cacheDir, { recursive: true, force: true });
+    for (const f of [silent, sound]) cleanupPathSync(f);
+    if (!options.cacheDir) cleanupPathSync(cacheDir, { recursive: true });
   }
   return { duration: film.duration, width: film.width, height: film.height };
 }

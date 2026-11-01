@@ -1,3 +1,6 @@
+import {cleanupPathSync} from '../file-ops.ts';
+import {StringDecoder} from 'node:string_decoder';
+import platform from '../platform.ts';
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -9,6 +12,8 @@ import type {
   OpenScreenEnvironmentStatus,
 } from "../../src/types/editor.ts";
 import { CaptureJobSchema, CaptureSettingsSchema } from "../../src/types/editor.ts";
+import {createRequire} from 'node:module';
+const {requestCaptureSources}=createRequire(import.meta.url)('../../desktop/capture-sources.cjs');
 
 const REPOSITORY = "https://github.com/getopenscreen/openscreen";
 const INSTALL_URL = "https://github.com/getopenscreen/openscreen/releases";
@@ -38,6 +43,10 @@ export function openScreenExecutableCandidates({
   binDirs = ["/opt/homebrew/bin", "/usr/local/bin"],
   applicationDirs = ["/Applications", path.join(home, "Applications")],
 }: OpenScreenLookup = {}) {
+  if(process.platform==='win32'){
+    const dirs=String(env.PATH||env.Path||'').split(path.delimiter).filter(dir=>path.isAbsolute(dir));
+    return [...new Set([env.OPENSCREEN_BIN,...dirs.map(dir=>path.join(dir,'Openscreen.exe')),...[env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs'),env.ProgramFiles].filter((v):v is string=>Boolean(v)).flatMap(dir=>['Openscreen','OpenScreen','openscreen'].map(name=>path.join(dir,name,'Openscreen.exe')))].filter((v):v is string=>Boolean(v)))];
+  }
   const fromPath = String(env.PATH || "").split(path.delimiter).filter((dir) => path.isAbsolute(dir))
     .map((dir) => path.join(dir, "openscreen")).find(executableFile);
   return [...new Set([
@@ -93,6 +102,8 @@ function versionOf(executable: string) {
     }
   }
 
+  // Windows Electron GUI binaries may launch instead of printing a version.
+  if(process.platform==='win32')return undefined;
   for (const args of [["--version"], ["version"], ["--help"]]) {
     const result = spawnSync(executable, args, { encoding: "utf8", timeout: 5_000 });
     const match = `${result.stdout || ""}\n${result.stderr || ""}`.match(/(?:OpenScreen|Openscreen)?\s*v?(\d+\.\d+(?:\.\d+)?)/i);
@@ -130,13 +141,15 @@ export function openScreenEnvironmentStatus(): OpenScreenEnvironmentStatus {
 
 function parseNdjson(text: string) {
   return text.split(/\r?\n/).flatMap((line) => {
-    try { return line.trim() ? [JSON.parse(line) as Record<string, unknown>] : []; }
+    try { const value=line.trim()?JSON.parse(line):undefined;return value&&typeof value==='object'&&!Array.isArray(value)?[value as Record<string,unknown>]:[]; }
     catch { return []; }
   });
 }
 
 export function sourceListFromEvents(events: Record<string, unknown>[]): CaptureSource[] {
-  const final = [...events].reverse().find((event) => event.type === "done" || event.event === "done") || events.at(-1) || {};
+  const objects=events.filter(event=>event&&typeof event==='object'&&!Array.isArray(event));
+  const final = [...objects].reverse().find((event) => event.type === "done" || event.event === "done") || objects.at(-1) || {};
+  if(final.success===false)throw Error(String(final.error||final.message||'OpenScreen 无法读取录制来源'));
   const root = (final.sources && typeof final.sources === "object" ? final.sources : final) as Record<string, unknown>;
   const output: CaptureSource[] = [];
   const ingest = (type: CaptureSource["type"], values: unknown) => {
@@ -166,6 +179,9 @@ export function sourceListFromEvents(events: Record<string, unknown>[]): Capture
 }
 
 export async function listOpenScreenSources(): Promise<CaptureSource[]> {
+  // A native Standard window can enumerate IDs/names without capturing every
+  // other window's thumbnail. OpenScreen's CLI can fail on protected/RDP windows.
+  if(process.platform==='win32'&&typeof process.send==='function')return requestCaptureSources() as Promise<CaptureSource[]>;
   const executable = findOpenScreenExecutable();
   if (!executable) throw new Error("尚未安装 OpenScreen");
   const appBundle = process.platform === "darwin" ? appBundleForExecutable(executable) : undefined;
@@ -195,20 +211,25 @@ export async function listOpenScreenSources(): Promise<CaptureSource[]> {
         } catch (error) {
           reject(error);
         } finally {
-          fs.rmSync(folder, { recursive: true, force: true });
+          cleanupPathSync(folder, { recursive: true });
         }
       });
     });
   }
   return new Promise((resolve, reject) => {
-    const child = spawn(executable, ["sources", "--json"], { stdio: ["ignore", "pipe", "pipe"] });
+    const env = {...process.env}; delete env.ELECTRON_RUN_AS_NODE; delete env.OPENSCREEN_COMPOSITOR_VIEW_NODE;
+    const child = spawn(executable, [...openScreenProfileArgs(), "sources", "--json"], { env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    const timer = setTimeout(() => {try{if(child.pid)platform.killTree(child.pid)}catch{}reject(new Error('读取 OpenScreen 录制来源超时，请检查本机安装和窗口状态。'));}, 90_000);
+    timer.unref();
     let stdout = ""; let stderr = "";
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
-    child.once("error", reject);
+    const decoder=new StringDecoder('utf8');
+    child.stdout.on("data", (chunk) => {stdout+=decoder.write(chunk);if(stdout.length>4_000_000){try{if(child.pid)platform.killTree(child.pid)}catch{}reject(Error('OpenScreen 返回的来源列表过大'));}});
+    child.stderr.on("data", (chunk) => { stderr = (stderr+chunk).slice(-8_000); });
+    child.once("error", error => {clearTimeout(timer);reject(error)});
     child.once("close", (code) => {
+      clearTimeout(timer);
       if (code) return reject(new Error(stderr.trim() || `OpenScreen sources 退出（${code}）`));
-      resolve(sourceListFromEvents(parseNdjson(stdout)));
+      try{resolve(sourceListFromEvents(parseNdjson(stdout+decoder.end())))}catch(error){reject(error)}
     });
   });
 }

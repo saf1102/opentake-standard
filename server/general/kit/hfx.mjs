@@ -1,7 +1,7 @@
 // hfx — OpenTake's tools for a HyperFrames film, usable inside the agent's sandbox (offline, nothing to install, no port).
 //   hfx check        HyperFrames' own lint, plus OpenTake's rules: every visual change is its own clip, sound has a role
 //   hfx look [n]     n frames (default 12), drawn exactly as OpenTake's export draws them, tiled into look/sheet.jpg
-import {sampleBrowser, sampleResponse, sampleFontStatus} from './hfx-support.mjs';
+import {sampleBrowser, sampleResponse, sampleFontStatus, injectPageScripts} from './hfx-support.mjs';
 import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url'; import { createRequire } from 'node:module'; import { execFileSync } from 'node:child_process';
 const NM = process.env.CW_NODE_MODULES, BIN = process.env.LINKREADER_BIN_DIR, CHROME = process.env.CW_CHROME;
 const root = process.env.CW_WORK || process.cwd(), [cmd, arg] = process.argv.slice(2);
@@ -74,7 +74,7 @@ if (cmd === 'check') {
       if (/\.(mp4|mov|m4v|webm|wav|mp3|m4a|aac|ogg)$/i.test(url.pathname)) return route.fulfill({ body: '', contentType: 'application/octet-stream' });
       const r = await globalThis.__hfFetch(new Request(url.href, { headers: route.request().headers() }));
       let body = Buffer.from(await r.arrayBuffer());
-      if (url.pathname === '/' || url.pathname === '/index.html') body = Buffer.from(String(body).replace(/<\/body>/i, `<script>window.__otFps=30;window.__otVideos=${JSON.stringify(videos)}</script><script>${shim}</script></body>`));
+      if (url.pathname === '/' || url.pathname === '/index.html') body = Buffer.from(injectPageScripts(String(body), `<script>window.__otFps=30;window.__otVideos=${JSON.stringify(videos)}</script><script>${shim}</script>`));
       if (r.status >= 400) throw Error(`样张资源读取失败（${r.status}）：${url.pathname}`);
       const response = sampleResponse(body, Object.fromEntries(r.headers), url.href, compressedAssets);
       return await route.fulfill({ status: r.status, ...response });

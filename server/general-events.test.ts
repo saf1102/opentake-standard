@@ -63,6 +63,7 @@ test('Codex arguments: sandboxed to work/, offline by default, user skills and c
     assert.ok(joined.includes(part), part);
   assert.deepEqual(first.slice(first.indexOf('-C'), first.indexOf('-C') + 2), ['-C', '/p/work']);
   assert.ok(!joined.includes('CODEX_HOME'));
+  assert.equal(joined.includes('windows.sandbox="elevated"'), process.platform === 'win32');
   const resumed = filmTurnArgs({ model: 'm', effort: 'low', work: '/p/work', lastMessage: '/l', network: true, resumeThread: 'T1', images: ['/r.png'] });
   assert.deepEqual(resumed.slice(0, 2), ['exec', 'resume']);
   assert.ok(resumed.join(' ').includes('network_access=true'));
@@ -71,6 +72,7 @@ test('Codex arguments: sandboxed to work/, offline by default, user skills and c
   const review = reviewArgs({ model: 'm', effort: 'low', dir: '/p/review', lastMessage: '/p/review/v.txt', schema: '/s.json', images: ['/a.jpg', '/b.jpg'] });
   const r = review.join(' ');
   assert.ok(r.includes('sandbox_mode="read-only"') && r.includes('--ephemeral') && r.includes('--output-schema /s.json'));
+  assert.equal(r.includes('windows.sandbox="elevated"'), process.platform === 'win32');
   assert.deepEqual(review.slice(-5), ['-', '-i', '/a.jpg', '-i', '/b.jpg']);
 });
 

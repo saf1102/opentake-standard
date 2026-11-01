@@ -1,3 +1,5 @@
+import {resolvePython} from './python-runtime.ts';
+import platform from '../platform.ts';
 import {chromium} from 'playwright-core';
 /**
  * 出片运行环境：给每个工程的 work/ 准备好固定路径的工具（.opentake/bin 里的 film、node、python3、ffmpeg、ffprobe）
@@ -10,22 +12,23 @@ import { OFFLINE_PACKAGES, REFUSED_COMMANDS, refusal } from './net-guard.ts';
 
 export const KIT_DIR = fileURLToPath(new URL('./kit', import.meta.url));
 const executable = (file: string) => { try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); } catch { return false; } };
-const onPath = (name: string) => (process.env.PATH || '').split(path.delimiter).map(dir => path.join(dir,name)).find(executable);
+const binaryName = (name:string) => process.platform==='win32'?name+'.exe':name;
+const onPath = (name: string) => (process.env.PATH || '').split(path.delimiter).map(dir => path.join(dir,binaryName(name))).find(executable);
 export function supportBin() {
  const explicit=process.env.LINKREADER_BIN_DIR;
- if(explicit && executable(path.join(explicit,'ffmpeg')) && executable(path.join(explicit,'ffprobe'))) return explicit;
- const bin=onPath('ffmpeg'); if(bin && executable(path.join(path.dirname(bin),'ffprobe')))return path.dirname(bin);
+ if(explicit && executable(path.join(explicit,binaryName('ffmpeg'))) && executable(path.join(explicit,binaryName('ffprobe')))) return explicit;
+ const bin=onPath('ffmpeg'); if(bin && executable(path.join(path.dirname(bin),binaryName('ffprobe'))))return path.dirname(bin);
  throw new Error('请安装 LGPL FFmpeg 和 ffprobe，或在设置中指定运行工具目录。');
 }
-export const ffmpegPath=()=>path.join(supportBin(),'ffmpeg');
-export const ffprobePath=()=>path.join(supportBin(),'ffprobe');
+export const ffmpegPath=()=>path.join(supportBin(),binaryName('ffmpeg'));
+export const ffprobePath=()=>path.join(supportBin(),binaryName('ffprobe'));
 export function chromePath(){
  const file=process.env.CW_CHROME || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
  if(file && executable(file))return file;
  const resolved=chromium.executablePath(); if(executable(resolved))return resolved;
  throw new Error('请准备 Playwright Chromium，或设置 PLAYWRIGHT_CHROMIUM_EXECUTABLE。');
 }
-export function pythonPath(){const file=process.env.LINKREADER_PYTHON || onPath('python3');if(file&&executable(file))return file;throw new Error('请安装 Python 3 和 numpy。');}
+export const pythonPath=resolvePython;
 export function nodeModulesPath() {
   for (let dir = KIT_DIR; dir !== path.dirname(dir); dir = path.dirname(dir)) {
     const candidate = path.join(dir, 'node_modules');
@@ -66,11 +69,17 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
     ffmpeg: `#!/bin/sh\nexec ${shellQuote(ffmpegPath())} "$@"\n`,
     ffprobe: `#!/bin/sh\nexec ${shellQuote(ffprobePath())} "$@"\n`,
   };
+  if(process.platform==='win32'){
+    // Batch paths are quoted and percent expansion escaped; never turn an arbitrary path into a shell command.
+    const quote=(value:string)=>{if(/["\r\n]/.test(value))throw Error('工具路径含不支持的字符');return '"'+value.replaceAll('%','%%')+'"';};
+    const command=(exe:string,args:string[]=[])=>'@echo off\r\nsetlocal DisableDelayedExpansion\r\n'+(electron?'set "ELECTRON_RUN_AS_NODE=1"\r\n':'')+[exe,...args].map(quote).join(' ')+' %*\r\n';
+    Object.assign(wrappers,{node:command(node),film:command(node,[path.join(KIT_DIR,'film.mjs')]),hfx:command(node,[path.join(KIT_DIR,'hfx.mjs')]),python3:command(pythonPath()),ffmpeg:command(ffmpegPath()),ffprobe:command(ffprobePath())});
+  }
   wrappers.python = wrappers.python3;
   // no installing or fetching software, 联网 or not (net-guard.ts)
-  for (const name of REFUSED_COMMANDS) wrappers[name] = refusal(name);
+  for (const name of REFUSED_COMMANDS) wrappers[name] = process.platform==='win32'?'@echo off\r\necho Installing software is disabled in this workspace. 1>&2\r\nexit /b 1\r\n':refusal(name);
   for (const [name, body] of Object.entries(wrappers)) {
-    const file = path.join(bin, name);
+    const file = path.join(bin, name+(process.platform==='win32'?'.cmd':''));
     if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== body) fs.writeFileSync(file, body, { mode: 0o755 });
     // ZIP/project transfers can strip executable bits even when wrapper text is current.
     fs.chmodSync(file, 0o755);
@@ -81,10 +90,10 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   fs.mkdirSync(zdot, { recursive: true });
   const front = `export PATH=${shellQuote(bin)}:"$PATH"\n`;
   for (const name of ['.zshenv', '.zprofile']) { const file = path.join(zdot, name); if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== front) fs.writeFileSync(file, front); }
-  const env: NodeJS.ProcessEnv = {
+  const basePath=platform.environmentPath(base)||(process.platform==='win32'?'':'/usr/bin:/bin:/usr/sbin:/sbin');
+  const env: NodeJS.ProcessEnv = platform.environmentWithPath({
     ...base,
-    ZDOTDIR: zdot,
-    PATH: `${bin}${path.delimiter}${base.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'}`,
+    ...(process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{ZDOTDIR:zdot}),
     TMPDIR: tmp, TMPPREFIX: path.join(tmp, 'zsh', 'zsh'),
     CW_WORK: work, CW_MEDIA: path.join(projectDir, 'media'), CW_KIT: KIT_DIR, CW_BIN: bin,
     CW_FFMPEG: ffmpegPath(), CW_FFPROBE: ffprobePath(), CW_CHROME: chromePath(), CW_PYTHON: pythonPath(), CW_NODE_MODULES: nodeModulesPath(),
@@ -95,7 +104,7 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
     ...OFFLINE_PACKAGES,
     // the style's own text presets and finishes (kit/styles/<id>/text-presets.json), read by the layered film tools
     ...(styleOf(projectDir) ? { CW_STYLE: styleOf(projectDir) } : {}),
-  };
+  },`${bin}${path.delimiter}${basePath}`);
   delete env.CODEX_THREAD_ID;
   return env;
 }

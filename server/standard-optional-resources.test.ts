@@ -1,0 +1,84 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { standardApi } from './standard/api.ts';
+import { createGeneral, saveGeneral } from './general/store.ts';
+import { createScreenProject, findProject, save } from './editor/store.ts';
+
+test('optional edits, cursor absence and installed fonts are successful local resource reads', async () => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'standard-resource-'));
+  const names=['LINK_READER_PROJECTS_DIR','LINKREADER_SYSTEM_SETTINGS_FILE','OPENSCREEN_BIN'];
+  const before=names.map(name=>process.env[name]);
+  process.env.LINK_READER_PROJECTS_DIR=root;
+  process.env.LINKREADER_SYSTEM_SETTINGS_FILE=path.join(root,'settings.json');
+  const executable=path.join(root,'native','Openscreen.exe');
+  fs.mkdirSync(path.dirname(executable),{recursive:true});
+  fs.writeFileSync(executable,'',{mode:0o755});
+  process.env.OPENSCREEN_BIN=executable;
+  const server=http.createServer((req,res)=>void standardApi(req,res,()=>{res.statusCode=404;res.end();}));
+  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const base=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const general=createGeneral({styleId:'whiteboard',settings:{aspect:'16:9',length:15},inputs:{kind:'topic',text:'资源验收',note:''}},'白板');
+    const folder=path.join(general.dir,'versions','v1');
+    fs.mkdirSync(folder,{recursive:true});
+    const original={format:'opentake.general.layers',version:1,engine:'hyperframes',duration:15,timeline:{tracks:[]}};
+    fs.writeFileSync(path.join(folder,'layers.json'),JSON.stringify(original));
+    general.project.versions=[{n:1,layersUrl:'layers.json'}] as any;
+    saveGeneral(general.dir,general.project);
+    const layersUrl=`${base}/api/general/projects/${general.project.id}/versions/1/layers`;
+    let response=await fetch(layersUrl);
+    assert.equal(response.status,200);
+    assert.deepEqual((await response.json()).result,{layers:original,edited:false});
+    const edited={...original,duration:12};
+    fs.writeFileSync(path.join(folder,'edited.json'),JSON.stringify(edited));
+    response=await fetch(layersUrl);
+    assert.deepEqual((await response.json()).result,{layers:edited,edited:true});
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(folder,'layers.json'),'utf8')),original);
+    fs.writeFileSync(path.join(folder,'edited.json'),'{broken');
+    assert.equal((await fetch(layersUrl)).status,500,'corrupt saved edits must not silently fall back');
+    assert.equal((await fetch(layersUrl.replace('/1/layers','/2/layers'))).status,404);
+
+    const screen=createScreenProject('Optional cursor');
+    const found=findProject(screen.id);
+    found.project.media.push({id:'plain',name:'plain.mp4',type:'video',status:'ready',originalFile:'media/plain.mp4',origin:'screen-recording'} as any);
+    save(found.dir,found.project);
+    const cursorUrl=`${base}/api/editor/projects/${screen.id}/media/plain/file?kind=cursor`;
+    response=await fetch(cursorUrl);
+    assert.equal(response.status,200);
+    assert.deepEqual(await response.json(),{version:2,provider:'none',samples:[],assets:[]});
+    assert.equal((await fetch(cursorUrl.replace('/plain/','/unknown/'))).status,404);
+    const cursor={version:2,provider:'native',samples:[{timeMs:0,cx:0.25,cy:0.75}],assets:[]};
+    fs.mkdirSync(path.join(found.dir,'cursor'));
+    fs.writeFileSync(path.join(found.dir,'cursor','plain.json'),JSON.stringify(cursor));
+    (found.project.media[0] as any).capture={cursorDataFile:'cursor/plain.json'};
+    save(found.dir,found.project);
+    assert.deepEqual(await (await fetch(cursorUrl)).json(),cursor);
+    fs.renameSync(path.join(found.dir,'cursor','plain.json'),path.join(found.dir,'cursor','moved.json'));
+    assert.ok(!(await fetch(cursorUrl)).ok,'missing declared cursor data must remain a visible resource failure');
+
+    response=await fetch(`${base}/api/editor/openscreen/fonts.css`);
+    assert.equal(response.status,200);
+    assert.equal(await response.text(),'','no dependency fonts means system fallback without 404');
+    const fonts=path.join(path.dirname(executable),'resources','fonts');
+    fs.mkdirSync(fonts,{recursive:true});
+    const bytes=Buffer.from('font HTTP fixture');
+    fs.writeFileSync(path.join(fonts,'Inter-Regular.ttf'),bytes);
+    const css=await (await fetch(`${base}/api/editor/openscreen/fonts.css`)).text();
+    assert.match(css,/font-family:"Inter"/);
+    assert.ok(!css.includes('https://'));
+    response=await fetch(`${base}/api/editor/openscreen/fonts/Inter-Regular.ttf`);
+    assert.equal(response.headers.get('content-type'),'font/ttf');
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);
+    assert.equal((await fetch(`${base}/api/editor/openscreen/fonts/not-allowed.ttf`)).status,404);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve=>server.close(()=>resolve()));
+    names.forEach((name,i)=>{if(before[i]===undefined)delete process.env[name];else process.env[name]=before[i];});
+    fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:100});
+  }
+});

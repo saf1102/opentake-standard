@@ -70,6 +70,7 @@ function StepList({ run, project }: { run: GeneralRun; project: GeneralProject }
 
 function RunBlock({ run, project, busy, actions }: { run: GeneralRun; project: GeneralProject; busy: string; actions: AgentActions }) {
   const finished = run.state === 'done'
+  const pageFailed = run.failure?.kind === 'generated-page' || /Maximum call stack size exceeded|too much recursion|生成页面执行失败/i.test(run.error || '')
   const [open, setOpen] = useState(!finished)
   // A run that starts again unfolds its steps (reset while rendering, not in an effect).
   const [wasFinished, setWasFinished] = useState(finished)
@@ -89,7 +90,8 @@ function RunBlock({ run, project, busy, actions }: { run: GeneralRun; project: G
     </div>}
     {run.state === 'failed' && <div className="ge-runnote" data-tone="failed" role="alert">
       <p>没做完{run.error ? `：${run.error}` : '。'}</p>
-      <button type="button" className="ge-soft" disabled={!!busy} onClick={actions.resume}>{busy === 'resume' ? '正在接着做…' : '接着做'}</button>
+      {pageFailed && <p>页面代码执行失败，工程已保留。重试会先让 Agent 修复现有页面。</p>}
+      <button type="button" className="ge-soft" disabled={!!busy} onClick={actions.resume}>{busy === 'resume' ? (pageFailed ? '正在修复后重试…' : '正在接着做…') : (pageFailed ? '修复后重试' : '接着做')}</button>
     </div>}
   </div>
 }

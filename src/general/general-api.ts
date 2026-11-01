@@ -162,16 +162,11 @@ export const generalEditorApi = {
   pageHostPort: () => (hostPort ??= call<{ port: number }>('/page-host').then(r => r.port, error => { hostPort = undefined; throw error })),
   textPresets: (id: string) => call<TextPresets>(`${projectPath(id)}/text-presets`),
   /** The agent's tracks (layers.json), or the person's edits of them (edited.json) when there are any. */
-  async layers(id: string, n: number, layersUrl: string): Promise<{ layers: GeneralLayers; edited: boolean }> {
-    const edited = await fetch(`${GENERAL_API}${projectPath(id)}/files/versions/v${n}/edited.json`, { cache: 'no-store' })
-    if (edited.ok) return { layers: await edited.json() as GeneralLayers, edited: true }
-    const original = await fetch(layersUrl, { cache: 'no-store' })
-    if (!original.ok) throw new GeneralApiError(`这一版的分轨读不到（${original.status}）`, original.status)
-    return { layers: await original.json() as GeneralLayers, edited: false }
-  },
+  layers: (id: string, n: number, _layersUrl: string) => call<{ layers: GeneralLayers; edited: boolean }>(`${projectPath(id)}/versions/${n}/layers`),
   saveEdited: (id: string, n: number, layers: GeneralLayers) => call<{ saved: boolean; at: string }>(`${projectPath(id)}/versions/${n}/edited`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(layers) }),
   /** Export version n with the person's edits (edited.json, else the agent's layers): a finished film or a 剪映 draft. Progress arrives as project.exportTask. */
   export: (id: string, n: number, format: 'mp4' | 'jianying') => call<GeneralExport>(`${projectPath(id)}/versions/${n}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format }) }),
+  cancelExport: (id: string, taskId: string) => call<GeneralExport>(`${projectPath(id)}/exports/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
   revealExport: (id: string) => call<{ revealed: boolean }>(`${projectPath(id)}/exports/reveal`, { method: 'POST' }),
   fileUrl: (id: string, rel: string) => `${GENERAL_API}${projectPath(id)}/files/${rel.split('/').map(encodeURIComponent).join('/')}`,
 }

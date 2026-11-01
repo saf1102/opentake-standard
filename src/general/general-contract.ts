@@ -37,6 +37,8 @@ export type GeneralRun = {
   /** what this run makes: the first cut, or the next version from a message */
   purpose: 'first' | 'revision' | 'resume';
   steps: GeneralStep[]; startedAt: string; endedAt?: string; error?: string;
+  /** Generated code failed in the browser. Resume must repair the source before rendering again. */
+  failure?: {kind: 'generated-page'; file: string; operation: 'load' | 'select' | 'seek'; line?: number; column?: number; frame?: number; diagnosticFile?: string};
   /** the agent asked to reach the network; the page shows the question until it is answered */
   networkRequest?: { reason: string; hosts: string[] };
   /** messages the person sent while the run worked; the agent sees them when its current step ends */
@@ -84,7 +86,7 @@ export type GeneralMessage = {
 
 /** Export status is additive: old projects have no exportTask until their first export. */
 export type GeneralExport = {
-  id: string; version: number; format: 'mp4' | 'jianying'; state: 'running' | 'done' | 'failed';
+  id: string; version: number; format: 'mp4' | 'jianying'; state: 'running' | 'cancelling' | 'cancelled' | 'done' | 'failed';
   step: string; progress: number; startedAt: string; endedAt?: string; error?: string; downloadUrl?: string;
   /** a 剪映 export: the 剪映工程 folder (with its double-click importers), shown in Finder */
   folder?: string;
