@@ -15,12 +15,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { renderVideo } from '../frame-render/index.ts';
 import { HF_ENTRY, readHyperframes } from './hf-project.ts';
+import { volumePoints } from './hf-timeline.ts';
 import type { HfPageEdits } from '../../src/general/general-contract.ts';
 import { ffmpegPath, ffprobePath } from './kit-env.ts';
 
 const exec = promisify(execFile);
 const SHIM = fs.readFileSync(new URL('./hf-render-shim.js', import.meta.url), 'utf8');
 const EDITS = fs.readFileSync(new URL('./hf-edit-bridge.js', import.meta.url), 'utf8');
+const SPEED = fs.readFileSync(new URL('./hf-speed-bridge.js', import.meta.url), 'utf8');
 const MEDIA = /\.(mp4|mov|m4v|webm|mkv|avi|wav|mp3|m4a|aac|ogg|flac)$/i;
 const TYPES: Record<string, string> = {
   '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
@@ -45,6 +47,16 @@ async function extractVideos(work: string, srcs: string[], cacheDir: string) {
   return out;
 }
 
+/** A volume lane as an ffmpeg expression of t: straight lines between its points, held before the first and after the last. */
+export function laneExpression(points: { t: number; v: number }[]) {
+  let expression = String(points[points.length - 1].v);
+  for (let i = points.length - 2; i >= 0; i--) {
+    const a = points[i], b = points[i + 1], span = Math.max(1e-6, b.t - a.t);
+    expression = `if(lt(t\\,${b.t})\\,${a.v}+(${b.v - a.v})*(t-${a.t})/${span}\\,${expression})`;
+  }
+  return `if(lt(t\\,${points[0].t})\\,${points[0].v}\\,${expression})`;
+}
+
 /** The film's sound: every audio clip and every sounding video, placed, trimmed, turned up or down, mixed. */
 async function mixSound(work: string, clips: Awaited<ReturnType<typeof readHyperframes>>['clips'], duration: number, out: string) {
   const sounding = clips.filter(c => c.hasAudio && c.src && fs.existsSync(path.join(work, decodeURIComponent(c.src))));
@@ -53,9 +65,14 @@ async function mixSound(work: string, clips: Awaited<ReturnType<typeof readHyper
   const chains: string[] = [];
   sounding.forEach((c, i) => {
     args.push('-i', path.join(work, decodeURIComponent(c.src)));
-    const tempo = c.rate && c.rate !== 1 ? `,atempo=${Math.min(4, Math.max(0.25, c.rate))}` : '';
+    // atempo takes 0.5–2 per stage; chain stages so 0.1×–100× keeps the clip's length.
+    let tempo = '';
+    for (let s = c.rate || 1; Math.abs(s - 1) > 1e-6;) { const n = Math.min(2, Math.max(0.5, s)); tempo += `,atempo=${n}`; s /= n; }
     const delay = Math.max(0, Math.round(c.start * 1000));
-    chains.push(`[${i}:a]atrim=start=${c.mediaStart}:duration=${c.duration * (c.rate || 1)},asetpts=PTS-STARTPTS${tempo},volume=${c.volume},adelay=${delay}|${delay},aresample=48000[a${i}]`);
+    // the clip's volume lane (淡入淡出 from the timeline, or the agent's own), in clip seconds after the speed change
+    const lane = volumePoints(c.automation);
+    const envelope = lane ? `,volume='${laneExpression(lane)}':eval=frame` : '';
+    chains.push(`[${i}:a]atrim=start=${c.mediaStart}:duration=${c.duration * (c.rate || 1)},asetpts=PTS-STARTPTS${tempo}${envelope},volume=${c.volume},adelay=${delay}|${delay},aresample=48000[a${i}]`);
   });
   const filter = `${chains.join(';')};${sounding.map((_, i) => `[a${i}]`).join('')}amix=inputs=${sounding.length}:normalize=0:duration=longest,apad,atrim=duration=${duration}[mix]`;
   await exec(ffmpegPath(), [...args, '-filter_complex', filter, '-map', '[mix]', '-ac', '2', '-ar', '48000', '-c:a', 'pcm_f32le', out], { maxBuffer: 8 << 20 });
@@ -76,7 +93,7 @@ export async function renderHyperframes(work: string, output: string, options: H
     options.onActivity?.('正在抽取素材并解码视频');
     const videos = await extractVideos(work, film.clips.filter(c => c.tag === 'video' && c.src).map(c => c.src), cacheDir);
     const json = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c');
-    const inject = `<script>window.__otFps=${fps};window.__otVideos=${json(videos)};window.__otPageEdits=${json(options.edits ?? {})}</script><script>${EDITS}</script><script>${SHIM}</script>`;
+    const inject = `<script>window.__otFps=${fps};window.__otVideos=${json(videos)};window.__otPageEdits=${json(options.edits ?? {})}</script><script>${EDITS}</script><script>${SPEED}</script><script>${SHIM}</script>`;
     const assetResolver = async (pathname: string) => {
       if (pathname.startsWith('/__ot_frames/')) return { body: await fs.promises.readFile(path.join(cacheDir, pathname.slice('/__ot_frames/'.length))), contentType: 'image/jpeg' };
       if (MEDIA.test(pathname)) return { body: Buffer.alloc(0), contentType: 'application/octet-stream' };

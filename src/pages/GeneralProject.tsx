@@ -16,6 +16,8 @@ import { NavSlot, Spinner } from '@/general/GeneralBits'
 import { GeneralStage, type StageHandle, type StageReference } from '@/general/GeneralStage'
 import { GeneralAgentPanel, type AgentActions } from '@/general/GeneralAgentPanel'
 import { GeneralEditor } from '@/general/GeneralEditor'
+import type { ComposerHandle } from '@/general/RefComposer'
+import { expandTokens } from '@/general/composer-tokens'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import '@/general/general.css'
 
@@ -171,8 +173,8 @@ export default function GeneralProject() {
   const [viewport, setViewport] = useState(() => window.innerWidth)
   const [resizing, setResizing] = useState(false)
   const stage = useRef<StageHandle>(null)
-  const composer = useRef<HTMLTextAreaElement | null>(null)
-  const attachComposer = useCallback((element: HTMLTextAreaElement | null) => { composer.current = element }, [])
+  const composer = useRef<ComposerHandle | null>(null)
+  const attachComposer = useCallback((handle: ComposerHandle | null) => { composer.current = handle }, [])
 
   useEffect(() => {
     const resize = () => setViewport(window.innerWidth)
@@ -208,6 +210,7 @@ export default function GeneralProject() {
   const actions: AgentActions = {
     stop: () => void act('stop', () => generalApi.stop(project.id)),
     resume: () => void act('resume', () => generalApi.resume(project.id)),
+    switchAgent: choice => void act(`switch-agent-${choice.agent}`, () => generalApi.switchAgent(project.id, choice)),
     generate: () => void act('generate', () => generalApi.generate(project.id)),
     network: allow => void act(allow ? 'network-yes' : 'network-no', () => generalApi.network(project.id, allow)),
     setAgent: choice => void act('agent', () => generalApi.patch(project.id, { agent: choice ?? null })),
@@ -215,7 +218,8 @@ export default function GeneralProject() {
     send: () => {
       const text = draft.trim()
       if (!text) return
-      void act('send', () => generalApi.send(project.id, text, reference?.reference), () => { setDraft(''); setReference(undefined) })
+      // the tags in the sentence go out as words the agent reads where they stand
+      void act('send', () => generalApi.send(project.id, expandTokens(text, project.inputs.media), reference?.reference), () => { setDraft(''); setReference(undefined) })
     },
   }
   const prefill = (segment: GeneralSegment, index: number) => {

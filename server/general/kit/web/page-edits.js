@@ -12,7 +12,7 @@ export function applyPageEdits(document, edits = {}) {
 }
 
 /**
- * The person's moves of elements inside a page (S先生 2026-10-25, like OpenFilm's overrides): per CSS selector, a shift
+ * The person's moves of elements inside a page: per CSS selector, a shift
  * in page pixels, a size step and a turn in 15° steps, set as the element's own translate / scale / rotate properties
  * so they compose with the page's animated transform. Applied after every frame; an element no longer listed gets
  * its properties back (data-ot-moved marks what was touched). Returns the selectors that matched nothing.

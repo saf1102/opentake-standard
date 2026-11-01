@@ -1,3 +1,4 @@
+import {connectionDefinition} from '../shared/agent-connections.ts';
 import type {GeneralAgentChoice} from '../src/general/general-contract.ts';
 import {filmAgentId} from './general/agent-adapter.ts';
 import {getConnectionConfig,resolveAgentConnectionLaunch,assertAgentExecutionAllowed} from './agent-connections.ts';
@@ -12,7 +13,7 @@ export async function checkCreationEnvironment(choice?:GeneralAgentChoice):Promi
  const id=filmAgentId(selected);
  const api=id==='codex' && getConnectionConfig(id).mode==='api';
  if(id==='codex' && !api)return checker.doctor({codexPath:()=>resolveCliPath(getConnectionConfig('codex').cliPath||undefined),onlyCodex:!standardEdition});
- const result=await checker.doctor({onlyCodex:!standardEdition,agentLabel:id==='claude'?'Claude Code 接入':'Codex API 接入',agentCheck:async()=>{
+ const result=await checker.doctor({onlyCodex:!standardEdition,agentLabel:`${connectionDefinition(id).name} ${api?'API ':''}接入`,agentCheck:async()=>{
   assertAgentExecutionAllowed(id);const launch=await resolveAgentConnectionLaunch(id);return {id,executable:launch.executable};
  }});
  // Legacy tools consumers retain their Codex field; Claude never borrows that executable.

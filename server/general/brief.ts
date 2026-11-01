@@ -7,7 +7,7 @@ import path from 'node:path';
 import type { GeneralMedia, GeneralProject } from '../../src/general/general-contract.ts';
 
 export type StyleInfo = { id: string; name_zh: string; input_type: string; description_zh?: string };
-/** 不用风格 (S先生 2026-10-25): no style rules at all, the film follows the person's own words, as Opus and OpenFilm work. */
+/** 不用风格：不添加风格规则，按用户自己的描述生成影片。 */
 export const FREE_STYLE: StyleInfo = { id: 'free', name_zh: '不用风格', input_type: 'any', description_zh: '不套风格，完全按你的要求做' };
 const isFree = (id: string) => id === FREE_STYLE.id;
 export type Phase = 'plan' | 'make' | 'polish' | 'revise';

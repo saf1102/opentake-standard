@@ -9,6 +9,9 @@ import { Spinner } from './GeneralBits'
 import { GeneralRunWall } from './GeneralRunWall'
 import { cropFrame } from './frame-grab'
 import { IS_MAC } from './platform'
+import { PreviewSpeedButton } from '@/studio/components/PreviewSpeedButton'
+import { usePreviewSpeed } from '@/studio/preview-speed'
+import { setGeneralPlayhead } from './composer-tokens'
 
 /** A ⌘ selection: what goes to the server, plus where to draw it on the picture of that version. */
 export type StageReference = { reference: GeneralReference; fraction: Box; version: number }
@@ -127,6 +130,8 @@ export function GeneralStage({ project, posterFallback, picked, onPickVersion, r
   const video = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(false)
   const [time, setTime] = useState(0)
+  // for 「当前播放头」 in the composer's @ menu
+  useEffect(() => setGeneralPlayhead(time), [time])
   const [duration, setDuration] = useState(0)
   const [media, setMedia] = useState({ w: 0, h: 0 })
   const [box, setBox] = useState({ w: 0, h: 0 })
@@ -155,6 +160,9 @@ export function GeneralStage({ project, posterFallback, picked, onPickVersion, r
   }, [mode, active]) // the frame comes back when a run ends (the run wall stood in for it)
 
   // A smooth playhead while playing; timeupdate alone moves in quarter-second steps.
+  // The rendered version plays at the preview speed too (1×/2×/4×); its sound keeps its pitch.
+  const previewSpeed = usePreviewSpeed()
+  useEffect(() => { if (video.current) video.current.playbackRate = previewSpeed })
   useEffect(() => {
     if (!playing) return
     let frameId = 0
@@ -270,7 +278,8 @@ export function GeneralStage({ project, posterFallback, picked, onPickVersion, r
             {playing ? <Pause size={14} fill="currentColor" aria-hidden="true" /> : <Play size={14} fill="currentColor" aria-hidden="true" />}
           </button>
           <span><b>{clockTime(time)}</b> / {clockTime(duration || picked.duration)}</span>
-          <button type="button" className="ge-ico r" aria-label="全屏" title="全屏" onClick={() => void frame.current?.requestFullscreen?.().catch(() => {})}><Maximize size={15} aria-hidden="true" /></button>
+          <PreviewSpeedButton className="r" />
+          <button type="button" className="ge-ico" aria-label="全屏" title="全屏" onClick={() => void frame.current?.requestFullscreen?.().catch(() => {})}><Maximize size={15} aria-hidden="true" /></button>
         </div>
         : <div className="ge-bar">
           <span>{project.run?.state === 'failed' && !planSegments.length ? '本次生成未完成，工程已保留' : planSegments.length ? `方案 · ${planSegments.length} 段` : '方案准备中'}</span>

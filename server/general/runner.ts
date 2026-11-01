@@ -1,9 +1,13 @@
+import {classifyAgentFailure,redactAcpText} from './acp.ts';
+import {recordFilmOutcome} from '../agent-comparison.ts';
+import {prepareAcpGuide} from './acp-work.ts';
+import {connectionDefinition,type AgentConnectionId} from '../../shared/agent-connections.ts';
 import type {CreationTools} from '../../shared/creation-tools.ts';
 import {requireCreationTools} from '../creation-tools.ts';
 import {standardEdition,extraStyle,includeStyle,recordCodexUsage} from './edition.ts';
 /**
  * 通用剪辑的一次运行：一轮做片（读需求、设计、写、自己看一遍、渲染）→ OpenTake 机检（不过才改一轮）→ 交付第 N 版。
- * 和 OpenFilm 一样只靠 Agent 自己看接触表；另开一个 Codex 看图审片（agentReview）默认关掉，它又慢又费 token。
+ * 由 Agent 自己看接触表；另开一个 Codex 看图审片（agentReview）默认关掉，它又慢又费 token。
  * - 每一轮是一次 `codex exec`（第一轮新开会话，之后用 `exec resume` 续接同一个会话）。
  * - 停止：结束 Codex 和它启动的进程，文件都留着；接着做：续接同一个会话把停下的那一轮做完。
  * - 插话：codex exec 没有中途插话的接口（app-server 有 turn/steer，但 app-server 不能忽略用户配置，见交回说明），
@@ -16,6 +20,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { snapshotLayers } from './layers.ts';
 import { carryEdits, describeEdits, stampHfWork } from './hf-carry.ts';
+import { carryTimeline, describeTimeline } from './hf-timeline.ts';
 import { quarantineSoftware } from './net-guard.ts';
 import { hyperframesToLayers, isHyperframesWork } from './hf-project.ts';
 import { renderHyperframes } from './hf-render.ts';
@@ -33,7 +38,7 @@ import {assertAgentExecutionAllowed,resolveAgentConnectionLaunch,getConnectionCo
 import { beginRepair, finishAgentSteps, verifySelfCheck, applyCodexEvent, applyProgress, initialSteps, setStep, type Progress, type Usage } from './events.ts';
 import { KIT_DIR, ffmpegPath, ffprobePath, prepareWork } from './kit-env.ts';
 import { REVIEW_SCHEMA, extractFrames, machineChecks, parseVerdict, reviewPrompt, verdictText, type Verdict } from './review.ts';
-import { fileUrl, findGeneral, updateGeneral, type GeneralLocation } from './store.ts';
+import { parseAgent, fileUrl, findGeneral, scanGeneral, updateGeneral, type GeneralLocation } from './store.ts';
 
 const exec = promisify(execFile);
 const now = () => new Date().toISOString();
@@ -48,6 +53,8 @@ export type GeneralRuntime = {
   style: (id: string) => StyleInfo | undefined;
   baseEnv: () => NodeJS.ProcessEnv;
   maxTurns: number;
+  /** Only model-busy failures get one automatic retry; injectable delay keeps fake-process tests fast. */
+  busyRetryDelayMs: number;
   /** a second Codex looks at the frames and judges the cut (off: the agent's own look plus OpenTake's machine checks) */
   agentReview: boolean;
 };
@@ -73,13 +80,14 @@ let runtime: GeneralRuntime = {
       return { executable: agent.executable, model: agent.model, effort: agent.effort, ...(agent.requested ? {requested: agent.requested} : {}) };
     }
     const launch=await resolveAgentConnectionLaunch(id);
-    const model=effectiveConnectionModel(id,selected.model);
+    const model=launch.transport==='acp'?(selected.model||'default'):effectiveConnectionModel(id,selected.model);
     const requested=selected.model && selected.model!=='default' && selected.model!==model?selected:undefined;
-    return {agent:id,executable:launch.executable,model,effort:selected.effort||'medium',env:launch.env,args:launch.args,method:launch.method,...(requested?{requested}:{})};
+    return {agent:id,executable:launch.executable,model,effort:selected.effort||'medium',env:launch.env,args:launch.args,method:launch.method,...(launch.transport?{transport:launch.transport}:{}),...(requested?{requested}:{})};
   },
   style: id => extraStyle?.id === id ? extraStyle : styleLibrary().find(s => s.id === id),
   baseEnv: () => installations.sanitizeAgentEnv(installations.loginEnvironment()),
   maxTurns: 6,
+  busyRetryDelayMs: 3000,
   agentReview: false,
 };
 export function setGeneralRuntime(patch: Partial<GeneralRuntime>) { runtime = { ...runtime, ...patch }; }
@@ -96,8 +104,10 @@ export function styleLibrary(): StyleInfo[] {
 // ——— internal session state ———
 export type Session = {
   threadId?: string;
-  agent?: 'codex' | 'claude';
+  agent?: AgentConnectionId;
   autoName: boolean;
+  /** Explicit provider changes, retained alongside past turns for the local run record. */
+  handoffs?: {from: AgentConnectionId; to: AgentConnectionId; previousRunId: string; at: string}[];
   /** what the run does next when it (re)starts */
   pending?: Phase | 'review' | 'deliver';
   /** the pending turn was interrupted and is being continued */
@@ -140,11 +150,13 @@ const ACTIVE: GeneralRun['state'][] = ['running', 'stopping'];
 export function reconcile(location: GeneralLocation): GeneralProject {
   const run = location.project.run;
   if (!run || !ACTIVE.includes(run.state) || live.has(location.project.id)) return location.project;
-  return updateGeneral(location.project.id, p => {
+  const result = updateGeneral(location.project.id, p => {
     if (!p.run) return;
     p.run.state = 'stopped'; p.run.endedAt = now(); p.run.error = 'OpenTake 重新启动过，这次运行已停止，可以接着做';
     p.run.steps = p.run.steps.map(s => s.state === 'running' ? { ...s, state: 'waiting', detail: '已停止' } : s);
   });
+  recordRunOutcome(location.project.id, run.id);
+  return result;
 }
 
 function patchRun(id: string, change: (run: GeneralRun, project: GeneralProject, dir: string) => void) {
@@ -210,25 +222,82 @@ export function stopRun(id: string): GeneralProject {
   return finishStopped(id, run.id);
 }
 function finishStopped(id: string, runId: string) {
-  return patchRun(id, r => {
+  const result = patchRun(id, r => {
     if (r.id !== runId || !['running', 'stopping', 'needs-network'].includes(r.state)) return;
     r.state = 'stopped'; r.endedAt = now(); r.networkRequest = undefined;
     r.steps = r.steps.map(s => s.state === 'running' ? { ...s, state: 'waiting', detail: '已停止，可以接着做' } : s);
   });
+  recordRunOutcome(id, runId);
+  return result;
+}
+
+/** A local account change ends only this provider's OpenTake sessions; its files/checkpoints stay. */
+export async function closeGeneralAgentSessions(agent: AgentConnectionId): Promise<void> {
+  const sessions = scanGeneral().filter(({dir, project}) => project.run?.agent === agent || (!isLive(project.id) && readSession(dir).agent === agent));
+  for (const {project} of sessions) if (project.run?.agent === agent) stopRun(project.id);
+  const deadline = Date.now() + 15_000;
+  while (sessions.some(({project}) => {
+    const latest = findGeneral(project.id).project.run;
+    return latest?.id === project.run?.id && latest?.agent === agent && isLive(project.id);
+  })) {
+    if (Date.now() >= deadline) throw Error('这家智能体的会话还没关闭，请等当前出片停止后重试');
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  for (const {dir, project} of sessions) {
+    const latest = findGeneral(project.id).project;
+    // A different provider may have started while the old process was closing. Never touch its session.
+    if (latest.run?.id !== project.run?.id || isLive(project.id)) continue;
+    const current = readSession(dir);
+    if ((current.agent || latest.run?.agent) !== agent) continue;
+    editSession(dir, session => { session.threadId = undefined; session.resumed = !!session.pending; });
+  }
+}
+
+function recordRunOutcome(id: string, expectedRunId?: string) {
+  try {
+    const run = findGeneral(id).project.run;
+    if (run && run.id === expectedRunId && (run.state === 'done' || run.state === 'failed' || run.state === 'stopped')) {
+      recordFilmOutcome(id, run.id, run.agent, run.state, run.endedAt || now());
+    }
+  } catch { /* Usage recording must not interrupt the person's film. */ }
 }
 
 /** POST resume: continue a stopped (or failed) run in the same Codex session. */
-export function resumeRun(id: string): GeneralProject {
+export function resumeRun(id: string, options: {handoff?:boolean} = {}): GeneralProject {
   const { dir, project } = findGeneral(id);
   const run = project.run;
   if (!run || !['stopped', 'failed'].includes(run.state)) throw Object.assign(new Error('没有可以接着做的运行'), { status: 409 });
   const session = readSession(dir);
   if (!session.pending) throw Object.assign(new Error('这次运行已经做完了'), { status: 409 });
-  editSession(dir, s => { s.resumed = !!s.threadId && ['plan', 'make', 'polish', 'revise'].includes(s.pending!); });
+  editSession(dir, s => { s.resumed = (options.handoff || !!s.threadId || !!s.resumed) && ['plan', 'make', 'polish', 'revise'].includes(s.pending!); });
   const steps = run.steps.map(s => s.state === 'done' || s.state === 'skipped' ? s : { ...s, state: 'waiting' as const, detail: undefined, progress: undefined });
   const out = updateGeneral(id, p => { p.run = { ...newRun('resume', p, steps), queued: session.queue.length }; });
   void drive(id);
   return out;
+}
+
+/** 第二部分的后端入口：只有明确请求才能换家，保留素材、源码、检查点和旧调用记录。 */
+const handoffs=new Set<string>();
+export async function switchRunAgent(id:string,input:unknown):Promise<GeneralProject>{
+ if(handoffs.has(id))throw Object.assign(Error('正在检查新的智能体，请稍候'),{status:409});
+ const choice=parseAgent(input);if(!choice?.agent)throw Object.assign(Error('请选择要接着做的智能体'),{status:400});
+ const target=filmAgentId(choice);assertAgentExecutionAllowed(target);
+ const {dir,project}=findGeneral(id),run=project.run;
+ if(!run||!['failed','stopped'].includes(run.state)||isLive(id))throw Object.assign(Error('请等出片停止后再切换智能体'),{status:409});
+ if(!readSession(dir).pending)throw Object.assign(Error('没有尚未完成的出片步骤'),{status:409});
+ if(target===run.agent)throw Object.assign(Error('请选择另一个已接通的智能体，原智能体可直接继续'),{status:400});
+ handoffs.add(id);
+ try{
+  await runtime.resolveCodex(choice);
+  const tools=await runtime.creationTools(choice);
+  const latest=findGeneral(id).project;
+  if(latest.run?.id!==run.id||latest.run.state!==run.state||isLive(id)||JSON.stringify(latest.agent)!==JSON.stringify(project.agent))throw Object.assign(Error('工程运行状态已改变，请重新检查'),{status:409});
+  assertAgentExecutionAllowed(target);
+  editSession(dir,s=>{s.threadId=undefined;s.agent=target;s.resumed=true;(s.handoffs??=[]).push({from:run.agent,to:target,previousRunId:run.id,at:now()});s.queue.push({id:crypto.randomUUID(),text:`已从 ${connectionDefinition(run.agent).name} 切换到 ${connectionDefinition(target).name}。请检查现有工程文件，从未完成步骤继续，保留已有内容。`});});
+  updateGeneral(id,p=>{p.agent=choice;p.messages.push(message('system',`中途换了智能体：${connectionDefinition(run.agent).name} → ${connectionDefinition(target).name}，从当前进度接着做，已完成的计划、代码和画面保留。`));});
+  if(tools)checkedTools.set(id,tools);else checkedTools.delete(id);
+  return resumeRun(id,{handoff:true});
+ }finally{handoffs.delete(id);}
 }
 
 /** A copied project may have saved versions without this machine's Codex session.
@@ -358,13 +427,14 @@ async function drive(id: string) {
         const verdict = await review(id, dir, runId);
         if (entry.stopRun === runId) { finishStopped(id, runId); return; }
         const s = readSession(dir);
-        // one more round only when the cut failed (S先生 2026-10-25: no forced polish, speed and cost as OpenFilm)
+        // one more round only when the cut failed; no forced polish, to avoid unnecessary time and model usage
         if (verdict && !verdict.pass && !s.polished) editSession(dir, x => Object.assign(x, { pending: 'polish', polished: true, review: verdictText(verdict) }));
         else editSession(dir, x => { x.pending = 'deliver'; });
         continue;
       }
       if (step === 'deliver') {
         await deliver(id, dir);
+        recordRunOutcome(id, runId);
         const left = readSession(dir).queue;
         if (left.length) {
           // words that arrived after the last turn: they become the next version
@@ -385,14 +455,16 @@ async function drive(id: string) {
     }
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
+    const failure=classifyAgentFailure(error);
     try {
       patchRun(id, r => {
         if (r.id !== runId || !['running', 'stopping'].includes(r.state)) return;
-        r.state = 'failed'; r.endedAt = now(); r.error = text;
+        r.state = 'failed'; r.endedAt = now(); r.error = text; r.errorKind = failure.kind;
         r.steps = r.steps.map(s => s.state === 'running' ? { ...s, state: 'failed', detail: text.slice(0, 200) } : s);
       });
     } catch { /* the project itself is gone */ }
   } finally {
+    recordRunOutcome(id, runId);
     entry.driving = false;
     if (entry.again) { entry.again = false; void drive(id); }
     else if (live.get(id) === entry && !entry.proc) { live.delete(id); checkedTools.delete(id); }
@@ -427,7 +499,7 @@ function afterTurn(id: string, dir: string, phase: Phase) {
 
 function readPlan(id: string, work: string): GeneralProject['plan'] | undefined {
   try {
-    // plan.json is optional now (one turn, as OpenFilm): film.json carries the title, logline and segments too
+    // plan.json is optional: film.json carries the title, logline and segments too
     const file = ['plan.json', 'film.json'].map(f => path.join(work, f)).find(f => fs.existsSync(f));
     if (!file) return undefined;
     const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
@@ -442,11 +514,11 @@ function readPlan(id: string, work: string): GeneralProject['plan'] | undefined 
 }
 
 /** One Codex turn: prompt, live steps from events and progress.json, the final message. */
-async function turn(id: string, dir: string, phase: Phase, runId: string, recoveredMissingThread = false): Promise<TurnOutcome> {
+async function turn(id: string, dir: string, phase: Phase, runId: string, recoveredMissingThread = false, busyRetry?: ResolvedFilmAgent): Promise<TurnOutcome> {
   const entry = live.get(id)!;
   const stopped = () => entry.stopRun === runId;
   const { project } = findGeneral(id);
-  const codex = await runtime.resolveCodex(project.agent);
+  const codex = busyRetry ? { ...busyRetry } : await runtime.resolveCodex(project.agent);
   const agentId=filmAgentId(codex);
   assertAgentExecutionAllowed(agentId);
   if (stopped()) return 'stopped';
@@ -459,9 +531,9 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   // the steps this turn will move through start again (a polish round re-does code → render)
   updateGeneral(id, p => {
     if (!p.run) return;
-    p.run.agent=agentId; p.run.method=codex.method||'cli'; p.run.model = codex.model; p.run.effort = codex.effort; p.run.queued = 0;
+    p.run.agent=agentId; p.run.method=codex.method||'cli'; p.run.transport=codex.transport; p.run.model = codex.model; p.run.effort = codex.effort; p.run.queued = 0;
     if(codex.requested) {
-      const text=`原模型 ${codex.requested.model} 不可用，已改用 ${agentId==='claude'?'Claude Code':'Codex'} 默认模型 ${codex.model}。`;
+      const text=`原模型 ${codex.requested.model} 不可用，已改用 ${connectionDefinition(agentId).name} 默认模型 ${codex.model}。`;
       if(!p.messages.some(m=>m.role==='system'&&m.text===text))p.messages.push(message('system',text));
     }
     if (phase === 'polish' && session.review) beginRepair(p.run, session.review, now());
@@ -473,32 +545,44 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   if (stopped()) return 'stopped';
   if(tools) { checkedTools.set(id,tools); if(agentId==='codex' && tools.codex) codex.executable=tools.codex; }
   const env = prepareWork(dir, {...runtime.baseEnv(),...codex.env}, network, tools);
+  const promptKit=codex.transport==='acp'?prepareAcpGuide(dir,style.id):KIT_DIR;
+  if(codex.transport==='acp')env.CW_KIT=promptKit;
   editSession(dir, s => { s.queue = []; });
   let brief: string | undefined;
-  if (!session.threadId) {
+  if (!session.threadId || codex.transport==='acp') {
     const media = project.inputs.media.map(m => ({ ...m, file: mediaFile(dir, m.id) })).filter(m => m.file) as (GeneralProject['inputs']['media'][number] & { file: string })[];
-    brief = buildBrief(project, style, KIT_DIR, await Promise.all(media.map(async m => ({ ...m, fps: await measuredFps(m.file) }))));
+    brief = buildBrief(project, style, promptKit, await Promise.all(media.map(async m => ({ ...m, fps: await measuredFps(m.file) }))));
     fs.writeFileSync(path.join(work, 'BRIEF.md'), brief);
   }
-  const prompt = turnPrompt({
-    phase, kit: KIT_DIR, styleId: style.id, brief, resumed: session.resumed, review: phase === 'polish' ? session.review : undefined,
+  let prompt = turnPrompt({
+    phase, kit: promptKit, styleId: style.id, brief, resumed: session.resumed || (codex.transport==='acp' && session.turns.length>0), review: phase === 'polish' ? session.review : undefined,
     revision: phase === 'revise' ? session.revision : undefined, queued, network: session.networkAnswer, networkOn: network,
     personEdits: phase === 'revise' ? personEditsOf(dir, session.revision?.version) : undefined,
   });
+  if(codex.transport==='acp')prompt+='\n\n工具命令请使用当前目录的相对路径或工程内绝对路径；不要用 shell 变量展开或内联求值。需要代码时先写入工程文件再执行。只能读写本工程，不要访问外部目录。';
   const images = [...queued.map(n => n.reference?.image), phase === 'revise' ? session.revision?.reference?.image : undefined].filter((f): f is string => !!f && fs.existsSync(f));
   const lastFile = path.join(dir, 'agent', `last-${runId}-${session.turns.length + 1}.txt`);
+  // Keep the original requested model (including default), never reinterpret an ACP-reported
+  // default as an explicit set_model request that may alter the provider's own configuration.
+  const retryAgent = { ...codex };
   const args = filmAgentArgs(codex,{ ...codex, work, lastMessage: lastFile, network, resumeThread: session.threadId, images });
   const startedAt = now();
   const record = editSession(dir, s => { s.turns.push({ runId, phase, startedAt, threadId: s.threadId }); }).turns.length - 1;
-  const agentRecord = agentRunRecord(codex, startedAt);
+  const agentRecord = agentRunRecord(codex, startedAt, id);
   fs.rmSync(path.join(work, 'network-request.json'), { force: true });
 
   let steps = findGeneral(id).project.run!.steps;
   let usage: Usage | undefined, failure: string | undefined, dirty = false;
   const flush = () => { if (!dirty) return; dirty = false; patchRun(id, r => { r.steps = steps; }); };
   const proc = startFilmAgent(codex, args, {
-    cwd: work, env, prompt, lastMessage:lastFile,images, eventLog: path.join(dir, 'agent', `events-${runId}.jsonl`),
+    cwd: work, projectRoot:dir, env, prompt, lastMessage:lastFile,images, eventLog: path.join(dir, 'agent', `events-${runId}.jsonl`),
     onEvent: event => {
+      if(event.type==='acp.model'&&typeof event.model==='string'){
+        codex.model=event.model;agentRecord.model=event.model;agentRecord.modelSelection=event.modelSelection==='selected'?'selected':'default';
+        patchRun(id,r=>{r.model=String(event.model);r.modelSelection=event.modelSelection==='selected'?'selected':'default';});
+        persistAgentRun(agentRecord);
+      }
+      if(event.type==='acp.error'){agentRecord.errorKind=String(event.kind||'other');agentRecord.errorExcerpt=String(event.excerpt||'').slice(0,240);}
       const out = applyFilmAgentEvent(agentId,steps,event,now());
       if (out.threadId) editSession(dir, s => { s.threadId = out.threadId; s.turns[record].threadId = out.threadId; });
       if (out.usage) usage = out.usage;
@@ -527,19 +611,44 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   entry.proc = undefined;
   const last = fs.existsSync(lastFile) ? fs.readFileSync(lastFile, 'utf8').trim() : '';
   editSession(dir, s => { Object.assign(s.turns[record], { endedAt: now(), code: result.code, usage, ...(failure ? { error: failure } : {}) }); s.lastAgentMessage = last || undefined; });
+  const rawAgentError=`${failure||''} ${result.stderr}`;
+  if(usage)agentRecord.usage=usage;
+  if((result.code!==0||failure)&&!stopped()){
+    const detail=classifyAgentFailure(failure||result.stderr);
+    agentRecord.errorKind??=detail.kind;agentRecord.errorExcerpt??=detail.excerpt;
+    failure=detail.kind!=='other'?detail.message:redactAcpText(failure||stderrTail(result.stderr)||detail.message).slice(0,240);
+  }
   finishAgentRecord(agentRecord, stopped() ? 'failed' : result.code === 0 && !failure ? 'completed' : 'failed', stopped() ? '已停止' : failure || (result.code !== 0 ? stderrTail(result.stderr) : undefined));
 
   if(agentId==='codex') recordCodexUsage();
   if (stopped()) { if (queued.length) editSession(dir, s => { s.queue = [...queued, ...s.queue]; }); return 'stopped'; }
   if (agentId==='codex' && (result.code !== 0 || failure) && session.threadId && !recoveredMissingThread
-      && missingCodexRollout(`${failure || ''} ${result.stderr}`)) {
+      && missingCodexRollout(rawAgentError)) {
     // A portable project keeps its media and work, but a Codex rollout is local
     // to its original computer. Retry once with a fresh brief, not a fresh project.
     editSession(dir, s => { s.threadId = undefined; s.resumed = true; s.queue = [...queued, ...s.queue]; });
     updateGeneral(id, p => { p.messages.push(message('system', '原来的 Codex 会话在本机不存在，已保留工程内容并用新会话继续。')); });
-    return turn(id, dir, phase, runId, true);
+    return turn(id, dir, phase, runId, true, busyRetry);
   }
-  if (result.code !== 0 || failure) throw new Error(`${agentId==='claude'?'Claude Code':'Codex'} 这一轮没有完成：${failure || stderrTail(result.stderr) || `退出码 ${result.code}`}`);
+  if ((result.code !== 0 || failure) && agentRecord.errorKind === 'busy' && !busyRetry) {
+    // The failed attempt remains recorded. Keep files, queued instructions and provider/model;
+    // cancel/disable while waiting must never start another process.
+    editSession(dir, s => { s.resumed = true; s.queue = [...queued, ...s.queue]; });
+    updateGeneral(id, p => { p.messages.push(message('system', '这个模型现在繁忙，稍等几秒后自动重试一次。')); });
+    const until = Date.now() + Math.max(0, runtime.busyRetryDelayMs);
+    while (Date.now() < until) {
+      if (stopped()) return 'stopped';
+      assertAgentExecutionAllowed(agentId);
+      await new Promise(resolve => setTimeout(resolve, Math.min(100, until - Date.now())));
+    }
+    if (stopped()) return 'stopped';
+    assertAgentExecutionAllowed(agentId);
+    return turn(id, dir, phase, runId, recoveredMissingThread, retryAgent);
+  }
+  if (result.code !== 0 || failure) {
+    const error=agentRecord.errorKind==='no-response'?failure:`${connectionDefinition(agentId).name} 这一轮没有完成：${failure || stderrTail(result.stderr) || `退出码 ${result.code}`}`;
+    throw Object.assign(new Error(error),{kind:agentRecord.errorKind});
+  }
   const request = readNetworkRequest(work, dir);
   if (request) {
     editSession(dir, s => { s.resumed = true; s.lastAgentMessage = undefined; });
@@ -600,7 +709,7 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
   const thumbs = frames.frames.map(f => fileUrl(id, path.relative(dir, f.file)));
   patchRun(id, r => { r.steps = setStep(r.steps, 'review', { thumbs, detail: `看图审片（${checks.filter(c => !c.ok).length ? `机检有 ${checks.filter(c => !c.ok).length} 项不合格` : '机检通过'}）` }); });
   let verdict: Verdict | undefined, problem: string | undefined;
-  if (!runtime.agentReview || filmAgentId(project.agent ?? readAgentSettings().modules.generalEditing)==='claude') {
+  if (!runtime.agentReview || filmAgentId(project.agent ?? readAgentSettings().modules.generalEditing)!=='codex') {
     const failed = checks.filter(c => !c.ok);
     verdict = { pass: !failed.length, summary: failed.length ? '成片没过机检' : '机检通过', issues: failed.map(c => ({ time: null, problem: c.text, fix: '' })) };
     patchRun(id, r => { r.steps = setStep(r.steps, 'review', { state: 'done', endedAt: now(), detail: verdict!.pass ? '机检通过' : `机检要改：${failed.map(c => c.text).join('；')}`.slice(0, 600) }); });
@@ -646,8 +755,12 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
 function personEditsOf(dir: string, version: number | undefined) {
   if (!version) return undefined;
   try {
-    const layers = JSON.parse(fs.readFileSync(path.join(dir, 'versions', `v${version}`, 'edited.json'), 'utf8')) as GeneralLayers;
-    return layers.engine === 'hyperframes' ? describeEdits(path.join(dir, 'versions', `v${version}`, 'work'), layers) : undefined;
+    const folder = path.join(dir, 'versions', `v${version}`);
+    const layers = JSON.parse(fs.readFileSync(path.join(folder, 'edited.json'), 'utf8')) as GeneralLayers;
+    if (layers.engine !== 'hyperframes') return undefined;
+    // words and moves, then the timeline: where clips sit, how long, how loud (S先生 10-31: 时间线解锁)
+    const original = JSON.parse(fs.readFileSync(path.join(folder, 'layers.json'), 'utf8')) as GeneralLayers;
+    return [...describeEdits(path.join(folder, 'work'), layers), ...describeTimeline(layers, original)];
   } catch { return undefined; }
 }
 
@@ -660,9 +773,13 @@ function carryPersonEdits(dir: string, from: number | undefined, n: number) {
   const read = (v: number, file: string) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'versions', `v${v}`, file), 'utf8')) as GeneralLayers; } catch { return undefined; } };
   const before = read(from, 'edited.json'), after = read(n, 'layers.json');
   if (before?.engine !== 'hyperframes' || after?.engine !== 'hyperframes') return undefined;
-  const result = carryEdits({ work: path.join(dir, 'versions', `v${from}`, 'work'), layers: before }, { work: path.join(dir, 'versions', `v${n}`, 'work'), layers: after });
+  const words = carryEdits({ work: path.join(dir, 'versions', `v${from}`, 'work'), layers: before }, { work: path.join(dir, 'versions', `v${n}`, 'work'), layers: after });
+  // the timeline edits go along too: clips the agent did not retime keep the person's timing and sound
+  const next = words.layers ?? structuredClone(after), original = read(from, 'layers.json');
+  const timing = original ? carryTimeline(before, original, next) : { kept: 0, dropped: [] as string[] };
+  const result = { kept: words.kept + timing.kept, dropped: [...words.dropped, ...timing.dropped] };
   if (!result.kept && !result.dropped.length) return undefined;
-  if (result.layers) fs.writeFileSync(path.join(dir, 'versions', `v${n}`, 'edited.json'), JSON.stringify(result.layers, null, 1));
+  if (result.kept) fs.writeFileSync(path.join(dir, 'versions', `v${n}`, 'edited.json'), JSON.stringify(next, null, 1));
   const kept = result.kept ? `你在第 ${from} 版里手动改的 ${result.kept} 处已经带到第 ${n} 版。` : '';
   const dropped = result.dropped.length ? `这次 Codex 改掉了：${result.dropped.slice(0, 6).join('、')}${result.dropped.length > 6 ? ` 等 ${result.dropped.length} 处` : ''}。` : '';
   return kept + dropped;
@@ -744,8 +861,8 @@ export function mediaFile(dir: string, mediaId: string): string | undefined {
 }
 
 // ——— the agent-runs log the settings page lists ———
-function agentRunRecord(codex: ResolvedCodex, startedAt: string): AgentRun {
-  const record: AgentRun = { id: crypto.randomUUID(), module: 'generalEditing', ...(codex.agent?{agent:codex.agent}:{}), ...(codex.method?{method:codex.method}:{}), executable: codex.executable, model: codex.model, effort: codex.effort, ...(codex.requested ? {requested: codex.requested} : {}), startedAt, status: 'running' };
+function agentRunRecord(codex: ResolvedCodex, startedAt: string, projectId?:string): AgentRun {
+  const record: AgentRun = { id: crypto.randomUUID(), module: 'generalEditing', ...(projectId?{projectId,filmRunId:findGeneral(projectId).project.run?.id}:{}), ...(codex.transport?{transport:codex.transport}:{}), ...(codex.agent?{agent:codex.agent}:{}), ...(codex.method?{method:codex.method}:{}), executable: codex.executable, model: codex.model, effort: codex.effort, ...(codex.requested ? {requested: codex.requested} : {}), startedAt, status: 'running' };
   persistAgentRun(record);
   return record;
 }

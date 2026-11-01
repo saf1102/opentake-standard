@@ -68,3 +68,21 @@ test('page element moves: applied as translate / scale / rotate, undone when tak
   const { normalizeFilm2 } = await import('./general/kit/lib/film2.mjs');
   assert.throws(() => normalizeFilm2({ ...result, picture: [{ ...result.picture[0], overrides: { '#logo': { rotate: 10 } } }] }, '/nonexistent', '/nonexistent'), /overrides/);
 });
+test('timeline fades and a dragged volume reach the film, and the kit accepts them with a 0.1–100× speed', async () => {
+  const layers = await filmToLayers({ ...film, music: [{ ...film.music[0], fadeIn: 1, fadeOut: 0.5 }] }, 'versions/v1/work', '.', []);
+  const track = (id: string) => layers.timeline.tracks.find(t => t.id === id)!;
+  const m = track('g-music').clips[0];
+  assert.equal(m.fadeIn, 1); assert.equal(m.fadeOut, 0.5);
+  const f = track('g-footage').clips[0];
+  f.fadeOut = 0.25; delete f.params.volumeStep; f.volume = 10 ** (-3.5 / 20); f.params.speed = 12;
+  const result = layersToFilm(layers);
+  assert.equal(result.music[0].fadeIn, 1); assert.equal(result.music[0].fadeOut, 0.5);
+  assert.equal(result.footage[0].fadeOut, 0.25); assert.equal(result.footage[0].fadeIn, undefined);
+  assert.equal(result.footage[0].volume, -3.5);
+  assert.equal(result.voice[0].fadeIn, undefined);
+  const { normalizeFilm2 } = await import('./general/kit/lib/film2.mjs');
+  const problems: string[] = [];
+  try { normalizeFilm2(result, '/nonexistent', '/nonexistent'); } catch (error) { problems.push(String((error as Error).message)); }
+  assert.ok(!problems.join('').includes('speed'), problems.join('\n'));
+  assert.ok(!problems.join('').includes('fade'), problems.join('\n'));
+});

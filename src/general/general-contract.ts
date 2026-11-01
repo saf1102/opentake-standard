@@ -33,12 +33,13 @@ export type GeneralSegment = { name: string; start: number; end: number; id?: st
 /** Between a segment and the one before it (docs/通用剪辑-分轨出片格式.md); OpenTake renders them. */
 export type GeneralTransition = 'cut' | 'dissolve' | 'fade' | 'dip-black' | 'dip-white';
 
+export type GeneralAgentErrorKind = 'quota' | 'credentials' | 'model-plan' | 'rate-limit' | 'busy' | 'no-response' | 'other';
 export type GeneralRunState = 'idle' | 'running' | 'stopping' | 'stopped' | 'needs-network' | 'done' | 'failed';
 export type GeneralRun = {
-  id: string; state: GeneralRunState; agent: 'codex' | 'claude'; method?: 'cli' | 'api'; model?: string; effort?: string;
+  id: string; state: GeneralRunState; agent: AgentConnectionId; method?: 'cli' | 'api'; transport?: 'acp'; modelSelection?: 'selected' | 'default'; model?: string; effort?: string;
   /** what this run makes: the first cut, or the next version from a message */
   purpose: 'first' | 'revision' | 'resume';
-  steps: GeneralStep[]; startedAt: string; endedAt?: string; error?: string;
+  steps: GeneralStep[]; startedAt: string; endedAt?: string; error?: string; errorKind?: GeneralAgentErrorKind;
   /** the agent asked to reach the network; the page shows the question until it is answered */
   networkRequest?: { reason: string; hosts: string[] };
   /** messages the person sent while the run worked; the agent sees them when its current step ends */
@@ -74,6 +75,11 @@ export function hfPageEdits(layers: Pick<GeneralLayers, 'timeline'>): HfPageEdit
   const text: NonNullable<HfPageEdits['text']> = {}, moves: NonNullable<HfPageEdits['moves']> = {};
   for (const track of layers.timeline.tracks) for (const clip of track.clips) {
     if (!clip.params.hf) continue;
+    // a caption line (shown one clip per line): its words, in the caption page's clip, by the line's own element
+    if (clip.params.line === true && typeof clip.params.host === 'string') {
+      if ((clip.text ?? '') !== (clip.params.original ?? '')) text[clip.params.host] = { ...text[clip.params.host], [clip.id]: clip.text ?? '' };
+      continue;
+    }
     const words = clip.params.textEdits as Record<string, string> | undefined, moved = clip.params.overrides as Record<string, unknown> | undefined;
     if (words && Object.keys(words).length) text[clip.id] = words;
     if (moved && Object.keys(moved).length) moves[clip.id] = moved;

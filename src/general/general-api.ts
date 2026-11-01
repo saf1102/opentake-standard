@@ -23,6 +23,7 @@ export type GeneralClient = {
   generate(id: string): Promise<GeneralProject>
   stop(id: string): Promise<GeneralProject>
   resume(id: string): Promise<GeneralProject>
+  switchAgent(id: string, agent: GeneralAgentChoice): Promise<GeneralProject>
   send(id: string, text: string, reference?: GeneralReference): Promise<GeneralProject>
   network(id: string, allow: boolean): Promise<GeneralProject>
   /** Live project updates. `onState` reports the connection: 'open', or 'retrying' while it reconnects. */
@@ -96,6 +97,7 @@ const httpClient: GeneralClient = {
   generate: id => post<GeneralProject>(`${projectPath(id)}/generate`),
   stop: id => post<GeneralProject>(`${projectPath(id)}/stop`),
   resume: id => post<GeneralProject>(`${projectPath(id)}/resume`),
+  switchAgent: (id, agent) => post<GeneralProject>(`${projectPath(id)}/switch-agent`, { agent }),
   send: (id, text, reference) => post<GeneralProject>(`${projectPath(id)}/messages`, reference ? { text, reference } : { text }),
   network: (id, allow) => post<GeneralProject>(`${projectPath(id)}/network`, { allow }),
   subscribe: (id, onProject, onState) => {
@@ -141,6 +143,7 @@ export const generalApi = {
   generate: (id: string) => client().then(c => c.generate(id)),
   stop: (id: string) => client().then(c => c.stop(id)),
   resume: (id: string) => client().then(c => c.resume(id)),
+  switchAgent: (id: string, agent: GeneralAgentChoice) => client().then(c => c.switchAgent(id, agent)),
   send: (id: string, text: string, reference?: GeneralReference) => client().then(c => c.send(id, text, reference)),
   network: (id: string, allow: boolean) => client().then(c => c.network(id, allow)),
   subscribe(id: string, onProject: (project: GeneralProject) => void, onState: (state: 'open' | 'retrying') => void) {
@@ -167,6 +170,8 @@ export const generalEditorApi = {
   textPresets: (id: string) => call<TextPresets>(`${projectPath(id)}/text-presets`),
   /** The agent's tracks (layers.json), or the person's edits of them (edited.json) when there are any. */
   async layers(id: string, n: number, layersUrl: string): Promise<{ layers: GeneralLayers; edited: boolean }> {
+    // a HyperFrames version read before 字幕一句一条 / 音效一声一段 is brought up to them first (once; a failure leaves it as it was)
+    await call(`${projectPath(id)}/versions/${n}/upgrade`, { method: 'POST' }).catch(() => undefined)
     const edited = await fetch(`${GENERAL_API}${projectPath(id)}/files/versions/v${n}/edited.json`, { cache: 'no-store' })
     if (edited.ok) return { layers: await edited.json() as GeneralLayers, edited: true }
     const original = await fetch(layersUrl, { cache: 'no-store' })
@@ -180,6 +185,16 @@ export const generalEditorApi = {
   exportHistory: (id:string) => call<GeneralExport[]>(`${projectPath(id)}/exports/history`),
   cancelExport: (id:string) => post<GeneralExport>(`${projectPath(id)}/exports/cancel`,{}),
   chooseExportDestination: (id:string) => post<{path:string}>(`${projectPath(id)}/exports/destination`,{}).then(r=>r.path),
+  /** 按声音切开: the separate sounds in `duration` s of a version's sound file from `from`, in seconds from `from` */
+  sounds: (id: string, n: number, src: string, from: number, duration: number) => call<{ start: number; end: number }[]>(`${projectPath(id)}/versions/${n}/sounds?${new URLSearchParams({ src, from: String(from), duration: String(duration) })}`),
+  /** The version's sound files and how long each is (seconds), for the timeline's waveforms */
+  soundFiles: (id: string, n: number) => call<Record<string, number>>(`${projectPath(id)}/versions/${n}/sound-files`),
+  // 动效卡变速: which scene pages can play their whole animation faster or slower
+  sceneSpeeds: (id: string, n: number) => call<Record<string, boolean>>(`${projectPath(id)}/versions/${n}/scene-speeds`),
+  /** A sound file's waveform: its peaks (配音, drawn as the 口播 voice track) or its picture (配乐 / 音效) */
+  waveformUrl: (id: string, n: number, src: string, kind: 'peaks' | 'picture') => `${GENERAL_API}${projectPath(id)}/versions/${n}/waveform?${new URLSearchParams({ src, kind })}`,
+  /** 打开工程目录: the project's folder in the Finder */
+  revealProject: (id: string) => call<{ revealed: boolean }>(`${projectPath(id)}/reveal`, { method: 'POST' }),
   revealExport: (id: string, jobId?:string) => call<{ revealed: boolean }>(`${projectPath(id)}/exports/reveal`, { method: 'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:jobId}) }),
   fileUrl: (id: string, rel: string) => `${GENERAL_API}${projectPath(id)}/files/${rel.split('/').map(encodeURIComponent).join('/')}`,
 }

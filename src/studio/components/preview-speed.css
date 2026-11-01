@@ -1,0 +1,5 @@
+.preview-speed-button { min-width: 38px; height: 28px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--studio-line, #ffffff1f); background: transparent; color: inherit; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.preview-speed-button:hover { background: var(--studio-panel-2, #ffffff10); }
+.preview-speed-menu { min-width: 0 !important; width: 56px; padding: 4px !important; }
+.preview-speed-menu [role="menuitem"] { justify-content: center; font-size: 12px; font-variant-numeric: tabular-nums; padding: 5px 0; }
+.preview-speed-menu [aria-current="true"] { font-weight: 700; color: var(--accent, #f5b316); }

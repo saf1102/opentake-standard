@@ -33,23 +33,41 @@ export function mediaFileName(media: GeneralMedia, layers?: GeneralLayers) {
   return typeof clip?.params.media === 'string' ? clip.params.media : `${media.id}.mp4`
 }
 
-export function editProjectFor(project: GeneralProject, layers: GeneralLayers, version: number): EditProject {
+/** The timeline's media id of a HyperFrames sound file (src as the page names it): it draws that file's waveform. */
+export const soundAssetId = (src: string) => `hf-sound:${src}`
+
+/**
+ * A HyperFrames film's sound files as media the timeline draws waveforms from (S先生 10-31: 配音像口播的声音轨一样有
+ * 波纹): `sounds` is each file's length. They stay out of the library; each sound clip names its file.
+ */
+function withSounds(timeline: Timeline, sounds: Record<string, number>, now: number): { timeline: Timeline; media: MediaAsset[] } {
+  const media: MediaAsset[] = Object.entries(sounds).map(([src, duration]) => ({
+    id: soundAssetId(src), name: src.split('/').pop() || src, type: 'audio', mimeType: 'audio/wav', originalFile: src, waveformFile: src,
+    duration, size: 0, createdAt: now, status: 'ready', origin: 'general', removedFromLibrary: true,
+  } as MediaAsset))
+  return { media, timeline: { ...timeline, tracks: timeline.tracks.map(track => ({ ...track, clips: track.clips.map(clip =>
+    clip.params.hf === true && typeof clip.params.src === 'string' && clip.params.tag === 'audio' && sounds[clip.params.src] ? { ...clip, assetId: soundAssetId(clip.params.src) } : clip) })) } }
+}
+
+export function editProjectFor(project: GeneralProject, layers: GeneralLayers, version: number, sounds: Record<string, number> = {}): EditProject {
   const now = Date.parse(project.updatedAt) || Date.now()
   const media: MediaAsset[] = project.inputs.media.map(m => ({
     id: m.id, name: m.name, type: m.duration > 0 ? 'video' : 'image', mimeType: m.duration > 0 ? 'video/mp4' : 'image/jpeg',
     originalFile: mediaFileName(m, layers), duration: m.duration, width: m.width || undefined, height: m.height || undefined, fps: layers.fps,
     size: 0, createdAt: now, status: 'ready', origin: 'imported', ...(m.poster ? { thumbnailFile: m.poster } : {}),
   } as MediaAsset))
-  // the shots the agent made are in the library too (as OpenFilm lists them): the film's own stretch of each, with a still
+  // the shots the agent made are in the library too: the film's own stretch of each, with a still
   const shots: MediaAsset[] = (layers.timeline.tracks.find(t => t.id === 'g-page')?.clips ?? []).map(clip => ({
     id: `shot-${clip.id}`, name: `${clip.name || '画面'} · Codex`, type: 'video', mimeType: 'video/mp4', originalFile: `${clip.id}.mp4`, duration: clip.duration,
     width: layers.width, height: layers.height, fps: layers.fps, size: 0, createdAt: now, status: 'ready', origin: 'general',
     ...(clip.params.thumb ? { thumbnailFile: String(clip.params.thumb) } : {}),
   } as MediaAsset))
   media.push(...shots)
-  const shown = namedTracks(visibleTimeline(layers.timeline), layers.engine)
-  // a HyperFrames film is shown, not yet edited, on the timeline: its edits write the page itself (the next step)
-  const timeline = layers.engine === 'hyperframes' ? { ...shown, tracks: shown.tracks.map(t => ({ ...t, locked: true })) } : shown
+  // a HyperFrames film edits like a 口播 timeline (S先生 10-31): its edits go to edited.json and the page host and
+  // the export read the page through them (server/general/hf-timeline.ts)
+  const heard = withSounds(namedTracks(visibleTimeline(layers.timeline), layers.engine), sounds, now)
+  media.push(...heard.media)
+  const timeline = heard.timeline
   return EditProjectSchema.parse({
     schemaVersion: 5, id: project.id, name: project.name, createdAt: Date.parse(project.createdAt) || now, updatedAt: now, revision: version,
     settings: { width: layers.width, height: layers.height, fps: layers.fps, canvasMode: 'custom' },

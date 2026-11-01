@@ -45,6 +45,15 @@ export function normalizeFilm2(film, dir, mediaDir) {
   };
   const list = (key) => { const v = film[key]; if (v === undefined) return []; if (!Array.isArray(v)) { bad(`${key} 要是数组`); return []; } return v; };
   const exists = (rel) => rel && fs.existsSync(path.isAbsolute(rel) ? rel : path.join(dir, rel));
+  // optional, set by the person in OpenTake's timeline: seconds of fade at each end of a clip's sound
+  const fades = (raw, clip, label) => {
+    for (const key of ['fadeIn', 'fadeOut']) {
+      if (raw?.[key] === undefined) continue;
+      const v = Number(raw[key]);
+      if (!(v >= 0 && v <= 60)) bad(`${label} 的 ${key} 要在 0–60 秒之间`);
+      else if (v > 0) clip[key] = v;
+    }
+  };
   const volume = (raw, label) => {
     const v = raw?.volume ?? 'mid';
     if (typeof v === 'number' ? !(Number.isFinite(v) && v >= -60 && v <= 20) : !(v in VOLUMES)) bad(`${label} 的 volume 只能是 low / mid / high（或 -60 到 20 的分贝数）`);
@@ -105,7 +114,9 @@ export function normalizeFilm2(film, dir, mediaDir) {
     if (!clip.media || path.basename(clip.media) !== clip.media) bad(`${label} 的 media 只写素材文件名`);
     else if (mediaDir && !fs.existsSync(path.join(mediaDir, clip.media))) bad(`${label} 的素材 ${clip.media} 不在用户素材里`);
     if (!(clip.in >= 0)) bad(`${label} 的 in 要 ≥ 0`);
-    if (!(clip.speed >= 0.25 && clip.speed <= 4)) bad(`${label} 的 speed 要在 0.25–4 之间`);
+    // the agent stays within 0.25–4 (MANUAL); the person may set 0.1–100 in the editor
+    if (!(clip.speed >= 0.1 && clip.speed <= 100)) bad(`${label} 的 speed 要在 0.1–100 之间`);
+    fades(raw, clip, label);
     if (!['cover', 'contain'].includes(clip.fit)) bad(`${label} 的 fit 只能是 cover 或 contain`);
     if (clip.focus.length !== 2 || clip.focus.some(v => !(v >= 0 && v <= 1))) bad(`${label} 的 focus 要是 [x, y]，都在 0–1 之间`);
     if (clip.move !== undefined) {
@@ -136,6 +147,7 @@ export function normalizeFilm2(film, dir, mediaDir) {
     const label = `${key}[${i}]${raw?.src ? `（${raw.src}）` : ''}`;
     const clip = { id: takeId(raw, label), ...span(raw, label, { needEnd }), src: String(raw?.src ?? ''), in: Number(raw?.in ?? 0), volume: volume(raw, label) };
     if (!clip.src || !exists(clip.src)) bad(`${label} 的声音文件 ${clip.src || '（没写）'} 不存在`);
+    fades(raw, clip, label);
     if (!(clip.in >= 0)) bad(`${label} 的 in 要 ≥ 0`);
     if (needLabel) { clip.label = String(raw?.label ?? ''); if (!clip.label) bad(`${label} 要写 label（两三个字，显示在轨道上）`); }
     if (needText) { clip.text = String(raw?.text ?? ''); if (!clip.text) bad(`${label} 要写旁白原文 text`); }

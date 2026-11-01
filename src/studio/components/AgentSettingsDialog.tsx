@@ -1,5 +1,6 @@
+import {connectionDefinition} from '../connections'
 import {IS_MAC} from '../../general/platform'
-import {connectionRequest,type ConnectionView} from '../connections'
+import {refreshConnections,useConnections} from '../connection-store'
 import {AgentPicker,VoiceSettings,modelsDescription,testAllCatalogModels} from './agent-settings-edition';
 import { useEffect, useState, useRef } from 'react'
 import { Bot, CheckCircle2, LoaderCircle, RefreshCw } from 'lucide-react'
@@ -19,8 +20,8 @@ export function AgentSettingsDialog({embedded=false,onDirtyChange,onBusyChange}:
   const [testingLabel, setTestingLabel] = useState('')
   const [testedConfig, setTestedConfig] = useState('')
   const [error, setError] = useState('')
-  const [connections,setConnections]=useState<ConnectionView[]>([])
-  useEffect(()=>{if(open&&IS_MAC)void connectionRequest<{connections:ConnectionView[]}>().then(r=>setConnections(r.connections)).catch(()=>{})},[open])
+  const {connections}=useConnections()
+  useEffect(()=>{if(open&&IS_MAC)void refreshConnections()},[open])
   useEffect(() => {
     if (!open) return
     let active = true
@@ -101,7 +102,7 @@ export function AgentSettingsDialog({embedded=false,onDirtyChange,onBusyChange}:
           </div>
           <p className="agent-settings-note">正在执行的任务保持启动时的设置。手动修改文字、播放、模板渲染与导出不调用 Codex；已确认的卡位与已生成的卡片不会因修改设置被替换。</p>
           <VoiceSettings/>
-          {!!view?.runs.length && <details className="agent-recent-runs"><summary>最近实际调用 · {view.runs.length} 条</summary><div>{view.runs.slice(0, 10).map(run => <div key={run.id}><span>{run.purpose === 'connectivity' ? '连通测试' : AGENT_MODULES.find(m => m.id === run.module)?.name}</span><code>{run.model} / {run.effort}</code><span>{run.status === 'completed' ? 'CLI 已完成' : run.status === 'running' ? '执行中' : '失败'}{run.durationMs !== undefined && ` · ${(run.durationMs / 1000).toFixed(1)} 秒`}</span><small>{new Date(run.startedAt).toLocaleString('zh-CN')}{run.error && ` · ${run.error}`}</small></div>)}</div></details>}
+          {!!view?.runs.length && <details className="agent-recent-runs"><summary>最近实际调用 · {view.runs.length} 条</summary><div>{view.runs.slice(0, 10).map(run => <div key={run.id}><span>{run.purpose === 'connectivity' ? '连通测试' : AGENT_MODULES.find(m => m.id === run.module)?.name}</span><code>{connectionDefinition(run.agent||'codex').name} · {run.method==='api'?'API 密钥':run.transport==='acp'?'命令行 · ACP':'命令行'} · {run.model} / {run.effort}</code><span>{run.status === 'completed' ? '已完成' : run.status === 'running' ? '执行中' : '失败'}{run.durationMs !== undefined && ` · ${(run.durationMs / 1000).toFixed(1)} 秒`}</span><small style={run.error?{color:'#9869dc'}:undefined}>{new Date(run.startedAt).toLocaleString('zh-CN')}{run.error && ` · ${run.error}`}</small></div>)}</div></details>}
         </div>}
         {(error || invalid.length > 0) && <p className="agent-settings-error" role="alert">{error || `${invalid.map(m => m.name).join('、')} 的模型或强度不可用，请重新选择。`}</p>}
         {!draft && !busy && error && <button onClick={() => void act('load', async () => { const result = await getAgentSettings(); setView(result); setDraft({ ...result.settings, cliPath: result.settings.cliPath }); setError(result.catalogError || '') })}>重新读取</button>}

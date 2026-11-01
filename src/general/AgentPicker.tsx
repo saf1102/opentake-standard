@@ -23,7 +23,7 @@ function useCatalog(open:boolean) {
     const refresh=async()=>{
       try {
         const [view,connections]=await Promise.all([getAgentSettings(),connectionRequest<{connections:ConnectionView[]}>()])
-        if(alive){setCatalog({models:view.catalog?.models??[],standard:view.settings.modules.generalEditing,connections:connections.connections.filter(c=>c.kind==='agent'&&c.connected&&c.enabled)});setError('')}
+        if(alive){setCatalog({models:view.catalog?.models??[],standard:view.settings.modules.generalEditing,connections:connections.connections.filter(connectionReadyForFilm)});setError('')}
       }catch(e){if(alive){setCatalog(undefined);setError(e instanceof Error?e.message:'读取接入状态失败')}}
     }
     void refresh()
@@ -36,10 +36,12 @@ function useCatalog(open:boolean) {
 
 const effortName = (effort: string) => EFFORT_LABELS[effort] ?? effort
 
-function ConnectedAgentPicker({ value, onChange, compact, up, disabled }: {
+function ConnectedAgentPicker({ value, onChange, compact, up, disabled, onResolvedAgent }: {
   value?: GeneralAgentChoice; onChange: (next: GeneralAgentChoice | undefined) => void
   /** the composer's short label: model and effort only */
   compact?: boolean; up?: boolean; disabled?: boolean
+  /** Share this picker's resolved system default with its panel; never infer it from an old run. */
+  onResolvedAgent?: (agent: GeneralAgentChoice['agent']) => void
 }) {
   const [open, setOpen] = useState(false)
   const {catalog,error}=useCatalog(open)
@@ -65,10 +67,12 @@ function ConnectedAgentPicker({ value, onChange, compact, up, disabled }: {
   }, [open])
   const standard=catalog?.standard,shown=value??standard
   const selectedId=shown?.agent||'codex'
+  useEffect(() => { onResolvedAgent?.(catalog ? selectedId : undefined) }, [catalog, selectedId, onResolvedAgent])
   const connected=catalog?.connections.find(c=>c.id===selectedId)
   const models:AgentModel[]=connected?.id==='codex'&&connected.mode==='cli'?catalog?.models??[]:(connected?.models??[]).map(m=>({...m,efforts:['low','medium','high'],defaultEffort:'medium'}))
   const real=(c?:GeneralAgentChoice)=>c&&models.length?{...effectiveChoice(c,models),agent:c.agent}:c
-  const nameOf=(id?:string)=>id===FOLLOW_DEFAULT?'跟随智能体默认':models.find(m=>m.id===id)?.name??id??''
+  const followsCliDefault=connected?.mode==='cli'&&selectedId!=='codex'&&selectedId!=='claude'&&connected.acpModelSelection!==true
+  const nameOf=(id?:string)=>id===FOLLOW_DEFAULT||followsCliDefault?`跟随 ${connected?.name||'智能体'} 默认`:models.find(m=>m.id===id)?.name??id??''
   const model=models.find(m=>m.id===real(shown)?.model)
   const pickModel=(next:AgentModel)=>onChange({agent:selectedId,model:next.id,effort:next.efforts.includes(shown?.effort??'')?shown!.effort:next.defaultEffort})
   const label=compact||value?connected?.name??'智能体未接通':'系统默认'
@@ -91,14 +95,14 @@ function ConnectedAgentPicker({ value, onChange, compact, up, disabled }: {
         <span><b>{c.name}</b><small>{c.mode==='api'?'API 密钥':'命令行 · 账号登录'}{!c.cliInstalled?' · 仅轻活，出片需安装命令行':!c.heavySupported?' · 出片待适配':''}</small></span><Check size={15}/>
       </button>)}
       {fallback&&<div role="status" className="ge-model-grp" style={{color:'#9869dc'}}>原模型不可用，出片时改用该智能体默认模型。</div>}
-      {!connected&&shown&&<div role="status" className="ge-model-grp" style={{color:'#9869dc'}}>工程原来的智能体尚未接通，请重新选择。</div>}
+      {!connected&&shown&&<div role="status" className="ge-model-grp" style={{color:'#9869dc'}}>所选智能体未接通，请重新连接或选择。</div>}
       {ready&&<>
         <div className="ge-model-grp">模型</div>
-        <button type="button" className="ge-model-opt" data-on={shown?.model==='default'||undefined} onClick={()=>onChange({agent:selectedId,model:'default',effort:shown?.effort||'medium'})}><span><b>跟随智能体默认</b></span><Check size={15}/></button>
-        {models.map(m=><button key={m.id} type="button" className="ge-model-opt" data-on={shown?.model===m.id||undefined} onClick={()=>pickModel(m)}><span><b>{m.name}</b></span><Check size={15}/></button>)}
-        {!models.length&&<label className="ge-model-grp">手填模型<input aria-label="手填模型" defaultValue={shown?.model==='default'?'':shown?.model} onBlur={e=>{const model=e.currentTarget.value.trim();if(model&&/^[\w.\/:_-]+$/.test(model))onChange({agent:selectedId,model,effort:shown?.effort||'medium'})}}/></label>}
-        <div className="ge-model-grp">推理强度</div>
-        <div className="ge-model-eff">{(model?.efforts??['low','medium','high']).map(effort=><button key={effort} type="button" data-on={shown?.effort===effort||undefined} onClick={()=>shown&&onChange({agent:selectedId,model:shown.model,effort})}>{effortName(effort)}</button>)}</div>
+        <button type="button" className="ge-model-opt" data-on={shown?.model==='default'||undefined} onClick={()=>onChange({agent:selectedId,model:'default',effort:shown?.effort||'medium'})}><span><b>跟随 {connected?.name||'智能体'} 默认</b></span><Check size={15}/></button>
+        {!followsCliDefault&&models.map(m=><button key={m.id} type="button" className="ge-model-opt" data-on={shown?.model===m.id||undefined} onClick={()=>pickModel(m)}><span><b>{m.name}</b></span><Check size={15}/></button>)}
+        {!models.length&&!followsCliDefault&&<label className="ge-model-grp">手填模型<input aria-label="手填模型" defaultValue={shown?.model==='default'?'':shown?.model} onBlur={e=>{const model=e.currentTarget.value.trim();if(model&&/^[\w.\/:_,-]+$/.test(model))onChange({agent:selectedId,model,effort:shown?.effort||'medium'})}}/></label>}
+        {!followsCliDefault&&<><div className="ge-model-grp">推理强度</div>
+        <div className="ge-model-eff">{(model?.efforts??['low','medium','high']).map(effort=><button key={effort} type="button" data-on={shown?.effort===effort||undefined} onClick={()=>shown&&onChange({agent:selectedId,model:shown.model,effort})}>{effortName(effort)}</button>)}</div></>}
       </>}
 
     </div></div>, document.body)}
@@ -199,12 +203,13 @@ export function NetworkToggle({ on, onChange, compact, disabled }: { on: boolean
 }
 
 /** The model and 联网 as one capsule, split by a hairline (S先生 2026-10-26: the two boxes fit together as one). */
-export function AgentControls({ agent, onAgent, network, onNetwork, compact, up, disabled }: {
+export function AgentControls({ agent, onAgent, network, onNetwork, compact, up, disabled, onResolvedAgent }: {
   agent?: GeneralAgentChoice; onAgent: (next: GeneralAgentChoice | undefined) => void
   network: boolean; onNetwork: (next: boolean) => void; compact?: boolean; up?: boolean; disabled?: boolean
+  onResolvedAgent?: (agent: GeneralAgentChoice['agent']) => void
 }) {
   return <span className="ge ge-model-group">
-    <AgentPicker value={agent} onChange={onAgent} compact={compact} up={up} disabled={disabled} />
+    <AgentPicker value={agent} onChange={onAgent} compact={compact} up={up} disabled={disabled} onResolvedAgent={onResolvedAgent} />
     <NetworkToggle on={network} onChange={onNetwork} compact={compact} disabled={disabled} />
   </span>
 }

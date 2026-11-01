@@ -17,7 +17,7 @@ test('任务17：Codex 原参数不变；API 地址仅作为本轮参数传入',
  assert.deepEqual(injected.slice(0,3),['exec','-c','model_provider="opentake"']);
  assert.deepEqual(injected.slice(3),filmTurnArgs(turn).slice(1));
  assert.ok(!filmAgentArgs({...agent,method:'api',model:'default'},{...turn,model:'default'}).includes('-m'),'API默认跟随CLI，不把default当作模型ID');
- assert.throws(()=>filmAgentId({agent:'kimi'}),/待|还没完成/);
+ assert.equal(filmAgentId({agent:'kimi'}),'kimi','任务24扩围；Codex/Claude原行为断言保留');
 });
 test('任务17：Claude 使用无头流式、临时配置和强制沙盒，API不使用订阅凭据',()=>{
  const args=filmAgentArgs({agent:'claude',executable:'/fixture/agent',model:'default',effort:'medium',method:'api'},{...turn,model:'default'});
@@ -37,7 +37,7 @@ test('任务17：Claude 模拟事件映射进度、会话、用量与失败',()=
  steps=applyClaudeEvent(steps,{type:'assistant',message:{content:[{type:'tool_use',name:'Bash',input:{command:'hfx render'}}]}},at).steps;
  assert.equal(steps.find(s=>s.id==='render')?.state,'running');
  const final=applyClaudeEvent(steps,{type:'result',subtype:'success',result:'已完成',usage:{input_tokens:20,output_tokens:10,cache_read_input_tokens:5}},at);
- assert.deepEqual(final.usage,{input:20,output:10,cached:5,reasoning:0});assert.equal(final.message,'已完成');
+ assert.deepEqual(final.usage,{input:20,output:10,cached:5,reasoning:0,total:35});assert.equal(final.message,'已完成');
  assert.match(applyClaudeEvent(steps,{type:'result',subtype:'error_during_execution',is_error:true,errors:['模拟失败']},at).error||'',/模拟失败/);
  assert.match(applyClaudeEvent(steps,{type:'system',subtype:'permission_denied'},at).error||'',/沙盒/);
 });

@@ -13,7 +13,9 @@ import {ExportSettingsSchema} from '../../src/types/editor.ts';
 import {exportSettingsForPreset} from '../../src/studio/export-settings.ts';
 import {writeExportPreferences} from '../export-preferences.ts';
 import {probeExportMedia} from './export-media.ts';
-import {isHyperframesWork,readHyperframes} from './hf-project.ts';
+import {HF_ENTRY,isHyperframesWork,readHyperframes} from './hf-project.ts';
+import {editedCaptionPage,editedCaptionPages,editedHyperframes} from './hf-timeline.ts';
+import {editedSpeedPages,withSpeedScripts} from './hf-speed.ts';
 import {validateDirectory} from '../system-settings.ts';
 
 const cancellers=new Map<string,()=>void>();
@@ -99,6 +101,14 @@ export async function startExport(id: string, version: number, format: unknown, 
     const clone = { recursive: true, dereference: true, mode: fs.constants.COPYFILE_FICLONE };
     if(fs.existsSync(work))fs.cpSync(work, path.join(output, 'work'), clone);
     else fs.mkdirSync(path.join(output,'work'));
+    // the person's timeline edits of a HyperFrames film go into the export's own copy of the page
+    if(kind==='hyperframes'){
+      const entry=path.join(output,'work',HF_ENTRY);if(fs.existsSync(entry))fs.writeFileSync(entry,editedHyperframes(path.dirname(work),fs.readFileSync(entry,'utf8')));
+      // and its caption pages shown line by line
+      for(const sub of editedCaptionPages(path.dirname(work))){const page=path.resolve(output,'work',decodeURIComponent(sub));if(page.startsWith(path.resolve(output,'work')+path.sep)&&fs.existsSync(page))fs.writeFileSync(page,editedCaptionPage(path.dirname(work),sub,fs.readFileSync(page,'utf8')));}
+      // and its scenes played faster or slower
+      for(const sub of editedSpeedPages(path.dirname(work))){const page=path.resolve(output,'work',decodeURIComponent(sub));if(page.startsWith(path.resolve(output,'work')+path.sep)&&fs.existsSync(page))fs.writeFileSync(page,withSpeedScripts(fs.readFileSync(page,'utf8')));}
+    }
     if(kind==='video')fs.copyFileSync(path.join(dir,'versions',`v${version}.mp4`),path.join(output,'work','source.mp4'),fs.constants.COPYFILE_FICLONE);
     fs.writeFileSync(path.join(output,'request.json'),JSON.stringify({settings,kind,media}));
     if (fs.existsSync(path.join(dir, 'media'))) fs.cpSync(path.join(dir, 'media'), path.join(output, 'media'), clone);

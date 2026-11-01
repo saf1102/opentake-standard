@@ -11,9 +11,12 @@ import { pathToFileURL } from 'node:url';
 import { findGeneral } from './store.ts';
 import { KIT_DIR, fontDirs, iconsDir, nodeModulesPath } from './kit-env.ts';
 import { HF_ENTRY, isHyperframesWork } from './hf-project.ts';
+import { editedCaptionPage, editedCaptionPages, editedHyperframes } from './hf-timeline.ts';
+import { editedSpeedPages, withSpeedScripts } from './hf-speed.ts';
 
 const BRIDGE = fs.readFileSync(new URL('./page-bridge.js', import.meta.url), 'utf8');
 const HF_EDITS = fs.readFileSync(new URL('./hf-edit-bridge.js', import.meta.url), 'utf8');
+const HF_SPEED = fs.readFileSync(new URL('./hf-speed-bridge.js', import.meta.url), 'utf8');
 // A HyperFrames film plays in the editor with HyperFrames' own runtime (Apache-2.0), driven by OpenTake's controls.
 let hfRuntime: string | undefined;
 const runtimeSource = () => (hfRuntime ??= fs.readFileSync(path.join(nodeModulesPath(), '@hyperframes', 'producer', 'dist', 'hyperframe.runtime.iife.js'), 'utf8'));
@@ -50,6 +53,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = new URL(req.url || '/', 'http://page.localhost');
   if (url.pathname === '/_ot/bridge.js') { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-store' }); return res.end(BRIDGE); }
   if (url.pathname === '/_ot/hf-edit.js') { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-store' }); return res.end(HF_EDITS); }
+  if (url.pathname === '/_ot/hf-speed.js') { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-store' }); return res.end(HF_SPEED); }
   if (url.pathname === '/_hf/runtime.js') { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); return res.end(runtimeSource()); }
   const file = (await kitResolver())(url.pathname, { work, media: path.join(dir, 'media') });
   if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) return fail(404, 'file');
@@ -59,11 +63,19 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     let html = fs.readFileSync(file, 'utf8');
     if (isHyperframesWork(work)) {
       // the film's root page gets the runtime before its own scripts (sub-compositions are loaded by the runtime itself)
-      // and, after them, the person's text edits
+      // and, after them, the person's text edits and the scenes' speeds
       if (path.resolve(file) === path.resolve(work, HF_ENTRY)) {
-        const tag = '<script src="/_hf/runtime.js"></script>', edits = '<script src="/_ot/hf-edit.js"></script>';
+        html = editedHyperframes(path.dirname(work), html);
+        const tag = '<script src="/_hf/runtime.js"></script>', edits = '<script src="/_ot/hf-edit.js"></script><script src="/_ot/hf-speed.js"></script>';
         html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, m => `${m}${tag}`) : `${tag}${html}`;
         html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, `${edits}</body>`) : `${html}${edits}`;
+      } else {
+        // a caption page shown line by line: its lines where the person put them
+        const rel = path.relative(work, file).split(path.sep).join('/');
+        const sub = editedCaptionPages(path.dirname(work)).find(page => path.posix.normalize(decodeURIComponent(page)) === rel);
+        if (sub) html = editedCaptionPage(path.dirname(work), sub, html);
+        // a scene played faster or slower: its frame scripts and timed elements follow its speed
+        if (editedSpeedPages(path.dirname(work)).some(page => path.posix.normalize(decodeURIComponent(page)) === rel)) html = withSpeedScripts(html);
       }
     } else {
       const tag = '<script src="/_ot/bridge.js"></script>';

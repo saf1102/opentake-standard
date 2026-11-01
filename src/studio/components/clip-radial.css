@@ -1,0 +1,69 @@
+/* ⌘ 点击素材的圆盘 (ClipRadial). Frosted glass; values open a panel on hover, actions run on click. */
+.clip-radial {
+  --cr-glass: #26282e9c; --cr-piece: #26282e8f; --cr-line: #ffffff1f; --cr-ink: #eef0f4; --cr-faint: #8e929b;
+  --cr-hot: #f5b316; --cr-hot-ink: #1d1404; --cr-red: #e5484d; --cr-panel: #232429b8; --cr-shadow: 0 18px 44px #0006;
+  position: fixed; inset: 0; z-index: 900; pointer-events: none; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+}
+html[data-ui-theme=warm] .clip-radial {
+  --cr-glass: #fffaf0a8; --cr-piece: #fffaf094; --cr-line: #5a46302e; --cr-ink: #302a24; --cr-faint: #8a7f71;
+  --cr-hot: #e9a516; --cr-hot-ink: #2b1d05; --cr-red: #c8423a; --cr-panel: #fbf5eac2; --cr-shadow: 0 18px 40px #4937223d;
+}
+.clip-radial-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.clip-radial-links path { fill: none; stroke: var(--cr-hot); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: .75; }
+.clip-radial-links path.reveal { stroke: #fff; stroke-width: 6; stroke-dasharray: none; opacity: 1; }
+.clip-radial-glass, .clip-radial-shadow { position: absolute; border-radius: 50%; transform-origin: var(--origin-x) var(--origin-y); }
+.clip-radial-shadow { box-shadow: var(--cr-shadow); }
+.clip-radial-glass { background: var(--cr-glass); backdrop-filter: blur(14px) saturate(1.25); -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  clip-path: circle(50% at 50% 50%); box-shadow: inset 0 0 0 1px var(--cr-line); }
+.clip-radial-disc { position: absolute; overflow: visible; pointer-events: none; }
+.clip-radial-piece { pointer-events: auto; cursor: pointer; }
+.clip-radial-piece path { fill: var(--cr-piece); stroke: var(--cr-line); stroke-width: 1; transition: fill .12s; }
+.clip-radial-piece text { fill: var(--cr-ink); font-size: 12px; font-weight: 600; text-anchor: middle; pointer-events: none; }
+.clip-radial-piece text.n { fill: var(--cr-faint); font-size: 9.5px; font-weight: 500; }
+.clip-radial-piece[data-danger] text { fill: var(--cr-red); }
+.clip-radial-piece[data-hot] path, .clip-radial-piece[data-open] path { fill: var(--cr-hot); stroke: transparent; }
+.clip-radial-piece[data-hot] text, .clip-radial-piece[data-open] text { fill: var(--cr-hot-ink); }
+.clip-radial-piece[data-hot][data-danger] path { fill: var(--cr-red); }
+.clip-radial-piece[data-hot][data-danger] text { fill: #fff; }
+.clip-radial-piece[aria-disabled] { cursor: default; opacity: .38; }
+.clip-radial-piece[aria-disabled] path { fill: var(--cr-piece) !important; }
+.clip-radial-piece[aria-disabled] text { fill: var(--cr-faint) !important; }
+.clip-radial-hub circle { fill: color-mix(in srgb, var(--cr-piece) 90%, transparent); stroke: var(--cr-hot); stroke-width: 1.5; }
+.clip-radial-hub text { fill: var(--cr-ink); font-size: 10.5px; font-weight: 700; text-anchor: middle; }
+.clip-radial-hub text.s { fill: var(--cr-faint); font-size: 10px; font-weight: 500; }
+.clip-radial-panel { position: absolute; width: 300px; padding: 14px 16px; border-radius: 12px; pointer-events: auto; color: var(--cr-ink);
+  background: var(--cr-panel); border: 1px solid var(--cr-line); box-shadow: var(--cr-shadow);
+  backdrop-filter: blur(14px) saturate(1.25); -webkit-backdrop-filter: blur(14px) saturate(1.25); animation: clip-radial-fade .16s ease-out both; }
+.clip-radial-panel h4 { margin: 0 0 10px; font-size: 13px; }
+.clip-radial-field p { margin: 8px 0 0; font-size: 11px; color: var(--cr-faint); }
+.clip-radial-field input[type=range] { width: 100%; accent-color: #9869dc; }
+.clip-radial-field textarea { width: 100%; resize: vertical; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--cr-line); background: #0000001f; color: var(--cr-ink); font: inherit; font-size: 13px; line-height: 1.5; outline: 0; }
+.clip-radial-value { font-size: 15px; font-weight: 700; color: #9869dc; font-variant-numeric: tabular-nums; }
+.clip-radial-marks { display: flex; justify-content: space-between; font-size: 10px; color: var(--cr-faint); }
+.clip-radial-row { display: grid; grid-template-columns: 32px 1fr 46px; align-items: center; gap: 8px; font-size: 12px; margin: 4px 0; }
+.clip-radial-row b { text-align: right; font-variant-numeric: tabular-nums; }
+.clip-radial-switch { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--cr-line); font-size: 12px; }
+.clip-radial-switch button { height: 24px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--cr-line); background: transparent; color: var(--cr-ink); font: inherit; cursor: pointer; }
+.clip-radial-switch button[aria-pressed=true] { background: var(--cr-hot); color: var(--cr-hot-ink); border-color: transparent; }
+
+/* 出现：0.5 秒内 —— 连线、毛玻璃从素材顶端长出、扇区从外圈依次汇聚、中心圆环画圈 */
+.clip-radial[data-phase=in] .clip-radial-links path.reveal { stroke-dasharray: 100; animation: clip-radial-draw .14s ease-out both; }
+.clip-radial[data-phase=in] :is(.clip-radial-glass, .clip-radial-shadow) { animation: clip-radial-grow .28s cubic-bezier(.2,.9,.25,1.1) both; }
+.clip-radial[data-phase=in] .clip-radial-piece { animation: clip-radial-gather .26s calc(.06s + var(--i) * 24ms) cubic-bezier(.2,1.2,.35,1) both; }
+.clip-radial[data-phase=in] .clip-radial-hub { animation: clip-radial-fade .16s .24s ease-out both; }
+.clip-radial[data-phase=in] .clip-radial-hub circle { stroke-dasharray: 100; animation: clip-radial-draw .2s .26s ease-out both; }
+/* 退出：倒着收回素材 */
+.clip-radial[data-phase=out] :is(.clip-radial-glass, .clip-radial-shadow) { animation: clip-radial-grow .18s ease-in reverse both; }
+.clip-radial[data-phase=out] :is(.clip-radial-piece, .clip-radial-hub, .clip-radial-panel, .clip-radial-links) { animation: clip-radial-leave .14s ease-in both; pointer-events: none; }
+@keyframes clip-radial-draw { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes clip-radial-grow { from { transform: scale(.08); opacity: 0; } 45% { opacity: 1; } to { transform: scale(1); opacity: 1; } }
+@keyframes clip-radial-gather { from { transform: translate(var(--dx), var(--dy)); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes clip-radial-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes clip-radial-leave { to { opacity: 0; transform: scale(.9); } }
+@media (prefers-reduced-motion: reduce) { .clip-radial * { animation-duration: .01s !important; animation-delay: 0s !important; } }
+
+/* the timeline while a disc is open: only the clip's own track stays sharp */
+[data-radial-dim] { filter: blur(1.6px); opacity: .32; transition: filter .22s ease-out, opacity .22s ease-out; pointer-events: none; }
+[data-radial-on].track-lane { background: color-mix(in srgb, #f5b316 7%, transparent); box-shadow: inset 3px 0 0 #f5b316; }
+[data-radial-on] .timeline-clip[data-radial-clip] { outline: 2px solid #f5b316; outline-offset: 1px; box-shadow: 0 0 24px #f5b31659; }
+.track-lane, .track-head { transition: filter .18s ease-out, opacity .18s ease-out; }

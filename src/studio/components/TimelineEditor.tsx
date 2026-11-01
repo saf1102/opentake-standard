@@ -1,5 +1,5 @@
 import {timelineHasCards, diagramCardTracks, cardSlotState, CARD_SLOT_LEGEND, CutRangeOverlay, voiceAnnotationsForClip, VoiceTimelineAnnotations, VoiceWaveform, MOTION_CARD_TIMELINE_LABELS, timelineClipAppearance, timelineClipLabel, presentationLayoutIntervals, librarySlotDropPreview, TimelineSmartTools, type CardTaskState, type PendingCut, type VoiceClipAnnotations, type LibrarySlotDropPreview, type SlotDropPreview} from '../timeline-edition';
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { timelineZoomShortcut } from '../timeline-shortcuts';
 import {volumeDb,volumeGain,volumeLabel,snapVolumeDb} from '../volume-db';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -60,6 +60,10 @@ import type {
   TimelineTrack,
 } from "@/types";
 import { FilmIcon } from "./StudioIcons";
+import { FIXED_TRACK_KINDS, copiedClips, copyTimelineClips, hasCopiedClips } from '../timeline-clipboard';
+import { ClipAudioHandles } from './ClipAudioHandles';
+import { ClipRadial, type RadialItem } from './ClipRadial';
+import './clip-speed.css';
 
 const TimelineMediaStrip = memo(function TimelineMediaStrip({
   projectId,
@@ -76,7 +80,7 @@ const TimelineMediaStrip = memo(function TimelineMediaStrip({
   voiceAnnotations?: VoiceClipAnnotations;
   pixelsPerSecond: number;
 }) {
-  if (!asset) return <b>{clip.name}</b>;
+  if (!asset) return <b>{clip.name}{clipSpeedLabel(clip)}</b>;
   const mediaWidth = Math.max(1, asset.duration * pixelsPerSecond);
   const offset = -clip.sourceStart * pixelsPerSecond;
   const sharedStyle = {
@@ -91,6 +95,7 @@ const TimelineMediaStrip = memo(function TimelineMediaStrip({
     <span
       className={`timeline-media-strip ${isAudioTrack ? "is-audio" : "is-video"}`}
       data-timeline-media={isAudioTrack ? "audio-waveform" : asset.type}
+      style={{ "--clip-gain-saved": clip.volume } as CSSProperties}
     >
       {showVideoFrames ? (
         <span
@@ -115,16 +120,19 @@ const TimelineMediaStrip = memo(function TimelineMediaStrip({
         />
       ) : null}
       {showWaveform ? (
-        <span
-          className={`timeline-waveform ${asset.waveformFile ? "" : "is-pending"}`}
-          style={{
-            ...sharedStyle,
-            ...(asset.waveformFile
-              ? { backgroundImage: `url(${mediaUrl(projectId, asset.id, "waveform")})` }
-              : {}),
-          }}
-          aria-hidden="true"
-        />
+        asset.waveformFile ? (
+          // the picture sits in its own layer so it can follow the clip's volume; the band behind it stays put
+          <>
+            <span className="timeline-waveform" aria-hidden="true">
+              <span className="timeline-waveform-img" style={{ ...sharedStyle, backgroundImage: `url(${mediaUrl(projectId, asset.id, "waveform")})` }} />
+            </span>
+            {/* outside the waveform so the themes' tints leave the orange alone */}
+            <span className="timeline-waveform-hot" aria-hidden="true">
+              <span style={{ WebkitMaskImage: `url(${mediaUrl(projectId, asset.id, "waveform")})`, maskImage: `url(${mediaUrl(projectId, asset.id, "waveform")})`,
+                WebkitMaskSize: sharedStyle.backgroundSize, maskSize: sharedStyle.backgroundSize, WebkitMaskPosition: sharedStyle.backgroundPosition, maskPosition: sharedStyle.backgroundPosition }} />
+            </span>
+          </>
+        ) : <span className="timeline-waveform is-pending" style={sharedStyle} aria-hidden="true" />
       ) : null}
       {trackKind === "voice" ? (
         <VoiceWaveform projectId={projectId} asset={asset} clip={clip} />
@@ -137,13 +145,29 @@ const TimelineMediaStrip = memo(function TimelineMediaStrip({
             pixelsPerSecond={pixelsPerSecond}
           />
         ) : null
-      ) : <b>{clip.name}</b>}
+      ) : <b>{clip.name}{clipSpeedLabel(clip)}</b>}
     </span>
   );
 });
 
 
 type TrackToggle = "hidden" | "locked" | "muted";
+
+const AUDIO_TRACK_KINDS = new Set(["voice", "source-bed", "music", "sfx"]);
+/** Clips whose sound can be faded and turned up or down from the timeline: audio, and footage that keeps its sound. */
+function clipSounds(track: TimelineTrack, clip: TimelineClip, media: MediaAsset[], fixed: ReadonlySet<string>) {
+  if (track.locked || fixed.has(track.kind) || clip.params.sound === false) return false;
+  if (AUDIO_TRACK_KINDS.has(track.kind)) return true;
+  if (!["video", "visual", "camera"].includes(track.kind)) return false;
+  return clip.params.sound === true || Boolean(media.find(asset => asset.id === clip.assetId)?.waveformFile);
+}
+
+/** A clip that plays faster or slower says so after its name (purple, like other reminders). */
+function clipSpeedLabel(clip: TimelineClip) {
+  const rate = Number(clip.params.playbackRate ?? clip.params.speed ?? 1);
+  if (!Number.isFinite(rate) || Math.abs(rate - 1) < 1e-3) return null;
+  return <em className="timeline-clip-speed"> · {rate < 1 ? rate.toFixed(2).replace(/0$/, '') : rate < 10 ? rate.toFixed(1).replace(/\.0$/, '') : Math.round(rate)}×</em>;
+}
 
 export function TimelineEditor({
   project,
@@ -152,6 +176,10 @@ export function TimelineEditor({
   onZoomChange,
   playhead,
   selectedClipIds,
+  onPasteClips,
+  fixedTrackKinds,
+  onClipAudio,
+  radialItems,
   draggingClip,
   resizingClip,
   snapGuide,
@@ -196,6 +224,14 @@ export function TimelineEditor({
   onZoomChange: (zoom: number) => void;
   playhead: number;
   selectedClipIds: string[];
+  /** ⌘V: the copied clips, the track under the pointer (if any) and the playhead to place them at. */
+  onPasteClips?: (clips: TimelineClip[], trackId: string | undefined, at: number) => void;
+  /** Track kinds ⌘C skips (the spoken edit's laid-out tracks by default). */
+  fixedTrackKinds?: ReadonlySet<string>;
+  /** Fade dots and volume line on sounding clips (not on the fixed tracks). */
+  onClipAudio?: (clipId: string, patch: Partial<Pick<TimelineClip, "volume" | "fadeIn" | "fadeOut">>) => void;
+  /** ⌘ 点击素材: what the disc offers for this clip (none: the click only zooms to it). */
+  radialItems?: (clip: TimelineClip, track: TimelineTrack) => RadialItem[] | undefined;
   draggingClip?: string;
   resizingClip?: string;
   snapGuide?: number;
@@ -292,6 +328,12 @@ export function TimelineEditor({
     if (!clipFocus || zoom !== clipFocus.zoom) return;
     timelineScrollRef.current?.scrollTo({left:Math.max(0,focusLeadingSpace+(clipFocus.start+clipFocus.duration/2)*42*zoom-clipFocus.viewport/2),behavior:'instant'});
   }, [clipFocus, zoom, focusLeadingSpace]);
+  // the disc opened by ⌘ 点击 (S先生 10-31); the other tracks blur while it is up
+  const [radial, setRadial] = useState<{ clipId: string; trackId: string } | null>(null);
+  const radialTrack = radial ? timeline.tracks.find(track => track.id === radial.trackId) : undefined;
+  const radialClip = radialTrack?.clips.find(clip => clip.id === radial?.clipId);
+  const radialList = radialClip && radialTrack && radialItems ? radialItems(radialClip, radialTrack) : undefined;
+  useEffect(() => { if (radial && !radialList?.length) setRadial(null); }, [radial, radialList?.length]);
   const focusClip = (clip:TimelineClip) => {
     const viewport=timelineScrollRef.current?.clientWidth || 900;
     const nextZoom=Math.max(MIN_TIMELINE_ZOOM,viewport/(3*42*Math.max(clip.duration,1/timeline.fps)));
@@ -375,6 +417,25 @@ export function TimelineEditor({
     onZoomChange(fitTimelineZoom(contentEnd, viewportWidth));
     timelineScrollRef.current?.scrollTo({ left: 0 });
   }, [contentEnd, onZoomChange]);
+
+  // ⌘C copies the selected clips; ⌘V puts them on the track under the pointer, at the playhead (S先生 10-31).
+  const hoveredTrackRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!onPasteClips) return;
+    const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+    const handleClipboard = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || typing(event.target)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'c') {
+        if (copyTimelineClips(timeline, selectedClipIds, fixedTrackKinds)) event.preventDefault();
+      } else if (key === 'v' && hasCopiedClips()) {
+        event.preventDefault();
+        onPasteClips(copiedClips(), hoveredTrackRef.current, playhead);
+      }
+    };
+    window.addEventListener('keydown', handleClipboard);
+    return () => window.removeEventListener('keydown', handleClipboard);
+  }, [onPasteClips, fixedTrackKinds, selectedClipIds, timeline.tracks, playhead]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -658,6 +719,7 @@ export function TimelineEditor({
           </span>)}
         </div>
       </div>}
+      {radial && radialClip && radialList && radialList.length > 0 ? <ClipRadial key={radial.clipId} clipId={radial.clipId} title={radialClip.name} items={radialList} onClose={() => setRadial(null)} /> : null}
       <div className="timeline-body">
         <div className="track-heads" style={{ gridTemplateRows: timelineTrackRows }}>
           <div className="ruler-spacer" />
@@ -665,6 +727,7 @@ export function TimelineEditor({
             <div
               className={`track-head track-head--${track.kind}`}
               key={track.id}
+              data-radial-dim={radialList && !track.clips.some(c => c.id === radial?.clipId) ? '' : undefined}
             >
               <span>
                 {track.kind === "subtitle" ? (
@@ -729,6 +792,10 @@ export function TimelineEditor({
                 className={`track-lane track-lane--${track.kind} ${activeDropTargetTrackId === track.id ? "is-drop-target" : ""}`}
                 key={track.id}
                 data-studio-track-id={track.id}
+                data-radial-dim={radialList && !track.clips.some(c => c.id === radial?.clipId) ? '' : undefined}
+                data-radial-on={radialList && track.clips.some(c => c.id === radial?.clipId) ? '' : undefined}
+                onPointerMove={() => { hoveredTrackRef.current = track.id; }}
+                onPointerLeave={() => { if (hoveredTrackRef.current === track.id) hoveredTrackRef.current = undefined; }}
                 onDragOver={(event) => handleMediaDragOver(event, track)}
                 onDragLeave={(event) => {
                   if (event.currentTarget.contains(event.relatedTarget as Node)) return;
@@ -767,6 +834,7 @@ export function TimelineEditor({
                   <button
                     key={clip.id}
                     data-timeline-clip-id={clip.id}
+                    data-radial-clip={radial?.clipId === clip.id ? '' : undefined}
                     data-card-state={state?.kind}
                     data-motion-card-type={(track.kind === "overlay" || track.kind === "enhanced") && "cardType" in appearance
                       ? appearance.cardType
@@ -807,6 +875,7 @@ export function TimelineEditor({
                       if (event.metaKey && event.button === 0) {
                         event.preventDefault();
                         focusClip(clip);
+                        if (radialItems && !actualTrack.locked && !clip.params.layoutSlot && !clip.params.timelineGap && radialItems(clip, actualTrack)?.length) setRadial({ clipId: clip.id, trackId: actualTrack.id });
                         return;
                       }
                       if (suppressTimelineClickRef.current) return;
@@ -905,8 +974,10 @@ export function TimelineEditor({
                         <b>{clip.params.layoutSlot && !clip.params.edited ? "" : timelineClipLabel(track.kind, clip, Boolean(state))}</b>
                       </>
                     ) : (
-                      <b>{clip.params.layoutSlot && !clip.params.edited ? "" : timelineClipLabel(track.kind, clip, Boolean(state))}</b>
+                      <b>{clip.params.layoutSlot && !clip.params.edited ? "" : timelineClipLabel(track.kind, clip, Boolean(state))}{generalTools ? clipSpeedLabel(clip) : null}</b>
                     ))}
+                    {onClipAudio && displayMode === "media" && clipSounds(track, clip, project.media, fixedTrackKinds ?? FIXED_TRACK_KINDS) &&
+                      <ClipAudioHandles clip={clip} width={clip.duration * pixelsPerSecond} onChange={patch => onClipAudio(clip.id, patch)} />}
                     {layoutIntervals.slice(1).map(interval=>interval.start)
                       .map(point=><span key={`layout-${point}`} className="timeline-clip-layout-boundary" style={{left:`${(point-clip.start)/clip.duration*100}%`}} title="布局区间边界；原素材未切割" aria-hidden="true" />)}
                     {(Boolean(generalTools) || track.kind === 'overlay' || track.kind === 'enhanced' || ((track.kind === 'visual' || track.kind === 'camera') && clip.assetId)) && <span

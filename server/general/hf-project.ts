@@ -9,6 +9,8 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { parseHTML } from 'linkedom';
+import { fadesOf } from './hf-timeline.ts';
+import { anchorSounds } from '../../src/general/hf-anchor.ts';
 import { isTimedElement, topLevelElements, trackKindOf, type StructureNode } from '@hyperframes/parsers';
 import { TimelineSchema, type Timeline, type TimelineClip, type TrackKind } from '../../src/types/editor.ts';
 import type { GeneralLayers, GeneralMedia } from '../../src/general/general-contract.ts';
@@ -27,7 +29,9 @@ export type HfClip = {
   hfId: string; elementId: string; tag: string; kind: 'video' | 'audio' | 'captions' | 'graphics'; role: string;
   start: number; duration: number; mediaStart: number; src: string; sub: string; volume: number; label: string;
   /** a video whose own sound is heard (HyperFrames: data-has-audio, and not muted) */
-  hasAudio: boolean; rate: number;
+  hasAudio: boolean; rate: number; automation?: string;
+  /** the scene this sound belongs to, when the page names one (data-ot-scene) */
+  scene?: string;
 };
 
 async function mediaSeconds(file: string) {
@@ -52,6 +56,7 @@ export async function readHyperframes(work: string) {
       hfId: a['data-hf-id'] || a.id || `${tag}-${clips.length}`, elementId: a.id ?? '', tag, kind, role: (a['data-ot-role'] ?? '').toLowerCase(),
       start, duration, mediaStart, src, sub: a['data-composition-src'] ?? '', volume: num(a['data-volume'], 1),
       hasAudio: tag === 'audio' || (tag === 'video' && a['data-has-audio'] === 'true' && a.muted === undefined), rate: num(a['data-playback-rate'], 1),
+      ...(a['data-automation'] ? { automation: a['data-automation'] } : {}), ...(a['data-ot-scene'] ? { scene: a['data-ot-scene'] } : {}),
       label: a['data-label'] || a['aria-label'] || a.id || (src ? path.basename(src, path.extname(src)) : tag),
     });
   }
@@ -77,22 +82,83 @@ const LANES: [string, string, TrackKind][] = [
   ['g-voice', '配音', 'voice'], ['g-music', '配乐', 'music'], ['g-sfx', '音效', 'sfx'],
 ];
 
+/** One line of a caption page: a timed element of its own, its words written in it (seconds from the page's start). */
+export type CaptionLine = { hfId: string; elementId: string; start: number; duration: number; text: string };
+const textOf = (el: Element): string => [...el.childNodes].map(n => (n.nodeName.toLowerCase() === 'br' ? '\n' : n.textContent ?? '')).join('').trim();
+
+/**
+ * The lines of caption page `sub` (S先生 10-31, 时间线解锁第二期: 字幕一句一条): each timed element of the page's
+ * composition with words in it. None when the page draws its words some other way (a script, one block of text).
+ */
+export function captionLines(work: string, sub: string): CaptionLine[] {
+  let html: string;
+  try { html = fs.readFileSync(path.join(work, decodeURIComponent(sub)), 'utf8'); } catch { return []; }
+  const page = parseHTML(html).document, template = page.querySelector('template');
+  const document = template ? parseHTML(`<!doctype html><html><body>${template.innerHTML}</body></html>`).document : page;
+  const root = document.querySelector('[data-composition-id]');
+  if (!root) return [];
+  const lines: CaptionLine[] = [];
+  for (const el of root.querySelectorAll('[data-start]')) {
+    const outer = el.parentElement?.closest('[data-start]');
+    const id = el.getAttribute('data-hf-id'), text = textOf(el);
+    if ((outer && outer !== root && root.contains(outer)) || !id || !text || el.querySelector('[data-start]')) continue;
+    lines.push({ hfId: id, elementId: el.id ?? '', start: num(el.getAttribute('data-start')), duration: num(el.getAttribute('data-duration'), 0), text });
+  }
+  return lines.filter(line => line.duration > 0);
+}
+
+/**
+ * A caption page's clip shown as its lines, one clip each, so the person moves, trims, deletes, copies and rewrites
+ * one line (hf-timeline.ts writes them back into the page). `hosts`: for the person's edits of a version read before
+ * lines existed, the caption clips as the agent delivered them; the lines follow where the person put the whole page.
+ * Returns whether anything changed.
+ */
+export function expandCaptionLines(timeline: Timeline, work: string, hosts?: Map<string, TimelineClip>): boolean {
+  const track = timeline.tracks.find(t => t.id === 'g-text');
+  if (!track) return false;
+  let changed = false;
+  track.clips = track.clips.flatMap(clip => {
+    if (clip.params.hf !== true || typeof clip.params.sub !== 'string' || clip.params.line === true) return [clip];
+    const lines = captionLines(work, clip.params.sub);
+    if (!lines.length) return [clip];
+    changed = true;
+    const delivered = hosts?.get(clip.id) ?? clip, shift = clip.start - delivered.start, end = clip.start + clip.duration;
+    const words = (clip.params.textEdits ?? {}) as Record<string, string>;
+    return lines.filter(line => delivered.start + line.start + shift < end - 1e-3).map(line => {
+      const text = words[line.hfId] ?? line.text;
+      return {
+        ...structuredClone(clip), id: line.hfId, name: text.split('\n')[0], text,
+        start: delivered.start + line.start + shift, duration: line.duration, sourceStart: 0, fadeIn: 0, fadeOut: 0,
+        params: { hf: true, hfId: line.hfId, line: true, host: clip.id, sub: clip.params.sub, hostStart: delivered.start, hostDuration: delivered.duration,
+          element: line.elementId, tag: 'div', original: line.text },
+      } as TimelineClip;
+    });
+  });
+  return changed;
+}
+
 /** The version's tracks. `base` is the snapshot folder relative to the project (where index.html is served from). */
 export async function hyperframesToLayers(work: string, base: string, media: GeneralMedia[], fps = 30): Promise<GeneralLayers> {
   const film = await readHyperframes(work);
   const byFile = new Map(media.map(m => [m.file ?? '', m]));
   const toClip = (c: HfClip, trackId: string): TimelineClip => {
-    const asset = byFile.get(path.basename(c.src));
+    const asset = byFile.get(path.basename(c.src)), media = c.tag === 'audio' || c.tag === 'video';
     return {
-      id: c.hfId, trackId, name: c.label, start: c.start, duration: Math.max(1 / fps, c.duration), sourceStart: c.mediaStart, volume: c.volume, fadeIn: 0, fadeOut: 0,
+      id: c.hfId, trackId, name: c.label, start: c.start, duration: Math.max(1 / fps, c.duration), sourceStart: c.mediaStart, volume: c.volume, ...fadesOf(c.automation, c.duration),
       ...(asset ? { assetId: asset.id } : {}),
-      params: { hf: true, hfId: c.hfId, element: c.elementId, tag: c.tag, ...(c.src ? { src: c.src } : {}), ...(c.sub ? { sub: c.sub } : {}), ...(c.role ? { role: c.role } : {}) },
+      // sound and speed the timeline edits (hf-timeline.ts writes them back): the stretch of source a media clip plays
+      ...(media ? { sourceDuration: c.duration * (c.rate || 1) } : {}),
+      params: { hf: true, hfId: c.hfId, element: c.elementId, tag: c.tag, ...(c.src ? { src: c.src } : {}), ...(c.sub ? { sub: c.sub } : {}), ...(c.role ? { role: c.role } : {}),
+        ...(media && c.rate !== 1 ? { speed: c.rate } : {}), ...(c.tag === 'video' ? { sound: c.hasAudio } : {}) },
     } as TimelineClip;
   };
   const lanes = new Map(LANES.map(([id]) => [id, [] as TimelineClip[]]));
   for (const c of film.clips) { const lane = laneOf(c, film.duration); lanes.get(lane)!.push(toClip(c, lane)); }
   const tracks = LANES.map(([id, name, kind], order) => ({ id, name, kind, order, locked: false, hidden: false, muted: false, hiddenInEditor: false, automation: [], clips: lanes.get(id)! }));
   const timeline: Timeline = TimelineSchema.parse({ duration: film.duration, fps, playhead: 0, tracks });
+  // a caption page is shown line by line; narration and effects move with their scene (hf-anchor.ts)
+  expandCaptionLines(timeline, work);
+  anchorSounds(timeline, new Map(film.clips.filter(c => c.scene).map(c => [c.hfId, c.scene!])));
   // the strip of parts under the preview: the 动效卡 one after another (overlapping cards fold into the first)
   const segments: GeneralLayers['segments'] = [];
   for (const c of [...lanes.get('g-page')!].sort((a, b) => a.start - b.start)) {

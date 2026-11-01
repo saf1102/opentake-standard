@@ -21,7 +21,7 @@ export function effectiveChoice(choice: AgentChoice, models: AgentModel[]): Effe
   return { ...(choice.agent?{agent:choice.agent}:{}), model: model.id, effort, ...(moved ? { requested: { ...choice } } : {}) };
 }
 export type AgentCatalog = { executable: string; cliVersion: string; models: AgentModel[]; checkedAt: string };
-export type AgentRun = { agent?:AgentConnectionId;method?:ConnectionMode; purpose?: 'connectivity'; id: string; module: AgentModule; executable: string; model: string; effort: string; requested?: AgentChoice; startedAt: string; durationMs?: number; status: 'running'|'completed'|'failed'; reportedModel?: string; reportedEffort?: string; error?: string };
+export type AgentRun = { agent?:AgentConnectionId;method?:ConnectionMode;transport?:'acp';errorKind?:string;errorExcerpt?:string;modelSelection?:'selected'|'default';projectId?:string;filmRunId?:string;usage?:{total?:number;input:number;cached:number;output:number;reasoning:number}; purpose?: 'connectivity'; id: string; module: AgentModule; executable: string; model: string; effort: string; requested?: AgentChoice; startedAt: string; durationMs?: number; status: 'running'|'completed'|'failed'; reportedModel?: string; reportedEffort?: string; error?: string };
 export type AgentSettingsView = { settings: AgentSettings; catalog: AgentCatalog | null; catalogError?: string; runs: AgentRun[] };
 export function defaultAgentSettings(): AgentSettings {
   return { version: 1, allowRemoteAi: false, cliPath: '', modules: Object.fromEntries(AGENT_MODULES.map(m => [m.id, { model: FOLLOW_DEFAULT, effort: 'medium' }])) as AgentSettings['modules'] };

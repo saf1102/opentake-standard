@@ -1,4 +1,5 @@
 import {useSyncExternalStore} from 'react';
+import type {ConnectionId,ConnectionMode,ConnectionView} from '../studio/connections';
 
 /** 一键部署：the rows of the check, the order they are shown and checked in, and which ones must pass before work starts. */
 export type CheckState='ok'|'warn'|'act'|'opt';
@@ -33,6 +34,13 @@ export async function recheck(id:DeployItemId){
  try{const result=await fetchCheck(id);setRow(id,result.state,result);return result}
  catch(error){const result:CheckResult={id,state:'warn',text:`这一项没查成：${error instanceof Error?error.message:String(error)}`};setRow(id,'warn',result);return result}
 }
+/** Update the shared deployment summary from an already checked connection, without probing every agent again. */
+export function syncDeployConnections(connections:ConnectionView[]){
+ if(!connections.length)return;
+ const agents=connections.filter(item=>item.kind==='agent'),ready=agents.filter(item=>item.enabled&&item.connected&&item.cliInstalled&&item.heavySupported);
+ const result:CheckResult={id:'agent',state:ready.length?'ok':'act',text:`找到 ${agents.filter(item=>item.cliInstalled).length} 个，已接通 ${agents.filter(item=>item.connected).length} 个${ready.length?'':'；出片需接通 Codex 或 Claude Code'}`,agents:agents.map(item=>({id:item.id,name:item.name,line:item.cliInstalled?'已找到命令行':'没找到命令行',state:item.connected?'on':item.cliInstalled?'found':'off',status:item.connected?'已接通':item.cliAuthMessage||'未接通'})),action:{kind:'settings',label:'管理智能体',target:'agents'}};
+ setRow('agent',result.state,result);
+}
 let current:Promise<void>|null=null;
 /** One row at a time, each result written into its own row: the list never redraws or jumps. */
 export function runAll(){
@@ -61,4 +69,5 @@ export async function onboardingSeen(){try{const r=await fetch('/api/editor/onbo
 export async function markOnboardingSeen(){try{await fetch('/api/editor/onboarding/seen',{method:'POST'})}catch{/* shown again next time */}}
 
 /** Opens a settings group from outside the settings dialog. */
-export const openSettings=(group:string)=>window.dispatchEvent(new CustomEvent('opentake:open-settings',{detail:{group}}));
+export type OpenSettingsDetail={group:string;agentId?:ConnectionId;fromDeploy?:boolean;mode?:ConnectionMode};
+export const openSettings=(group:string,agentId?:ConnectionId,fromDeploy=false,mode?:ConnectionMode)=>window.dispatchEvent(new CustomEvent<OpenSettingsDetail>('opentake:open-settings',{detail:{group,agentId,fromDeploy,mode}}));

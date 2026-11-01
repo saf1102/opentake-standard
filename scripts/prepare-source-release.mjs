@@ -8,6 +8,11 @@ import {fileURLToPath} from 'node:url';
 export const PUBLIC_REPOSITORY='saf1102/opentake-standard';
 
 export function releaseNotes(version){
+ // 发布说明从随源码冻结的 README 同版本记录读取，避免下个版本落回旧文案。
+ const readme=fs.readFileSync(new URL('../README.md',import.meta.url),'utf8');
+ const heading='## '+version+' 更新\n';
+ const start=readme.indexOf(heading);
+ if(start>=0)return readme.slice(start+heading.length).split(/\n## /,1)[0].trim();
  return `OpenTake Standard ${version} · 优化流程，提高生片速度
 仅支持 macOS（Apple 芯片）；Windows 适配中，暂不支持。
 通用剪辑出片更快，进度实时显示；导出统一为画质、编码（H.264 / HEVC / ProRes）和帧率三组选项。

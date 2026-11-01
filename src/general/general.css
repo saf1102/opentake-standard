@@ -274,7 +274,7 @@ html[data-ui-theme=warm] .ge-play { background:#40362b;color:#fff8e9; }
 .ge-fold[aria-expanded=true] > svg:last-child { transform:rotate(180deg); }
 .ge-runbox { display:flex;flex-direction:column;gap:12px; }
 .ge-runnote { display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:12px;border-radius:10px;border:1px solid var(--ge-line);background:var(--ge-chip);font-size:12.5px;line-height:1.6;color:var(--ge-ink2); }
-.ge-runnote[data-tone=failed] p { color:var(--ge-red); }
+.ge-runnote[data-tone=failed] p { color:#9869dc; }
 .ge-runnote p { margin:0; }
 .ge-soft { display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:1px solid var(--ge-line2);border-radius:8px;background:none;font-size:12.5px;font-weight:600;color:var(--ge-ink2);cursor:pointer; }
 .ge-soft:hover:not(:disabled) { color:var(--ge-ink);background:var(--ge-hover); }
@@ -513,3 +513,26 @@ html[data-ui-theme=warm] .ge-play { background:#40362b;color:#fff8e9; }
 @keyframes ge-from-in { from { opacity:0; transform:translateY(8px); } }
 @media (prefers-reduced-motion:reduce) { .ge-from { animation:none; } }
 .ge-from-note { margin:0 0 8px; font-size:12.5px; color:#9869dc; }
+
+/* 任务24：失败续接的提醒用亮紫，琥珀仅用于推荐的主动作。 */
+.ge-failover { border:1px solid #9869dc;background:#9869dc24;border-radius:12px;padding:14px;gap:10px;overflow-wrap:anywhere; }
+.ge-failover > b { color:#9869dc;font-size:13.5px;font-weight:600; }
+.ge-runnote.ge-failover > p { color:var(--ge-ink2); }
+.ge-failover-actions { display:flex;gap:8px;flex-wrap:wrap;align-items:center; }
+.ge-failover-button { min-height:32px;padding:5px 13px;border:1px solid var(--ge-line2);border-radius:8px;background:var(--ge-raise);color:var(--ge-ink);font-size:12px;cursor:pointer; }
+.ge-failover-button.primary { background:#f5b316;color:#1d1404;border-color:transparent;font-weight:650; }
+.ge-failover-button.later { background:transparent;border-color:transparent;padding-inline:6px;color:var(--ge-muted); }
+.ge-failover-button:disabled { opacity:.5;cursor:default; }
+.ge-failover small { font-size:12px;color:var(--ge-muted); }
+.ge-failover small.ge-failover-notice { color:#9869dc; }
+.ge-failover-notice button { border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer; }
+html[data-ui-theme=warm] .ge-failover { background:#9869dc1c; }
+html[data-ui-theme=warm] .ge-failover-button.primary { background:#e9a516;color:#2b1d05; }
+.ge-agent[data-failover] .ge-step[data-tone=failed] .ic { color:#9869dc; }
+.ge-agent[data-failover] .ge-ahead .st i[data-tone=failed] { background:#9869dc; }
+.ge-agent[data-failover] .ge-ahead .st[data-tone=failed],
+.ge-agent[data-failover] .ge-ahead .st[data-tone=wait],
+.ge-agent[data-failover] .ge-retry { color:#9869dc; }
+.ge-agent[data-failover] .ge-ahead .st i[data-tone=wait] { background:#9869dc; }
+.ge-runnote.ge-failover > .ge-failover-reason, .ge-failover-reason a { color:#9869dc; }
+.ge-failover-reason a { text-decoration:underline;text-underline-offset:3px; }

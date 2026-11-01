@@ -1,8 +1,10 @@
 import {sampleArgs} from '../../../shared/browser-launch.cjs';
 // hfx — OpenTake's tools for a HyperFrames film, usable inside the agent's sandbox (offline, nothing to install, no port).
-//   hfx check        HyperFrames' own lint, plus OpenTake's rules: every visual change is its own clip, sound has a role
+//   hfx check        HyperFrames' own lint, plus OpenTake's rules: every visual change is its own clip, sound has a role,
+//                    every sound effect is its own clip
 //   hfx look [n]     n frames (default 12), drawn exactly as OpenTake's export draws them, tiled into look/sheet.jpg
 import {sampleBrowser, sampleResponse, sampleFontStatus} from './hfx-support.mjs';
+import {MIXED_SECONDS, MIXED_SOUNDS, soundBursts} from './lib/sound-bursts.mjs';
 import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url'; import { createRequire } from 'node:module'; import { execFileSync } from 'node:child_process';
 const NM = process.env.CW_NODE_MODULES, BIN = process.env.LINKREADER_BIN_DIR, CHROME = process.env.CW_CHROME;
 const root = process.env.CW_WORK || process.cwd(), [cmd, arg] = process.argv.slice(2);
@@ -30,7 +32,7 @@ async function clips() {
   const node = el => ({ tag: el.tagName.toLowerCase(), attrs: Object.fromEntries([...el.attributes].map(a => [a.name, a.value])), children: [...el.children].map(node) });
   const rootEl = document.querySelector('[data-composition-id]');
   if (!rootEl) { say('index.html 里没有根节点（data-composition-id）'); process.exit(1); }
-  return { rootEl, list: topLevelElements(node(rootEl)).filter(isTimedElement).map(n => ({ id: n.attrs.id || n.attrs['data-hf-id'] || n.tag, kind: trackKindOf(n).kind, role: n.attrs['data-ot-role'] || '', start: +n.attrs['data-start'] || 0, dur: +n.attrs['data-duration'] || 0, sub: !!n.attrs['data-composition-src'] })) };
+  return { rootEl, list: topLevelElements(node(rootEl)).filter(isTimedElement).map(n => ({ id: n.attrs.id || n.attrs['data-hf-id'] || n.tag, kind: trackKindOf(n).kind, role: n.attrs['data-ot-role'] || '', start: +n.attrs['data-start'] || 0, dur: +n.attrs['data-duration'] || 0, sub: !!n.attrs['data-composition-src'], subSrc: n.attrs['data-composition-src'] || '', src: n.attrs.src || '', from: +n.attrs['data-media-start'] || 0 })) };
 }
 
 if (cmd === 'check') {
@@ -49,8 +51,31 @@ if (cmd === 'check') {
   const long = graphics.filter(g => g.dur > limits(total).max);
   if (long.length) problems.push(`这些画面片段太长，要按画面变化拆开：${long.map(g => `${g.id}（${g.dur.toFixed(1)} 秒）`).join('、')}`);
   for (const a of by('audio')) if (!/^(voice|music|sfx)$/.test(a.role)) problems.push(`声音片段 ${a.id} 要标 data-ot-role="voice|music|sfx"`);
+  // a sound-effect strip that is really several effects: the person can't move or drop one of them
+  for (const a of by('audio').filter(a => a.role === 'sfx' && a.dur > MIXED_SECONDS && a.src)) {
+    const file = path.join(root, decodeURIComponent(a.src));
+    if (!fs.existsSync(file)) continue;
+    const found = await soundBursts(tool('ffmpeg'), file, a.from, a.dur).catch(() => []);
+    if (found.length >= MIXED_SOUNDS) problems.push(`音效 ${a.id}（${a.start}–${+(a.start + a.dur).toFixed(2)} 秒）里有 ${found.length} 声，要拆成 ${found.length} 个 <audio data-ot-role="sfx">，每声一个、data-start 写它响起的那一秒（这条里大约在 ${found.map(b => +(a.start + b.start).toFixed(2)).join('、')} 秒）`);
+  }
+  // captions line by line: each line a timed element of the caption page with its words in it
+  for (const c of by('captions').filter(c => c.sub && c.src === '')) {
+    const file = path.join(root, decodeURIComponent(c.subSrc));
+    if (!fs.existsSync(file)) continue;
+    const { parseHTML } = await imp('linkedom/esm/index.js');
+    const page = parseHTML(fs.readFileSync(file, 'utf8')).document, template = page.querySelector('template');
+    const doc = template ? parseHTML(`<!doctype html><html><body>${template.innerHTML}</body></html>`).document : page;
+    const lines = [...doc.querySelectorAll('[data-composition-id] [data-start]')].filter(el => el.textContent.trim() && !el.querySelector('[data-start]'));
+    if (!lines.length) problems.push(`字幕页 ${c.subSrc} 要一句一个带 data-start/data-duration 的 .clip 元素、字直接写在里面（不要用脚本生成），用户要能一句一条地改`);
+  }
+  // narration per scene: one recording over the whole film can't follow the scenes when they move
+  for (const v of by('audio').filter(a => a.role === 'voice')) {
+    const covered = graphics.filter(g => g.start >= v.start - 0.05 && g.start + g.dur <= v.start + v.dur + 0.05);
+    if (covered.length >= 2) say(`提醒：旁白 ${v.id} 跨了 ${covered.length} 段画面，最好按画面段分开（同一个文件用 data-media-start 取各段）`);
+  }
   for (const f of findings.filter(f => f.severity === 'warning').slice(0, 12)) say(`提醒 ${f.code}: ${f.message}`);
-  if (problems.length) { say(`切段完整规则：至少 ${limits(total).min} 个画面子页面；每段最多 ${limits(total).max} 秒。先按画面变化规划全部片段，可用 hfx plan ${total} 查看时间骨架。`); say('', '要改：', ...problems.map(p => `- ${p}`)); process.exit(1); }
+  if (problems.length) { if (graphics.length < limits(total).min || long.length) say(`切段完整规则：至少 ${limits(total).min} 个画面子页面；每段最多 ${limits(total).max} 秒。先按画面变化规划全部片段，可用 hfx plan ${total} 查看时间骨架。`);
+    say('', '要改：', ...problems.map(p => `- ${p}`)); process.exit(1); }
   say('', '检查通过');
 } else if (cmd === 'look') {
   const n = Math.max(1, Math.min(48, Number(arg) || 12));

@@ -29,7 +29,7 @@ for (const platform of ['MacIntel','Win32']) test(`任务17：${platform} 工程
    await h.act(async()=>standard.click());assert.equal(picked.at(-1),undefined);
   }else{
   assert.match(document.body.textContent||'',/Claude Code/);assert.doesNotMatch(document.body.textContent||'',/DeepSeek/);
-  const kimi=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Kimi'));assert.equal(kimi?.disabled,true);assert.match(kimi?.textContent||'',/仅轻活/);
+  const kimi=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Kimi'));assert.equal(kimi,undefined,'任务24只列可出片接法；这个Kimi仅API且未安装');
   const claude=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Claude Code'));assert.ok(claude);await h.act(async()=>claude.click());assert.deepEqual(picked.at(-1),{agent:'claude',model:'default',effort:'medium'});
   claudeEnabled=false;await h.act(async()=>{window.dispatchEvent(new dom.window.Event('opentake-connections-changed'));await new Promise(r=>setTimeout(r,5))});assert.doesNotMatch(document.body.textContent||'',/Claude Code/);
   assert.ok(connectionRequests>0);

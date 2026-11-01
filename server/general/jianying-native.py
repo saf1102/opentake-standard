@@ -3,7 +3,7 @@ def populate(script,m,res,jy):
     g=m['generalLayers']; film=g['film']; us=lambda x:round(x*1e6)
     lanes={}; labels={'footage':'通用素材','picture':'通用画面页','textVideos':'通用文字','voice':'通用旁白','music':'通用配乐','sfx':'通用音效','finish':'通用整片效果','source':'通用素材原声'}
     from timing import non_overlapping_lanes
-    g['_reverse']=[]
+    g['_reverse']=[]; g['_textOrder']={}
     for kind in labels:
         items=g.get(kind,[])
         for n,items in enumerate([[item] for item in items] if kind=='textVideos' else non_overlapping_lanes(items)):
@@ -25,6 +25,7 @@ def populate(script,m,res,jy):
                         settings=jy.ClipSettings(scale_x=scale,scale_y=scale,transform_x=-(fx-.5)*ox/(w/2),transform_y=(fy-.5)*oy/(h/2))
                     seg=jy.VideoSegment(str(res/item['file']),timerange,source_timerange=source,volume=0,clip_settings=settings)
                     if item.get('reverse'):g['_reverse'].append(seg.segment_id)
+                    if kind=='textVideos':g['_textOrder'][seg.segment_id]=item.get('renderOrder',n)
                     if kind=='footage':
                         following=next((s for s in film['segments'][1:] if abs(us(s['start'])-(item['start']+item['duration']))<=2),None)
                         if following and following['transition'] in ('dissolve','dip-black','dip-white'):
@@ -50,5 +51,6 @@ def decorate(content,m,res):
             r+=text_index; text_index+=1
         if r:
             for seg in track['segments']:
-                seg['render_index']=r*1000;seg['track_render_index']=r
+                layer=70000+g['_textOrder'].get(seg['id'],text_index-1) if track['name'].startswith('通用文字') else r
+                seg['render_index']=layer*1000;seg['track_render_index']=layer
                 if seg['id'] in g['_reverse']:seg['reverse']=True

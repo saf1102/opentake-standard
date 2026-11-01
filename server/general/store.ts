@@ -1,3 +1,4 @@
+import {AGENT_CONNECTION_IDS} from '../../shared/agent-connections.ts';
 import {canCreateLegacyProjectRoot} from './edition.ts';
 /**
  * 通用剪辑工程的存储。每个工程是共享工程根目录下的一个文件夹，里面放 general-project.json：
@@ -123,11 +124,11 @@ const text = (value: unknown, max: number, label: string) => {
 
 const EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
 /** null or absent: 系统默认; else a model id and one of the efforts (the catalog check is the runner's, at each turn) */
-function parseAgent(value: unknown): GeneralAgentChoice | undefined {
+export function parseAgent(value: unknown): GeneralAgentChoice | undefined {
   if (value === null || value === undefined) return undefined;
   const v = value as Record<string, unknown>;
-  if (typeof v !== 'object' || typeof v.model !== 'string' || !/^[a-zA-Z0-9._\/:_-]{1,120}$/.test(v.model) || typeof v.effort !== 'string' || !EFFORTS.includes(v.effort)) throw Object.assign(new Error('模型或推理强度不对'), { status: 400 });
-  if (v.agent !== undefined && !['codex','claude','kimi','deepseek','minimax','codebuddy'].includes(String(v.agent))) throw Object.assign(new Error('智能体不在接入列表里'), {status:400});
+  if (typeof v !== 'object' || typeof v.model !== 'string' || !/^[a-zA-Z0-9._\/:_,-]{1,120}$/.test(v.model) || typeof v.effort !== 'string' || !EFFORTS.includes(v.effort)) throw Object.assign(new Error('模型或推理强度不对'), { status: 400 });
+  if (v.agent !== undefined && !(AGENT_CONNECTION_IDS as readonly string[]).includes(String(v.agent))) throw Object.assign(new Error('智能体不在接入列表里'), {status:400});
   return { model: v.model, effort: v.effort, ...(v.agent ? {agent:v.agent as GeneralAgentChoice['agent']} : {}) };
 }
 

@@ -12,8 +12,11 @@
 - **根页面是 `index.html`**。根节点（`data-composition-id`）下面只放带时间的片段：
   - 用户的视频是 `<video>` 片段，要保留原声就写 `data-has-audio="true"`；
   - **每一次画面变化**（一组字、一张卡、一套色块编排、一个演示步骤）各是一个画面片段，做成子页面（`compositions/*.html`，用 `data-composition-src` 挂在根节点上，标 `data-track-kind="graphics"`）。不要把整片动效写在一个元素或一条时间线里，用户要能逐段改；
-  - 字幕放在一条 `data-track-kind="captions"` 的字幕轨上；
+  - 字幕放在一条 `data-track-kind="captions"` 的字幕轨上：一个字幕子页面（`compositions/captions.html`），**每句一个带 `data-start`、`data-duration` 的 `.clip` 元素**（时间从字幕片段第 0 秒算），字直接写在元素里，换行用 `<br>`；不要用脚本生成字幕、不要把几句写进一个元素。用户在编辑页里一句一条地挪、删、改字。每句的入场动画用 CSS `animation`，它从这一句自己的起点开始算；
   - 每个 `<audio>` 标 `data-ot-role`：`voice`（旁白）、`music`（配乐）或 `sfx`（音效）。配乐、音效、旁白分开放，不要混成一个文件。
+  - **音效一声一段**：每一声（一下锣、一记鼓、一阵风起）各是一个 `<audio data-ot-role="sfx">`，`data-start` 写它响起的那一秒，`data-duration` 写这一声的长度；文件放 `assets/sfx/`，同一个文件可以挂多次。不要把几声排进一个长文件、铺满整片——用户要能单独挪、删、调某一声。持续的环境声（雨、风、人群）可以是一段长 `<audio>`，只铺它所在的那几段画面。用 `sfx.py` 合成时，每声单独写一个 WAV。
+  - **旁白按画面段分**：每段画面的旁白一个 `<audio data-ot-role="voice">`，放在那段画面的时间里；一整条录音就用 `data-media-start` 从同一个文件里取各段。
+  - 旁白和音效归它起点所在的那段画面，用户挪画面时它们跟着走；要归到别的画面（比如提前半拍进的转场声），写 `data-ot-scene="<那段画面片段的 id>"`。
 - **元素编号**：交付后 OpenTake 会给每个元素加上 `data-hf-id`，用户在编辑页改字、挪位置靠它找元素。已有的编号原样保留，不要删改；新加的元素不用自己写编号。
 - **素材**：用户的素材在 `$CW_MEDIA`（只读）。要用的先复制到 `assets/`，页面里用相对路径引用。没开联网时只用用户给的素材，不下载别的；开了联网，按这一轮任务里的说明上网找素材。
 - **字体**：`film fonts` 列出本机可用的字体文件，复制到 `fonts/` 再用 `@font-face` 引用；中文字体要覆盖片中用到的全部字形。
@@ -33,7 +36,7 @@
 
 | 命令 | 做什么 |
 |---|---|
-| `hfx check` | HyperFrames 自带的检查，加上上面的结构规则；列出全部片段。不通过就改到通过 |
+| `hfx check` | HyperFrames 自带的检查，加上上面的结构规则（含音效是否一声一段）；列出全部片段。不通过就改到通过 |
 | `hfx look [帧数]` | 按 OpenTake 导出的画法抽帧，拼成 `look/sheet.jpg`，用 view_image 看 |
 | `film progress <步骤> [说明]` | 告诉 OpenTake 进度：`read-style`、`read-input`、`plan`、`code`、`self-check` |
 

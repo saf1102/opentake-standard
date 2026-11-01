@@ -25,9 +25,11 @@ test('S11：版本入口先加载时，原生 ESM 的部署状态库正常初始
     .replaceAll("'./onboarding-store'","'./onboarding-store.mjs'")
     .replaceAll("'./edition'","'./edition.mjs'")
     .replaceAll("'./edition-config'","'./edition-config.mjs'")
-    .replaceAll("'../desktop/DesktopSession'","'./desktop.mjs'");
+    .replaceAll("'../desktop/DesktopSession'","'./desktop.mjs'")
+    .replaceAll("'../general/platform'","'./platform.mjs'");
    await build({stdin:{contents:source,loader:'tsx',resolveDir:root},outfile:path.join(dir,file.replace(/\.tsx?$/,'.mjs')),bundle:false,format:'esm',target:'esnext',logLevel:'silent'});
   }
+  await build({entryPoints:[path.join(root,'src/general/platform.ts')],outfile:path.join(dir,'platform.mjs'),bundle:false,format:'esm',target:'esnext',logLevel:'silent'});
   fs.writeFileSync(path.join(dir,'desktop.mjs'),`export function useDesktopAccount(){throw Error('导入阶段不得调用账号 hook')}`);
   const edition=await import(pathToFileURL(path.join(dir,'edition.mjs')).href);
   const store=await import(pathToFileURL(path.join(dir,'onboarding-store.mjs')).href);

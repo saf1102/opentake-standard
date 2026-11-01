@@ -18,7 +18,31 @@ export type SubtitleSegmentationOptions = {
   pause?: number;
   minWords?: number;
   maxWords?: number;
+  /**
+   * When speech runs on with no pause or punctuation to break at, split a long Chinese line at a word boundary
+   * near the length limit, preferring the start of a new clause (它 / 你 / 那么 …) — 「点一下一键部署 / 它就会
+   * 自动检查你电脑上 / 装了哪些agent能不能用」. Off unless asked for.
+   */
+  semanticSplit?: boolean;
 };
+
+/** Words that begin a new clause: a good place to start the next subtitle line. 你/我 are left out: they are as often the object (检查你电脑上). */
+const CLAUSE_START = /^(?:它|他|她|大家|那么|然后|所以|但是|可是|不过|而且|如果|因为|其实|这样|这个|那个|这些|那些|这种|那种|比如|还有|另外|接下来|最后|首先)/u;
+
+/** Two-word names a line must keep together. */
+const MULTIWORD_NAME = /^(?:Claude Code|Code Buddy|Deep Seek|Mini Max|Open AI|MacBook Pro|Final Cut|After Effects)$/iu;
+
+function wordBoundaries(text: string) {
+  const offsets = new Set<number>();
+  try {
+    for (const part of new Intl.Segmenter("zh", { granularity: "word" }).segment(text)) offsets.add(part.index);
+  } catch {
+    // No ICU word segmenter: every character boundary is allowed.
+    for (let index = 0; index <= text.length; index++) offsets.add(index);
+  }
+  offsets.add(text.length);
+  return offsets;
+}
 
 const meaningful = (value: string) => /[\p{L}\p{N}]/u.test(value);
 const hardStop = (value: string) => /[。！？!?；;]/u.test(value);
@@ -36,9 +60,9 @@ export function cleanSubtitleDisplayText(value: string) {
   return chars
     .filter((char, index) => {
       if (!/[，。！？；：、,.!?;:]/u.test(char)) return true;
-      // Product/version names such as Seedance 2.5 keep their decimal point.
+      // Product/version names such as Seedance 2.5 keep their decimal point, and 34,600 its thousands comma.
       return (
-        char === "." &&
+        (char === "." || char === ",") &&
         /\d/u.test(chars[index - 1] || "") &&
         /\d/u.test(chars[index + 1] || "")
       );
@@ -188,6 +212,36 @@ export function segmentTimedWordsForDisplay<TWord extends TimedSubtitleWord>(
           bestBalance = balance;
           splitAt = candidate + 1;
         }
+      }
+    }
+    if (options.semanticSplit && usesCjkRules) {
+      // By meaning: the longest line that fits, ending at a word boundary, a pause or punctuation, best of all
+      // where a new clause begins. This replaces the half-and-half balance used elsewhere.
+      splitAt = -1;
+      const pieces = buffer.map((word) => word.text.trim());
+      const boundaries = wordBoundaries(pieces.join(""));
+      let offset = 0, best = Number.POSITIVE_INFINITY;
+      for (let candidate = 0; candidate < buffer.length - 1; candidate++) {
+        offset += pieces[candidate].length;
+        const rest = pieces.slice(candidate + 1).join("");
+        const latinEdge = hasAsciiWord(pieces[candidate]) || hasAsciiWord(pieces[candidate + 1]);
+        if (!boundaries.has(offset) && !latinEdge && !safeBoundary(candidate)) continue;
+        const prefixUnits = subtitleTextUnits(joinWords(buffer.slice(0, candidate + 1)));
+        if (prefixUnits < minUnits || prefixUnits > maxUnits) continue;
+        // Never split a name in two, nor start a line on a particle (「…以后 / 呢」).
+        if (/^[呢吧啊吗嘛了的地得着过们]/u.test(rest)) continue;
+        if (MULTIWORD_NAME.test(`${pieces[candidate]} ${pieces[candidate + 1]}`)) continue;
+        const gap = buffer[candidate + 1].start - buffer[candidate].end;
+        const score = maxUnits - prefixUnits
+          - (CLAUSE_START.test(rest) ? 6 : 0)
+          - (explicitPhraseStop(pieces[candidate]) || phraseStop(pieces[candidate]) ? 6 : 0)
+          - (gap >= 0.25 ? 5 : gap >= 0.12 ? 2 : 0)
+          // A line should not hang on a word that leads into the next (「怎么改就 / 可以了」).
+          + (/[就会在和是把被给对跟要能也都还又才]$/u.test(pieces[candidate]) ? 4 : /的$/u.test(pieces[candidate]) ? 2 : 0)
+          + (hasAsciiWord(pieces[candidate]) && hasAsciiWord(pieces[candidate + 1]) ? 2 : 0)
+          // An English name usually goes with the Chinese after it (Codex剪辑, agent能不能用).
+          + (hasAsciiWord(pieces[candidate]) && hasCjk(pieces[candidate + 1]) ? 5 : 0);
+        if (score < best) { best = score; splitAt = candidate + 1; }
       }
     }
     if (splitAt > 0) {

@@ -14,9 +14,9 @@ import { bodyJson, sendJson } from '../http.ts';
 import { assertFreeSpace } from '../system-settings.ts';
 import { serveProjectFile, serveResolvedFile } from './files.ts';
 import { pageHostPort } from './page-host.ts';
-import { saveEdited, stylePresets } from './layers.ts';
+import { saveEdited, sceneSpeedsOf, soundFilesOf, soundsOf, soundWaveform, stylePresets, upgradeVersion } from './layers.ts';
 import { ffmpegPath, ffprobePath } from './kit-env.ts';
-import { answerNetwork, isLive, mediaFile, postMessage, reconcile, resumeRun, assertReady, startFirst, stopForDelete, stopRun, styleLibrary, readSession, writeSession } from './runner.ts';
+import { switchRunAgent, answerNetwork, isLive, mediaFile, postMessage, reconcile, resumeRun, assertReady, startFirst, stopForDelete, stopRun, styleLibrary, readSession, writeSession } from './runner.ts';
 import { createGeneral, fileUrl, findGeneral, generalChanges, patchGeneral, scanGeneral, summarize, trashGeneral, updateGeneral } from './store.ts';
 
 const exec = promisify(execFile);
@@ -60,7 +60,14 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
       }
       return sendJson(res, 405, { ok: false, error: '不支持的方法' });
     }
+    if(action==='agent-comparison'&&method==='GET'&&parts.length===3){const {compareProjectAgentRuns}=await import('../agent-comparison.ts');return ok(res,compareProjectAgentRuns(findGeneral(id).project.id));}
     if (action === 'events' && method === 'GET') return events(req, res, id);
+    // 打开工程目录 in the editor's media column (S先生 10-31: it did nothing)
+    if (action === 'reveal' && method === 'POST' && parts.length === 3) {
+      const { dir } = findGeneral(id);
+      const cmd = revealCommand(dir); await exec(cmd.command, cmd.args);
+      return ok(res, { revealed: true });
+    }
     if (action === 'files' && (method === 'GET' || method === 'HEAD')) {
       const { dir, project } = findGeneral(id);
       const rel = url.pathname.split('/').filter(Boolean).slice(3).join('/');
@@ -104,12 +111,34 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
     }
     if (action === 'text-presets' && method === 'GET') return ok(res, await stylePresets(findGeneral(id).project.styleId));
     // the person's edits of version n: versions/vN/edited.json, the same shape as layers.json
+    // a version read before 字幕一句一条 / 音效一声一段: its caption page as lines, its mixed effect strips cut (once)
+    if (action === 'versions' && parts[4] === 'upgrade' && parts.length === 5 && method === 'POST') return ok(res, await upgradeVersion(id, Number(parts[3])));
+    // the version's sound files: how long each is, and its waveform (peaks for 配音, a picture for 配乐 / 音效)
+    if (action === 'versions' && parts[4] === 'sound-files' && parts.length === 5 && method === 'GET') return ok(res, await soundFilesOf(id, Number(parts[3])));
+    // 动效卡变速: which scenes can play their whole animation faster or slower
+    if (action === 'versions' && parts[4] === 'scene-speeds' && parts.length === 5 && method === 'GET') return ok(res, sceneSpeedsOf(id, Number(parts[3])));
+    if (action === 'versions' && parts[4] === 'waveform' && parts.length === 5 && method === 'GET') {
+      const kind = url.searchParams.get('kind') === 'peaks' ? 'peaks' : 'picture';
+      const body = await soundWaveform(id, Number(parts[3]), url.searchParams.get('src') ?? '', kind);
+      res.writeHead(200, { 'content-type': kind === 'peaks' ? 'application/octet-stream' : 'image/png', 'content-length': body.length, 'cache-control': 'private, max-age=3600' });
+      return res.end(body);
+    }
+    // 按声音切开: the separate sounds in a stretch of one of the version's sound files
+    if (action === 'versions' && parts[4] === 'sounds' && parts.length === 5 && method === 'GET') {
+      const q = url.searchParams;
+      return ok(res, await soundsOf(id, Number(parts[3]), q.get('src') ?? '', Number(q.get('from')) || 0, Number(q.get('duration')) || 0));
+    }
     if (action === 'versions' && parts[4] === 'edited' && parts.length === 5 && method === 'PUT') return ok(res, saveEdited(id, Number(parts[3]), await bodyJson(req, 32 * 1024 * 1024)));
     if (action === 'media' && method === 'POST' && parts.length === 3) return ok(res, await addMedia(req, id), 201);
     if (action === 'media' && method === 'DELETE' && parts.length === 4) return ok(res, removeMedia(id, parts[3]));
     if (method !== 'POST' || parts.length !== 3) return sendJson(res, 404, { ok: false, error: '接口不存在' });
     if (action === 'generate') { assertReady(findGeneral(id).project); return ok(res, startFirst(id, { request: true, ...(process.platform==='darwin'?{tools:await requireCreationTools(findGeneral(id).project.agent)}:{} ) })); }
     if (action === 'stop') return ok(res, stopRun(id));
+    if(action==='switch-agent'){
+      if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||''))return sendJson(res,403,{ok:false,error:'只允许在本机切换智能体'});
+      if(req.headers.origin&&new URL(req.headers.origin).host!==req.headers.host)return sendJson(res,403,{ok:false,error:'不允许跨站切换智能体'});
+      const body=await bodyJson(req);return ok(res,await switchRunAgent(id,body.agent));
+    }
     if (action === 'resume') return ok(res, resumeRun(id));
     if (action === 'messages') return ok(res, postMessage(id, await bodyJson(req, 16 * 1024 * 1024)));
     if (action === 'network') {

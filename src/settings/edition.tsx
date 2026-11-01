@@ -3,9 +3,10 @@ import {AboutUpdate} from '../standard/ClientUpdate';
 import {ConnectionList} from '../studio/components/ConnectionSettings';
 import {AgentInstallation} from '../studio/components/AgentInstallation';
 import {IS_MAC} from '../general/platform';
+import type {ConnectionId,ConnectionMode} from '../studio/connections';
 import pkg from '../../package.json';
 export const settingsGroups=['general','agents','models','storage','export','backup','about'];
-export function AgentRoster(props:{onDirtyChange?:(value:boolean)=>void;onBusyChange?:(value:boolean)=>void}={}){return IS_MAC?<ConnectionList {...props}/>:<section className="agent-roster"><h2>已接入的 Agent</h2><p className="agent-roster-intro">按运行工作台服务的这台电脑检测。Codex 接入后，可在「工作模块的模型」里选择模型。</p><div className="agent-roster-list"><AgentInstallation kind="codex" {...props} use={<>用于 <b>工作模块</b>（见「工作模块的模型」）</>}/></div></section>}
+export function AgentRoster(props:{initialAgent?:ConnectionId;initialMode?:ConnectionMode;onDirtyChange?:(value:boolean)=>void;onBusyChange?:(value:boolean)=>void}={}){return IS_MAC?<ConnectionList {...props}/>:<section className="agent-roster"><h2>已接入的 Agent</h2><p className="agent-roster-intro">按运行工作台服务的这台电脑检测。Codex 接入后，可在「工作模块的模型」里选择模型。</p><div className="agent-roster-list"><AgentInstallation kind="codex" {...props} use={<>用于 <b>工作模块</b>（见「工作模块的模型」）</>}/></div></section>}
 
 export function EnhancedAgentSettings(){return null}
 export function IntegrationSettings(){return null}

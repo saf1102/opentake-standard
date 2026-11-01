@@ -112,7 +112,7 @@ export function FirstAgentChoice({onDone}: {onDone: () => void}) {
       </div>
     </div>
     {chosen && chosen.connected && !chosen.cliInstalled && <p className="first-agent-notice">连接已通过；还需要安装 {chosen.name} 命令行才能出片。</p>}
-    {chosen && !chosen.heavySupported && <p className="first-agent-notice">{chosen.name} 出片待适配，请选择 Codex 或 Claude Code。</p>}
+    {chosen && !chosen.heavySupported && <p className="first-agent-notice">{chosen.name} 出片待适配，请选择已支持出片的智能体。</p>}
     {error && <p role="alert" className="first-agent-notice">{error} <button type="button" className="first-agent-retry" disabled={loading} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={13} aria-hidden/>重新检测</button></p>}
     <div className="first-agent-foot"><button type="button" className="first-agent-later" disabled={saving || editorBusy} onClick={() => void finish(true)}>以后再说</button><button type="button" className="first-agent-primary" disabled={!ready || saving} onClick={() => void finish(false)}>{saving ? '正在保存…' : '用这个开始'}<ChevronRight size={16} aria-hidden/></button></div>
   </section>

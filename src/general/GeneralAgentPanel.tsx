@@ -1,7 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { RefComposer, type ComposerHandle } from './RefComposer'
+import { generalApi } from './general-api'
 import { ArrowUp, ChevronDown, ChevronRight, CircleCheck, CirclePause, CircleX, Film, FolderLock, Globe, GlobeLock, History, X } from 'lucide-react'
 import type { GeneralAgentChoice, GeneralPlan, GeneralProject, GeneralRun, GeneralVersion } from './general-contract'
 import { AgentControls } from './AgentPicker'
+import { GeneralFailoverCard } from './GeneralFailoverCard'
+import { connectionDefinition } from '@/studio/connections'
+import { AgentMark } from '@/studio/components/AgentMark'
+import { IS_MAC } from './platform'
 import {
   clockTime, elapsedLabel, feedItems, networkCopy, revisionNote, runActive, runStatus, secondsLabel, stepRows, stepsSummary, versionCardTime, versionName,
   type FeedItem, type StepRow,
@@ -11,7 +17,7 @@ import { QUOTE_KEY } from './platform'
 import type { StageReference } from './GeneralStage'
 
 export type AgentActions = {
-  stop: () => void; resume: () => void; generate: () => void; network: (allow: boolean) => void; send: () => void
+  stop: () => void; resume: () => void; switchAgent: (choice: GeneralAgentChoice) => void; generate: () => void; network: (allow: boolean) => void; send: () => void
   /** the project's model and effort (undefined: 系统默认) and its 联网 switch, used from the next turn on */
   setAgent: (choice: GeneralAgentChoice | undefined) => void; setNetwork: (on: boolean) => void
 }
@@ -92,10 +98,9 @@ function RunBlock({ run, project, busy, actions }: { run: GeneralRun; project: G
       <p>已停止。方案和样张都留着，可以接着做。</p>
       <button type="button" className="ge-soft" data-solid disabled={!!busy} onClick={actions.resume}>{busy === 'resume' ? '正在接着做…' : '接着做'}</button>
     </div>}
-    {run.state === 'failed' && <div className="ge-runnote" data-tone="failed" role="alert">
-      <p>没做完{run.error ? `：${run.error}` : '。'}</p>
-      <button type="button" className="ge-soft" disabled={!!busy} onClick={actions.resume}>{busy === 'resume' ? '正在接着做…' : '接着做'}</button>
-    </div>}
+    {run.state === 'failed' && (IS_MAC
+      ? <GeneralFailoverCard run={run} busy={busy} onSwitch={actions.switchAgent} onResume={actions.resume} />
+      : <div className="ge-runnote" data-tone="failed" role="alert"><p>没做完{run.error ? `：${run.error}` : '。'}</p><button type="button" className="ge-soft" disabled={!!busy} onClick={actions.resume}>{busy === 'resume' ? '正在接着做…' : '接着做'}</button></div>)}
   </div>
 }
 
@@ -151,17 +156,24 @@ export function GeneralAgentPanel({ project, brief, shown, canQuote, onPickVersi
   canQuote: boolean
   draft: string; setDraft: (value: string) => void; reference?: StageReference; clearReference: () => void
   /** which action is in flight ('' when none) */
-  busy: string; actions: AgentActions; connection: 'open' | 'retrying'; resizer: ReactNode; composer?: (element: HTMLTextAreaElement | null) => void
+  busy: string; actions: AgentActions; connection: 'open' | 'retrying'; resizer: ReactNode; composer?: (handle: ComposerHandle | null) => void
 }) {
   const run = project.run
   const active = runActive(run)
+  const [selectedDefault, setSelectedDefault] = useState<GeneralAgentChoice['agent']>()
+  const agentId = IS_MAC ? (active ? run?.agent : project.agent?.agent || selectedDefault) : 'codex'
+  const agentName = agentId ? connectionDefinition(agentId).name : '读取智能体…'
   const now = useNow(active)
-  const status = runStatus(project, now)
+  const baseStatus = runStatus(project, now)
+  const status = IS_MAC && !active && run?.state === 'failed' && agentId && run.agent !== agentId
+    ? { ...baseStatus, text: `上一轮（${connectionDefinition(run.agent).name}）没做完` }
+    : IS_MAC && run?.state === 'failed' && run.errorKind === 'no-response' ? { ...baseStatus, text: '没有回应' } : baseStatus
   const asking = run?.state === 'needs-network' && run.networkRequest ? run.networkRequest : undefined
   const items = feedItems(project, brief)
   const body = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
-  const area = useRef<HTMLTextAreaElement | null>(null)
+  const area = useRef<ComposerHandle | null>(null)
+  const attachComposer = useCallback((handle: ComposerHandle | null) => { area.current = handle; composer?.(handle) }, [composer])
   const [lost, setLost] = useState(false)
 
   // Say 「正在重连」 only when the stream stays down for a moment.
@@ -178,26 +190,18 @@ export function GeneralAgentPanel({ project, brief, shown, canQuote, onPickVersi
     if (element && pinned.current) element.scrollTop = element.scrollHeight
   }, [signature])
 
-  // The composer grows with its text, up to its max height.
-  useLayoutEffect(() => {
-    const element = area.current
-    if (!element) return
-    element.style.height = 'auto'
-    element.style.height = `${element.scrollHeight}px`
-  }, [draft])
-
   const canSend = !!draft.trim() && busy !== 'send'
   // the ⌘-drag hint lives in the box (the row under it holds the model capsule and send)
   const placeholder = active ? '有补充可以直接说，它做完这一步就会看到' : project.versions.length
     ? (canQuote ? `想怎么改，直接说；按住 ${QUOTE_KEY} 拖动画面可以框选` : '想怎么改，直接说') : '有什么要求，直接说'
   const note = !active ? revisionNote(project.versions, shown) : undefined
 
-  return <aside className="ge-agent" data-asking={asking ? '' : undefined} aria-label="Codex 对话">
+  return <aside className="ge-agent" data-failover={IS_MAC ? '' : undefined} data-asking={asking ? '' : undefined} aria-label={`${agentName} 对话`}>
     {resizer}
     <header className="ge-ahead">
-      <CodexMark />
-      <span className="name">Codex</span>
-      <span className="st" role="status"><i data-tone={status.tone} aria-hidden="true" /><span>{status.text}</span></span>
+      <>{IS_MAC ? agentId ? <AgentMark id={agentId} size={22} /> : <Spinner size={22} /> : <CodexMark />}</>
+      <span className="name">{agentName}</span>
+      <span className="st" data-tone={status.tone} role="status"><i data-tone={status.tone} aria-hidden="true" /><span>{status.text}</span></span>
       {active && <button type="button" className="ge-stop" disabled={run?.state === 'stopping' || busy === 'stop'} onClick={actions.stop}>
         <StopGlyph />{run?.state === 'stopping' || busy === 'stop' ? '正在停止…' : '停止'}
       </button>}
@@ -228,14 +232,11 @@ export function GeneralAgentPanel({ project, brief, shown, canQuote, onPickVersi
           画面 {clockTime(reference.reference.time)}<span>· 框选的区域</span>
           <button type="button" aria-label="去掉这个引用" onClick={clearReference}><X size={13} aria-hidden="true" /></button>
         </span>}
-        <textarea ref={element => { area.current = element; composer?.(element) }} rows={2} value={draft} placeholder={placeholder} aria-label="给 Codex 的话"
-          onChange={event => setDraft(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); if (canSend) actions.send() }
-          }} />
+        <RefComposer value={draft} onChange={setDraft} placeholder={placeholder} label={`给 ${agentName} 的话`} media={project.inputs.media}
+          upload={file => generalApi.upload(project.id, file)} handle={attachComposer} onEnter={() => { if (canSend) actions.send() }} />
         <div className="ge-crow">
           <span className="ge-crow-tools">
-            <AgentControls compact up agent={project.agent} onAgent={actions.setAgent} network={!!project.network} onNetwork={actions.setNetwork} disabled={busy === 'agent'} />
+            <AgentControls compact up agent={project.agent} onAgent={actions.setAgent} network={!!project.network} onNetwork={actions.setNetwork} disabled={busy === 'agent'} onResolvedAgent={setSelectedDefault} />
           </span>
           <button type="button" className="ge-send" aria-label="发送" disabled={!canSend} onClick={actions.send}>
             {busy === 'send' ? <Spinner size={14} /> : <ArrowUp size={16} strokeWidth={2.4} aria-hidden="true" />}

@@ -1,0 +1,19 @@
+/* The agent composer with tags (RefComposer): reads like the old textarea; tags sit in the line. */
+.ge-box .ge-rc { position:relative;display:block;width:100%;min-height:42px;max-height:180px;overflow-y:auto;padding:0;color:var(--ge-ink);font:inherit;font-size:13.5px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;outline:0;cursor:text; }
+.ge-box .ge-rc[data-empty]::before { content:attr(data-placeholder);position:absolute;inset:0 auto auto 0;color:var(--ge-faint);pointer-events:none; }
+.ge-pill { display:inline-flex;align-items:center;gap:5px;max-width:220px;height:21px;margin:0 2px;padding:0 7px 0 5px;border:1px solid var(--ge-line2);border-radius:6px;background:var(--ge-raise);color:var(--ge-ink);font-size:12px;line-height:1;vertical-align:-3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;user-select:none; }
+.ge-pill:active { cursor:grabbing; }
+.ge-pill i { flex:none;width:18px;height:12px;border-radius:2px;background:linear-gradient(135deg,#556,#334) center/cover; }
+.ge-pill b { flex:none;font-weight:600;color:var(--ge-muted); }
+.ge-pill[data-kind="s"] b { color:#9869dc; }
+.ge-pill.is-waiting { opacity:.6;cursor:progress;border-style:dashed; }
+.ge-rc-drop { position:fixed;z-index:1000;width:2px;border-radius:1px;background:#9869dc;pointer-events:none; }
+.ge-at { position:fixed;z-index:1000;width:260px;max-height:300px;overflow-y:auto;padding:5px;border:1px solid var(--ge-line2);border-radius:10px;background:var(--ge-panel-solid,#1f2024);box-shadow:0 14px 40px #0006;color:var(--ge-ink);font-size:12.5px; }
+html[data-ui-theme=warm] .ge-at { background:#f4ead6; }
+.ge-at h5 { margin:6px 8px 3px;font-size:11px;font-weight:600;color:var(--ge-faint); }
+.ge-at [role=option] { display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 8px;border-radius:6px;cursor:pointer; }
+.ge-at [role=option].on { background:var(--ge-chip-on,#ffffff14); }
+.ge-at [role=option] > span { display:inline-flex;align-items:center;gap:7px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.ge-at [role=option] i { flex:none;width:18px;height:12px;border-radius:2px;background:linear-gradient(135deg,#556,#334) center/cover; }
+.ge-at [role=option] b { flex:none;width:18px;text-align:center;font-weight:600;color:var(--ge-muted); }
+.ge-at small { flex:none;color:var(--ge-faint);font-size:11px;font-variant-numeric:tabular-nums; }

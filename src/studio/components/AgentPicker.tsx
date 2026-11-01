@@ -1,13 +1,13 @@
 import {IS_MAC} from '../../general/platform';
 import {useEffect,useState} from 'react';
 import {connectionRequest,type ConnectionView} from '../connections';
-import {LIGHT_AGENT_MODULES,type AgentConnectionId} from '../../../shared/agent-connections';
+import {LIGHT_AGENT_MODULES,connectionReadyForLight,connectionReadyForFilm,type AgentConnectionId} from '../../../shared/agent-connections';
 import type {AgentModule} from '../agent-settings';
 /** 仅列已接通且当前工作能实际使用的智能体。 */
 export function AgentPicker({work,value='codex',module,onChange}:{work:string;value?:AgentConnectionId;module?:AgentModule;onChange?:(id:AgentConnectionId)=>void}){
  const [connections,setConnections]=useState<ConnectionView[]>([]);
  useEffect(()=>{if(!IS_MAC)return;let active=true;const load=()=>void connectionRequest<{connections:ConnectionView[]}>().then(result=>{if(active)setConnections(result.connections)}).catch(()=>{if(active)setConnections([])});load();window.addEventListener('opentake-connections-changed',load);return()=>{active=false;window.removeEventListener('opentake-connections-changed',load)}},[]);
- const choices=connections.filter(c=>c.kind==='agent'&&c.connected&&c.enabled&&(c.id==='codex'&&(c.cliInstalled||!!module&&(LIGHT_AGENT_MODULES as readonly string[]).includes(module))||module==='generalEditing'&&c.heavySupported&&c.cliInstalled||!!module&&(LIGHT_AGENT_MODULES as readonly string[]).includes(module)&&c.mode==='api'));
+ const choices=connections.filter(c=>module==='generalEditing'?connectionReadyForFilm(c):!!module&&(LIGHT_AGENT_MODULES as readonly string[]).includes(module)?connectionReadyForLight(c):c.kind==='agent'&&c.id==='codex'&&c.connected&&c.enabled&&c.cliInstalled);
  if(!IS_MAC)return <LegacyAgentPicker work={work}/>;
  return <select className="agent-picker" aria-label={`${work}使用的 Agent`} value={value} onChange={e=>onChange?.(e.target.value as AgentConnectionId)}>{!choices.some(c=>c.id===value)&&<option value={value} disabled>所选智能体未接通</option>}{choices.map(c=><option key={c.id} value={c.id}>{c.name} · {c.mode==='api'?'API 密钥':'命令行 · 账号登录'}{!c.cliInstalled?' · 仅轻活':''}</option>)}</select>;
 }

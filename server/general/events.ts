@@ -74,7 +74,7 @@ export function classifyFiles(paths: string[]): { step: GeneralStepId; detail?: 
   return undefined;
 }
 
-export type Usage = { input: number; cached: number; output: number; reasoning: number };
+export type Usage = { total?:number; input: number; cached: number; output: number; reasoning: number };
 export type EventOutcome = { steps: GeneralStep[]; threadId?: string; usage?: Usage; message?: string; error?: string; turnDone?: boolean };
 
 /** Fold one `codex exec --json` event into the steps. */
@@ -83,7 +83,8 @@ export function applyCodexEvent(steps: GeneralStep[], event: Record<string, unkn
   if (type === 'thread.started') return { steps, threadId: String(event.thread_id || '') || undefined };
   if (type === 'turn.completed') {
     const u = (event.usage || {}) as Record<string, number>;
-    return { steps, turnDone: true, usage: { input: u.input_tokens || 0, cached: u.cached_input_tokens || 0, output: u.output_tokens || 0, reasoning: u.reasoning_output_tokens || 0 } };
+    const valid=(value:unknown)=>typeof value==='number'&&Number.isFinite(value)&&value>=0;
+    return { steps, turnDone: true, ...(valid(u.input_tokens)&&valid(u.output_tokens)?{usage:{input:u.input_tokens,cached:valid(u.cached_input_tokens)?u.cached_input_tokens:0,output:u.output_tokens,reasoning:valid(u.reasoning_output_tokens)?u.reasoning_output_tokens:0}}:{}) };
   }
   if (type === 'turn.failed') return { steps, turnDone: true, error: String((event.error as { message?: string })?.message || 'Codex 这一轮失败') };
   if (type === 'error') return { steps, error: String(event.message || 'Codex 报错') };

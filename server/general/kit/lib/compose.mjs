@@ -131,8 +131,12 @@ export async function mixTracks(film, out) {
   const add = (file, clip, bus, extra = []) => {
     const k = inputs.push(file) - 1;
     const len = (clip.end ?? film.duration) - clip.start;
+    // fades the person dragged on the timeline, at most half the clip each, as in the 口播 export
+    const fades = [];
+    if (clip.fadeIn) fades.push(`afade=t=in:st=0:d=${round(Math.min(clip.fadeIn, len / 2))}`);
+    if (clip.fadeOut) { const d = Math.min(clip.fadeOut, len / 2); fades.push(`afade=t=out:st=${round(len - d)}:d=${round(d)}`); }
     const chain = [`atrim=start=${clip.in}${clip.end !== undefined ? `:duration=${round(len * (clip.speed || 1))}` : ''}`, 'asetpts=PTS-STARTPTS', ...extra,
-      `volume=${volumeDb(clip.volume)}dB`, 'aresample=48000', 'aformat=channel_layouts=stereo', `adelay=${Math.round(clip.start * 1000)}:all=1`];
+      `volume=${volumeDb(clip.volume)}dB`, ...fades, 'aresample=48000', 'aformat=channel_layouts=stereo', `adelay=${Math.round(clip.start * 1000)}:all=1`];
     buses[bus].push(`[${k}:a]${chain.join(',')}`);
   };
   for (const c of film.voice) add(path.join(WORK, c.src), c, 'voice');

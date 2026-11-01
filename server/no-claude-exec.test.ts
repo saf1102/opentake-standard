@@ -36,7 +36,7 @@ test('Claude execution is confined to explicit gated adapters',()=>{
  const files=SCANNED.flatMap(dir=>fs.existsSync(path.join(root,dir))?sources(path.join(root,dir)):[]).filter(file=>file!==self);
  assert.ok(files.length>200,`scanned only ${files.length} files`);
  const found:string[]=[];
- const gated=new Set(['server/general/agent-adapter.ts','server/agent-connections.ts','desktop/agent-installation.cjs','scripts/standard/overlays/desktop/agent-installation.cjs']);
+ const gated=new Set(['server/general/agent-adapter.ts','shared/agent-connections.ts','server/agent-connections.ts','desktop/agent-installation.cjs','scripts/standard/overlays/desktop/agent-installation.cjs']);
  for(const file of files){
   const text=fs.readFileSync(file,'utf8'),name=path.relative(root,file),isTest=/\.test\.[cm]?[jt]s$/.test(name);
   text.split('\n').forEach((line,i)=>{
@@ -51,9 +51,10 @@ test('Claude execution is confined to explicit gated adapters',()=>{
  assert.deepEqual(found,[]);
  assert.equal(fs.existsSync(path.join(root,'server','enhanced-agent.ts')),false,'the old unguarded module must not return');
  const adapter=fs.readFileSync(path.join(root,'server/general/agent-adapter.ts'),'utf8');
- assert.match(adapter,/assertAgentExecutionAllowed\(id\);[\s\S]*?startCodex\(agent.executable/);
+ assert.match(adapter,/assertAgentWorkAllowed\(id\);[\s\S]*?startCodex\(agent.executable/);
  assert.match(adapter,/onAgentDisabled\([\s\S]*?proc.stop\(\)/);
  const connection=fs.readFileSync(path.join(root,'server/agent-connections.ts'),'utf8');
+ assert.match(connection,/function assertAgentWorkAllowed\(id:ConnectionId\)\{assertAgentExecutionAllowed\(id\);/);
  assert.match(connection,/assertAgentExecutionAllowed\(id\);const config/);
 });
 
@@ -149,6 +150,10 @@ test('closed switch: settings, connectivity and film launch never start Claude C
   assert.equal(tested.ok,false); assert.match(tested.error||'',/开关已关闭/);
   const {startFilmAgent}=await import('./general/agent-adapter.ts');
   assert.throws(()=>startFilmAgent({agent:'claude',executable:onPath,model:'default',effort:'medium'},[],{cwd:home,env:{PATH:bin},prompt:'不应执行',onEvent(){}}),/开关已关闭/);
+  const {startAcpAgent}=await import('./general/acp.ts');
+  assert.throws(()=>startAcpAgent(onPath,['acp'],{agent:'claude',cwd:home,env:{PATH:bin},prompt:'不应执行',onEvent(){}}),/开关已关闭/);
+  assert.throws(()=>startAcpAgent(onPath,['acp'],{agent:'kimi',cwd:home,env:{PATH:bin},prompt:'不应执行',onEvent(){}}),/不能通过通用 ACP/);
+  assert.throws(()=>startFilmAgent({agent:'kimi',executable:onPath,model:'default',effort:'medium'},['acp'],{cwd:home,env:{PATH:bin},prompt:'不应执行',onEvent(){}}),/不能通过通用 ACP/);
   // The rest of Settings › AI 与 Agent and the system settings page, run the same way.
   for(const route of ['agent-settings/installation/codex','agent-settings/roster','agent-settings','system-settings'])await call('GET',route);
   assert.ok(started.length>0,'the watch saw no program start at all');

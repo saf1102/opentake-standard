@@ -48,8 +48,7 @@ class PeakFolder {
   }
 }
 
-async function decodeAudioPeaks(input: string, durationSec: number) {
-  const ffmpeg = binary("ffmpeg");
+export async function decodeAudioPeaks(input: string, durationSec: number, ffmpeg = binary("ffmpeg")) {
   if (!ffmpeg) throw new Error("宿主机未安装 ffmpeg，不能生成音频波形");
   const blocks = Math.min(
     MAX_PEAK_BLOCKS,

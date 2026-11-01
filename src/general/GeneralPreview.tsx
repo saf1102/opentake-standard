@@ -16,6 +16,10 @@ import { IS_MAC, QUOTE_KEY } from './platform'
 import { boxFromPoints } from './general-logic'
 import { usePlacementDrag, type PlacementSlot } from '@/studio/components/placement-drag'
 import { PlacementSlots } from '@/studio/components/PlacementHandle'
+import { getPreviewSpeed, usePreviewSpeed } from '@/studio/preview-speed'
+import { clipFadeGain } from '@/studio/clip-audio'
+import { PreviewSpeedButton } from '@/studio/components/PreviewSpeedButton'
+import { usePreviewZoom } from '@/studio/preview-zoom'
 
 type PresetFont = { family: string; url: string; style: string; weight: string }
 type Props = {
@@ -38,6 +42,8 @@ type Props = {
   onSetPageElement?: (clipId: string, selector: string, patch: PageMove) => void
   /** ⌘-drag (Ctrl elsewhere) on the picture: the area (film pixels) and the moment, quoted into the conversation */
   onQuote?: (area: { x: number; y: number; w: number; h: number }, time: number) => void
+  /** HyperFrames: bumped after timeline edits are saved, so the page loads again with them */
+  pageRevision?: number
   /** the area quoted now (film pixels), outlined on the picture */
   quoted?: { x: number; y: number; w: number; h: number }
 }
@@ -104,10 +110,10 @@ function FootageLayer({ layers, time, playing, mediaUrl }: Pick<Props, 'layers' 
       const local = (time - clip.start) * speed
       const target = reverse ? clip.sourceStart + (clip.sourceDuration ?? clip.duration * speed) - local : clip.sourceStart + local
       video.muted = muted || !clip.params.sound || clip.volume <= 0
-      video.volume = Math.min(1, Math.max(0, clip.volume))
+      video.volume = Math.min(1, Math.max(0, clip.volume * clipFadeGain(clip, time)))
       if (!on) { if (!video.paused) video.pause(); continue }
       if (playing && !reverse) {
-        video.playbackRate = speed
+        video.playbackRate = speed * getPreviewSpeed()
         if (Math.abs(video.currentTime - target) > 0.25) video.currentTime = target
         if (video.paused) void video.play().catch(() => {})
       } else {
@@ -191,8 +197,9 @@ function SoundLayer({ layers, time, playing, pageOrigin }: Pick<Props, 'layers' 
       const audio = refs.current.get(clip.id)
       if (!audio) continue
       const on = playing && !track.muted && activeAt(clip, time), target = clip.sourceStart + (time - clip.start)
-      gainFor(audio).gain.value = Math.max(0, clip.volume * track.fader)
+      gainFor(audio).gain.value = Math.max(0, clip.volume * track.fader * clipFadeGain(clip, time))
       if (!on) { if (!audio.paused) audio.pause(); continue }
+      if (audio.playbackRate !== getPreviewSpeed()) audio.playbackRate = getPreviewSpeed()
       if (Math.abs(audio.currentTime - target) > 0.2) audio.currentTime = target
       if (audio.paused) void audio.play().catch(() => {})
     }
@@ -339,8 +346,10 @@ const FINISH: Record<string, CSSProperties> = {
  * HyperFrames: the person only sees OpenTake). OpenTake's transport drives it through the runtime's control messages
  * (play, pause, seek); while it plays, the runtime's clock is the editor's clock.
  */
-function HyperframesLayer({ layers, time, playing, pageOrigin, onTime, onPlaying, frame }: Pick<Props, 'layers' | 'time' | 'playing' | 'pageOrigin' | 'onTime' | 'onPlaying'> & { frame: RefObject<HTMLIFrameElement | null> }) {
+function HyperframesLayer({ layers, time, playing, pageOrigin, onTime, onPlaying, frame, revision = 0 }: Pick<Props, 'layers' | 'time' | 'playing' | 'pageOrigin' | 'onTime' | 'onPlaying'> & { revision?: number; frame: RefObject<HTMLIFrameElement | null> }) {
   const [ready, setReady] = useState(false)
+  // a new revision of the page (timeline edits saved) loads again; it answers 'ready' and is sent to the playhead
+  useEffect(() => setReady(false), [revision])
   const reported = useRef(-1)
   const post = (action: string, extra: Record<string, unknown> = {}) => {
     if (pageOrigin) frame.current?.contentWindow?.postMessage({ source: 'hf-parent', type: 'control', protocolVersion: 1, fps: { numerator: layers.fps, denominator: 1 }, capabilities: [], action, ...extra }, pageOrigin)
@@ -361,6 +370,8 @@ function HyperframesLayer({ layers, time, playing, pageOrigin, onTime, onPlaying
   // the person's edits, words and moves (hf-edit-bridge.js on the page puts them in, and takes them out again on undo)
   const edits = JSON.stringify(hfPageEdits(layers))
   useEffect(() => { if (ready && pageOrigin) frame.current?.contentWindow?.postMessage({ type: 'ot-page-edits', edits: JSON.parse(edits) }, pageOrigin) }, [edits, ready, pageOrigin, frame])
+  const previewSpeed = usePreviewSpeed()
+  useEffect(() => { if (ready) post('set-playback-rate', { playbackRate: previewSpeed }) }, [previewSpeed, ready]) // eslint-disable-line react-hooks/exhaustive-deps -- post reads the frame
   useEffect(() => { if (ready) post(playing ? 'play' : 'pause') }, [playing, ready]) // eslint-disable-line react-hooks/exhaustive-deps -- post reads the frame
   // a seek from OpenTake (scrubbing, the timeline, the buttons): every change while paused, a jump while playing
   useEffect(() => {
@@ -369,11 +380,11 @@ function HyperframesLayer({ layers, time, playing, pageOrigin, onTime, onPlaying
     post('seek', { timeSeconds: time })
   }, [time, ready]) // eslint-disable-line react-hooks/exhaustive-deps -- playing is read, not followed
   if (!pageOrigin) return null
-  return <iframe ref={frame} title="成片画面" src={`${pageOrigin}/${encodeURIComponent(layers.entry ?? 'index.html')}`} sandbox="allow-scripts allow-same-origin" allow="autoplay"
+  return <iframe ref={frame} title="成片画面" src={`${pageOrigin}/${encodeURIComponent(layers.entry ?? 'index.html')}${revision ? `?r=${revision}` : ''}`} sandbox="allow-scripts allow-same-origin" allow="autoplay"
     style={{ position: 'absolute', left: 0, top: 0, width: layers.width, height: layers.height, border: 0, background: '#000', colorScheme: 'normal' }} />
 }
 
-export function GeneralPreview({ layers: given, mediaUrl, pageOrigin, presets, fonts, time, playing, onTime, onPlaying, onEditText, onEditPageText, onPickClip, onSetPreset, onSetText, onSetPageElement, onQuote, quoted }: Props) {
+export function GeneralPreview({ pageRevision, layers: given, mediaUrl, pageOrigin, presets, fonts, time, playing, onTime, onPlaying, onEditText, onEditPageText, onPickClip, onSetPreset, onSetText, onSetPageElement, onQuote, quoted }: Props) {
   const fontsLoaded = useFonts(fonts, pageOrigin)
   const frames = useRef(new Map<string, HTMLIFrameElement>())
   const hfFrame = useRef<HTMLIFrameElement>(null)
@@ -393,6 +404,9 @@ export function GeneralPreview({ layers: given, mediaUrl, pageOrigin, presets, f
   }, [given, pagePick, pageDrag])
   const { ref, size } = useFitSize(layers.width, layers.height)
   const scale = size.width / layers.width
+  const previewZoom = usePreviewZoom(ref, size)
+  // Pointer positions on the stage: the fit scale times the editor's own zoom.
+  const pointerScale = scale * previewZoom.zoom
   // the style picker: a text-track clip chosen by a click, its picker open or not, a preset tried by hovering
   const [picked, setPicked] = useState<string>()
   const [picking, setPicking] = useState(false)
@@ -517,35 +531,38 @@ export function GeneralPreview({ layers: given, mediaUrl, pageOrigin, presets, f
     onPointerCancel: () => { drag.current = null; setDrawing(undefined) },
   } : {}
   const skipQuoteClick = () => { if (!quoteClick.current) return false; quoteClick.current = false; return true }
-  const clock = useRef<{ at: number; from: number } | null>(null)
+  const clock = useRef<{ at: number; from: number; speed: number } | null>(null)
   const hyperframes = layers.engine === 'hyperframes'
   useEffect(() => {
     if (!playing || hyperframes) { clock.current = null; return }
     let frame = 0
-    clock.current = { at: performance.now(), from: time }
+    clock.current = { at: performance.now(), from: time, speed: getPreviewSpeed() }
     const tick = () => {
       const c = clock.current; if (!c) return
-      const t = c.from + (performance.now() - c.at) / 1000
+      // A speed change restarts the clock from where it is, so the picture never jumps.
+      if (c.speed !== getPreviewSpeed()) clock.current = { at: performance.now(), from: c.from + (performance.now() - c.at) / 1000 * c.speed, speed: getPreviewSpeed() }
+      const n = clock.current!
+      const t = n.from + (performance.now() - n.at) / 1000 * n.speed
       if (t >= layers.duration) { onTime(layers.duration); onPlaying(false); return }
       onTime(t); frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
   }, [playing]) // eslint-disable-line react-hooks/exhaustive-deps -- the clock starts from the time at play
-  const seek = (t: number) => { const v = Math.max(0, Math.min(layers.duration, t)); if (clock.current) clock.current = { at: performance.now(), from: v }; onTime(v) }
+  const seek = (t: number) => { const v = Math.max(0, Math.min(layers.duration, t)); if (clock.current) clock.current = { at: performance.now(), from: v, speed: getPreviewSpeed() }; onTime(v) }
   /** Double-click: the text track's text, else a page's editable text, else the footage under the pointer. */
   const editAt = async (event: ReactMouseEvent) => {
     const box = stage.current?.getBoundingClientRect()
     if (!box || !scale) return
     onPlaying(false)
-    const toStage = (r: DOMRect | Box): Box => 'left' in r ? { x: (r.left - box.left) / scale, y: (r.top - box.top) / scale, w: r.width / scale, h: r.height / scale } : r
+    const toStage = (r: DOMRect | Box): Box => 'left' in r ? { x: (r.left - box.left) / pointerScale, y: (r.top - box.top) / pointerScale, w: r.width / pointerScale, h: r.height / pointerScale } : r
     for (const el of textRoot.current?.children ?? []) {
       const r = el.getBoundingClientRect(), id = (el as HTMLElement).dataset.textId
       if (!id || event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) continue
       const clip = clipsOf(layers, 'g-text').find(c => c.id === id)
       if (clip) { setEditing({ clipId: id, text: clip.text ?? '', rect: toStage(r), style: styleOf(getComputedStyle(el)) }); return }
     }
-    const x = (event.clientX - box.left) / scale, y = (event.clientY - box.top) / scale
+    const x = (event.clientX - box.left) / pointerScale, y = (event.clientY - box.top) / pointerScale
     // a HyperFrames film: any text leaf of its page (a caption, a card's title), edited in the clip it belongs to
     if (hyperframes) {
       const hit = hfFrame.current && pageOrigin ? await pageHit(hfFrame.current, pageOrigin, x, y) : {}
@@ -566,9 +583,10 @@ export function GeneralPreview({ layers: given, mediaUrl, pageOrigin, presets, f
   return <main className="preview-panel general-preview">
     <div ref={ref} className="preview-stage-viewport" style={{ '--preview-frame-width': `${size.width}px`, '--preview-frame-height': `${size.height}px` } as CSSProperties}>
       <div className="preview-frame-outline" aria-hidden="true" />
-      <div ref={canvasEl} className="preview-canvas" style={{ aspectRatio: `${layers.width}/${layers.height}`, width: `${size.width}px`, height: `${size.height}px`, visibility: size.width > 0 ? 'visible' : 'hidden', overflow: 'hidden', background: '#000' }}>
+      {previewZoom.mini}{previewZoom.hud}
+      <div ref={canvasEl} className="preview-canvas" style={{ aspectRatio: `${layers.width}/${layers.height}`, width: `${size.width}px`, height: `${size.height}px`, visibility: size.width > 0 ? 'visible' : 'hidden', overflow: 'hidden', background: '#000', ...previewZoom.canvasStyle }}>
         <div ref={stage} style={{ position: 'absolute', left: 0, top: 0, width: layers.width, height: layers.height, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
-          {hyperframes ? <HyperframesLayer layers={layers} time={time} playing={playing} pageOrigin={pageOrigin} onTime={onTime} onPlaying={onPlaying} frame={hfFrame} /> : <>
+          {hyperframes ? <HyperframesLayer layers={layers} time={time} playing={playing} pageOrigin={pageOrigin} onTime={onTime} onPlaying={onPlaying} frame={hfFrame} revision={pageRevision} /> : <>
           <FootageLayer layers={layers} time={time} playing={playing} mediaUrl={mediaUrl} />
           <PageLayer layers={layers} time={time} pageOrigin={pageOrigin} frames={frames} />
           <TextLayer layers={layers} time={time} presets={presets} fontsLoaded={fontsLoaded} root={textRoot}
@@ -630,6 +648,7 @@ export function GeneralPreview({ layers: given, mediaUrl, pageOrigin, presets, f
           onChange={event => seek(Number(event.currentTarget.value))} />
       </div>
       <span className="general-preview-size">{layers.width}×{layers.height} · {layers.fps}fps</span>
+      <PreviewSpeedButton />
     </div>
   </main>
 }

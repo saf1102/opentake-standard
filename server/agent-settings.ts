@@ -1,4 +1,4 @@
-import {AGENT_CONNECTION_IDS,LIGHT_AGENT_MODULES} from '../shared/agent-connections.ts';
+import {AGENT_CONNECTION_IDS,LIGHT_AGENT_MODULES,connectionReadyForLight,connectionReadyForFilm} from '../shared/agent-connections.ts';
 import platform from './platform.ts';
 import installations from './agent-installation.ts';
 import fs from 'node:fs';
@@ -18,7 +18,7 @@ export function atomicAgentJson(file: string, value: unknown) {
   try { fs.writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: 0o600 }); fs.renameSync(tmp, file); }
   finally { fs.rmSync(tmp, { force: true }); }
 }
-const choiceSchema = z.object({ agent:z.enum(AGENT_CONNECTION_IDS).optional(), model: z.string().regex(/^[a-zA-Z0-9._\/:-]+$/), effort: z.enum(['none','minimal','low','medium','high','xhigh','max','ultra']) }).strict();
+const choiceSchema = z.object({ agent:z.enum(AGENT_CONNECTION_IDS).optional(), model: z.string().regex(/^[a-zA-Z0-9._\/:,-]+$/), effort: z.enum(['none','minimal','low','medium','high','xhigh','max','ultra']) }).strict();
 const settingsSchema = z.object({ version: z.literal(1), allowRemoteAi: z.boolean().default(false), cliPath: z.string().trim(), modules: z.record(z.enum(AGENT_MODULES.map(m => m.id)), choiceSchema) }).strict();
 export function readAgentSettings(): AgentSettings {
   const file = agentSettingsFile();
@@ -120,8 +120,9 @@ export async function saveAgentSettings(value: unknown) {
     const agentId=settings.modules[module.id].agent||'codex';
     if(process.platform==='darwin'&&agentId!=='codex'){
       const {getConnectionStatus}=await import('./agent-connections.ts');const connection=await getConnectionStatus(agentId);
-      if(!connection.connected)throw Error(`${module.name}：请先接通所选智能体`);
-      if(module.id==='generalEditing'&&(!connection.heavySupported||!connection.cliInstalled))throw Error('出片需要已适配的命令行');
+      if(!connection.enabled||!connection.connected)throw Error(`${module.name}：所选智能体未接通`);
+      if(module.id!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module.id)||!connectionReadyForLight(connection)))throw Error(`${module.name}：所选智能体暂不支持这项工作`);
+      if(module.id==='generalEditing'&&!connectionReadyForFilm(connection))throw Error('出片需要已适配的命令行');
       continue;
     }
     if(!catalog)throw Error('Codex 没有返回可用模型');
@@ -158,9 +159,9 @@ export const parseAgentChoice=(value:unknown)=>choiceSchema.parse(value);
 export async function validateModuleAgentChoice(module:AgentModule,value:unknown){
  const choice=parseAgentChoice(value);if(!AGENT_MODULES.some(m=>m.id===module))throw Error('未知工作模块');
  const {getConnectionStatus}=await import('./agent-connections.ts');const connection=await getConnectionStatus(choice.agent||'codex');
- if(!connection.connected)throw Error('请先测试连接');
- if(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)&&(!connection.cliInstalled||module==='generalEditing'&&!connection.heavySupported))throw Error('出片需要安装已适配的命令行');
- if(choice.agent&&choice.agent!=='codex'&&module!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)||connection.mode!=='api'))throw Error('此模块的智能体接法待适配，请使用已支持的接入');
+ if(!connection.enabled||!connection.connected)throw Error('所选智能体未接通');
+ if(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)&&(!connection.cliInstalled||module==='generalEditing'&&!connectionReadyForFilm(connection)))throw Error('出片需要安装已适配的命令行');
+ if(choice.agent&&choice.agent!=='codex'&&module!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)||!connectionReadyForLight(connection)))throw Error('此模块的智能体接法待适配，请使用已支持的接入');
  return choice;
 }
 /** 单模块默认值：首次引导只修改自己的选择，不校验或覆盖其他模块。 */

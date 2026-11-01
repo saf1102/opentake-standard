@@ -73,3 +73,46 @@ test('一次性POST测试连接入口：两版共用，Standard拒绝Pro服务�
   const blocked=await fetch(base+'/agent-connections/dreamina/test',{method:'POST',headers:{'Content-Type':'application/json',Origin:base,'x-test-edition':'Standard'},body:JSON.stringify({transient:true,apiKey:KEY,baseUrl})});assert.equal(blocked.status,404);assert.equal(calls,4);assert.deepEqual(fs.readdirSync(dir),[]);
  }finally{provider.closeAllConnections();app.closeAllConnections();await Promise.all([new Promise<void>(r=>provider.close(()=>r())),new Promise<void>(r=>app.close(()=>r()))]);}
 }));
+
+test('API轻活401撤销连接，新密钥测试成功可恢复，403权限拒绝不算未登录',async()=>fixture(async(deps)=>{
+ deps.fetcher=async()=>Response.json({data:[{id:'fixture-model'}]});
+ await saveAgentConnection('kimi',{mode:'api',apiKey:KEY},deps);assert.equal((await testUnifiedConnection('kimi',deps)).ok,true);
+ deps.fetcher=async()=>new Response('',{status:403});
+ await assert.rejects(runConnectionText('kimi','纯文字','fixture-model',undefined,deps),/权限/);assert.equal(getConnectionConfig('kimi').connected,true);assert.equal(getConnectionConfig('kimi').authRejectedAt,undefined);
+ deps.fetcher=async()=>new Response('',{status:401});
+ await assert.rejects(runConnectionText('kimi','纯文字','fixture-model',undefined,deps),/凭据/);assert.equal(getConnectionConfig('kimi').connected,false);assert.ok(getConnectionConfig('kimi').authRejectedAt);
+ await saveAgentConnection('kimi',{apiKey:KEY+'new'},deps);assert.equal(getConnectionConfig('kimi').connected,false);
+ deps.fetcher=async()=>Response.json({data:[{id:'fixture-model'}]});assert.equal((await testUnifiedConnection('kimi',deps)).ok,true);assert.equal(getConnectionConfig('kimi').authRejectedAt,undefined);
+}));
+
+
+test('API模型繁忙单独归类且保留登录，裸503不猜繁忙，错误读取有界且不泄露原文',async()=>fixture(async(deps)=>{
+ deps.fetcher=async()=>Response.json({data:[{id:'fixture-model'}]});
+ await saveAgentConnection('kimi',{mode:'api',apiKey:KEY},deps);assert.equal((await testUnifiedConnection('kimi',deps)).ok,true);
+ for(const message of ['Selected model is at capacity. Please try a different model.','overloaded']){
+  deps.fetcher=async()=>Response.json({error:{message:message+' private@example.com '+KEY}},{status:503});
+  await assert.rejects(runConnectionText('kimi','纯文字','fixture-model',undefined,deps),error=>{assert.equal((error as any).kind,'busy');assert.match(String(error),/这个模型现在繁忙/);assert.doesNotMatch(String(error),/private@example|fixture-key/);return true});
+  assert.equal(getConnectionConfig('kimi').connected,true);assert.equal(getConnectionConfig('kimi').authRejectedAt,undefined);
+ }
+ deps.fetcher=async()=>new Response('',{status:503});
+ await assert.rejects(runConnectionText('kimi','纯文字','fixture-model',undefined,deps),error=>{assert.equal((error as any).kind,undefined);return true});
+ let cancelled=false,pulls=0;deps.fetcher=async()=>new Response(new ReadableStream({pull(controller){pulls++;controller.enqueue(new Uint8Array(20000).fill(120))},cancel(){cancelled=true}}),{status:503});
+ await assert.rejects(runConnectionText('kimi','纯文字','fixture-model',undefined,deps),/HTTP 503/);assert.equal(cancelled,true);assert.ok(pulls<=2);
+ deps.fetcher=async()=>Response.json({error:{message:'Your subscription does not include this model'}},{status:403});
+ await assert.rejects(runConnectionText('kimi','纯文字','fixture-model',undefined,deps),error=>{assert.equal((error as any).kind,'model-plan');return true});assert.equal(getConnectionConfig('kimi').connected,true);
+}));
+
+test('拒绝和恢复发送无账号的版本通知，晚到失败不能覆盖已经恢复的API连接',async()=>fixture(async(deps)=>{
+ const {onAgentConnectionStatusChanged,markAgentCredentialsRejected}=await import('./agent-connections.ts');
+ const events:unknown[]=[];const off=onAgentConnectionStatusChanged(event=>events.push(event));
+ try{
+  deps.fetcher=async()=>Response.json({data:[{id:'fixture-model'}]});
+  await saveAgentConnection('kimi',{mode:'api',apiKey:KEY},deps);await testUnifiedConnection('kimi',deps);
+  const connectedRevision=getConnectionConfig('kimi').revision!;assert.deepEqual(events,[{id:'kimi',revision:connectedRevision}]);
+  markAgentCredentialsRejected('kimi','api',connectedRevision);const rejectedRevision=getConnectionConfig('kimi').revision!;assert.ok(rejectedRevision>connectedRevision);
+  let release!:()=>void;const oldTest=testUnifiedConnection('kimi',{...deps,fetcher:async()=>{await new Promise<void>(resolve=>{release=resolve});return new Response('',{status:401})}});
+  await new Promise(resolve=>setImmediate(resolve));await testUnifiedConnection('kimi',deps);const restoredRevision=getConnectionConfig('kimi').revision!;
+  assert.ok(restoredRevision>rejectedRevision);release();assert.equal((await oldTest).ok,false);assert.equal(getConnectionConfig('kimi').connected,true);
+  assert.deepEqual(events,[{id:'kimi',revision:connectedRevision},{id:'kimi',revision:rejectedRevision},{id:'kimi',revision:restoredRevision}]);
+ }finally{off()}
+}));

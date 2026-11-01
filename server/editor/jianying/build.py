@@ -9,9 +9,10 @@ import sys
 import time
 import uuid
 import math
+import struct
 import pyJianYingDraft as jy
 from native_masks import make_mask, mask_geometry, make_stroke, stroke_safe_framing
-from timing import placed_source_duration, normalize_frame_boundaries, bounded_source_duration, visible_subtitles, precise_audio_duration, jianying_draft_fps, non_overlapping_lanes
+from timing import placed_source_duration, normalize_frame_boundaries, bounded_source_duration, precise_audio_duration, jianying_draft_fps, non_overlapping_lanes
 
 folder = Path(sys.argv[1]).resolve()
 m = normalize_frame_boundaries(json.loads((folder / 'handoff.json').read_text()))
@@ -223,9 +224,18 @@ for label in ('B-roll', 'B-roll 图片', '录屏视频', '录屏人物画中画'
                     native_strokes[seg.segment_id]=make_stroke(res,item['border']['color'])
             script.add_segment(seg, lane)
 
-def rgb(color):
-    color=color.lstrip('#')
-    return tuple(int(color[i:i+2],16)/255 for i in (0,2,4))
+def rgba(color):
+    import re
+    value=color.strip().lower()
+    if value in ('transparent','none'): return (0,0,0),0
+    if value.startswith('rgb'):
+        nums=re.findall(r'[\d.]+',value)
+        return tuple(float(n)/255 for n in nums[:3]),float(nums[3]) if len(nums)>3 else 1
+    value=value.lstrip('#')
+    if len(value) in (3,4): value=''.join(ch*2 for ch in value)
+    return tuple(int(value[i:i+2],16)/255 for i in (0,2,4)),int(value[6:8],16)/255 if len(value)==8 else 1
+
+def rgb(color): return rgba(color)[0]
 
 def background_style(st):
     import re
@@ -237,8 +247,152 @@ def background_style(st):
     else: color=value; alpha=1
     return jy.TextBackground(color=color,alpha=alpha,round_radius=.24,height=.14,width=.14)
 
+def general_background(st):
+    # Native background parameters are not CSS padding/radius units. Preserve
+    # colour/opacity and use the nearest editable native background geometry.
+    value=st.get('backgroundColor','transparent')
+    color,alpha=rgba(value)
+    if alpha<=0: return None
+    return jy.TextBackground(color='#'+''.join(f'{round(channel*255):02x}' for channel in color),
+        alpha=alpha,round_radius=max(0,min(1,st.get('backgroundRadiusEm',0))),height=.14,width=.14)
+
+general_captions={}
+def packaged_font(filename):
+    if not filename: return None
+    candidate=(res/filename).resolve()
+    if not candidate.is_relative_to(res.resolve()) or not candidate.is_file():
+        raise ValueError(f'字幕字体不在导出资源中：{filename}')
+    return candidate
+
+font_faces={}; font_coverage={}
+def font_tables(data,offset=0):
+    count=struct.unpack_from('>H',data,offset+4)[0]
+    return {data[p:p+4]:struct.unpack_from('>III',data,p+4) for p in range(offset+12,offset+12+16*count,16)}
+
+def font_names(data,tables):
+    if b'name' not in tables: return []
+    _,offset,_=tables[b'name']; _,count,strings=struct.unpack_from('>HHH',data,offset)
+    names=[]
+    for i in range(count):
+        platform,encoding,language,kind,length,start=struct.unpack_from('>HHHHHH',data,offset+6+i*12)
+        if kind not in (1,4,6,16): continue
+        raw=data[offset+strings+start:offset+strings+start+length]
+        try: names.append(raw.decode('utf-16-be' if platform in (0,3) else 'mac_roman'))
+        except UnicodeDecodeError: pass
+    return names
+
+def font_face(font,family):
+    """Choose a TTC face by its actual name, then package a standalone sfnt.
+
+    Both Pillow and Jianying now read the same face; no undocumented TTC-index
+    field is added to the native material schema.
+    """
+    key=(font,family)
+    if key in font_faces: return font_faces[key]
+    data=font.read_bytes()
+    if data[:4]!=b'ttcf': font_faces[key]=font; return font
+    count=struct.unpack_from('>I',data,8)[0]
+    offsets=struct.unpack_from('>'+str(count)+'I',data,12)
+    normalize=lambda name: ''.join(ch for ch in name.casefold() if ch.isalnum())
+    wanted=normalize(family)
+    face=next((i for i,o in enumerate(offsets) if wanted and any(normalize(n)==wanted for n in font_names(data,font_tables(data,o)))),0)
+    offset=offsets[face]; tables=font_tables(data,offset)
+    result=bytearray(data[offset:offset+12]+bytes(16*len(tables)))
+    head_offset=None
+    def checksum(value):
+        value=bytes(value)+bytes((-len(value))%4)
+        return sum(struct.unpack('>'+str(len(value)//4)+'I',value))&0xffffffff
+    for i,(tag,(_,start,length)) in enumerate(tables.items()):
+        result.extend(bytes((-len(result))%4)); dest=len(result)
+        content=bytearray(data[start:start+length])
+        if tag==b'head': content[8:12]=bytes(4); head_offset=dest
+        struct.pack_into('>4sIII',result,12+16*i,tag,checksum(content),dest,length)
+        result.extend(content)
+    if head_offset is not None:
+        struct.pack_into('>I',result,head_offset+8,(0xb1b0afba-checksum(result))&0xffffffff)
+    output=font.with_name(font.stem+f'-face-{face}.otf')
+    output.write_bytes(result); font_faces[key]=output
+    if face==0 and wanted and not any(normalize(n)==wanted for n in font_names(data,tables)):
+        export_warnings.append(f'字体集合未找到「{family}」的同名字面，使用集合首字面，请在剪映核对。')
+    return output
+
+def has_glyph(font,char):
+    if font not in font_coverage:
+        data=font.read_bytes(); tables=font_tables(data)
+        maps=[]
+        if b'cmap' in tables:
+            _,offset,_=tables[b'cmap']; count=struct.unpack_from('>H',data,offset+2)[0]
+            for i in range(count):
+                platform,encoding,start=struct.unpack_from('>HHI',data,offset+4+8*i)
+                if platform==0 or (platform==3 and encoding in (1,10)):
+                    maps.append(offset+start)
+        font_coverage[font]=(data,maps)
+    data,maps=font_coverage[font]; code=ord(char)
+    for offset in maps:
+        kind=struct.unpack_from('>H',data,offset)[0]
+        if kind in (12,13):
+            count=struct.unpack_from('>I',data,offset+12)[0]
+            for i in range(count):
+                start,end,glyph=struct.unpack_from('>III',data,offset+16+12*i)
+                if start<=code<=end and glyph+(code-start if kind==12 else 0)>0: return True
+        elif kind==4 and code<=0xffff:
+            count=struct.unpack_from('>H',data,offset+6)[0]//2
+            ends=offset+14; starts=ends+2*count+2; deltas=starts+2*count; ranges=deltas+2*count
+            for i in range(count):
+                end=struct.unpack_from('>H',data,ends+2*i)[0]
+                start=struct.unpack_from('>H',data,starts+2*i)[0]
+                if not start<=code<=end: continue
+                delta=struct.unpack_from('>h',data,deltas+2*i)[0]
+                shift=struct.unpack_from('>H',data,ranges+2*i)[0]
+                glyph=struct.unpack_from('>H',data,ranges+2*i+shift+2*(code-start))[0] if shift else code
+                if glyph and (glyph+delta)&0xffff: return True
+    return False
+
+def general_fonts(st):
+    primary=packaged_font(st.get('fontFile'))
+    if primary is None: raise ValueError('通用字幕缺少随包字体，不能静默改用剪映默认字体')
+    fallback=packaged_font(st.get('fallbackFontFile')) or primary
+    family=st.get('fallbackFamily','') if st.get('fontFile')==st.get('fallbackFontFile') else st.get('fontFamily','')
+    return font_face(primary,family),font_face(fallback,st.get('fallbackFamily',''))
+
+def character_font(primary,fallback,char):
+    return primary if has_glyph(primary,char) or not has_glyph(fallback,char) else fallback
+
+def general_box(text,st):
+    if 'box' in st: return st['box']
+    from PIL import ImageFont
+    layout=st['layout']; size=st['fontSizePx']; tracking=st.get('tracking',0)*size
+    primary,fallback=general_fonts(st)
+    fonts={p:ImageFont.truetype(str(p),max(1,round(size))) for p in {primary,fallback}}
+    max_width=max(1,layout['maxWidth'])
+    content_width=max(1,max_width-2*layout.get('paddingX',0))
+    widths=[]; width=0
+    # Static layout only: original text remains unchanged and Jianying owns
+    # wrapping. Browser/native font rasterizers may wrap a boundary differently.
+    for char in text:
+        if char=='\n': widths.append(width); width=0; continue
+        font=fonts[character_font(primary,fallback,char)]
+        advance=font.getlength(char)+tracking
+        if width and width+advance>content_width:
+            widths.append(width); width=0
+        width+=advance
+    widths.append(width)
+    width=min(max_width,max(widths,default=0))
+    height=max(1,len(widths))*size*st.get('lineHeight',1.2)
+    # The web background adds symmetric padding, which does not change its
+    # anchor centre. Keep native text centre aligned with the same anchored box.
+    px=layout.get('paddingX',0)
+    py=layout.get('paddingY',0)
+    width+=2*px; height+=2*py
+    if layout.get('bar'): width=max_width
+    if layout.get('fixedWidth'): width=layout['fixedWidth']
+    return dict(x=layout['x']-layout['anchorX']*width,
+                y=layout['y']-layout['anchorY']*height,width=width,height=height)
+
 caption_lanes=[(captions,0)]
-for c in visible_subtitles(m['subtitles']):
+# Task 25: retain each authored cue, including overlaps. Separate native lanes
+# below avoid pyJianYingDraft's same-track overlap rejection without cropping.
+for c in sorted(m['subtitles'], key=lambda cue: cue['start']):
     # A subtitle crossing a card boundary is split to keep its placement aligned.
     a,b=c['start'],c['start']+c['duration']
     cuts=sorted({a,b}|{x for k in m['cards'] for x in [k['start'],k['start']+k['duration']] if a<x<b})
@@ -247,15 +401,35 @@ for c in visible_subtitles(m['subtitles']):
         x=0
         if card and not card.get('overlayOnVideo') and card['presentation']['type']=='half': x=.5 if card['presentation']['halfSide']=='left' else -.5
         st=c.get('style',{})
-        font_pixels=st.get('fontSize',32)*w/1280*c.get('autoFit',1)
+        gs=c.get('generalStyle')
+        font_pixels=gs['fontSizePx'] if gs else st.get('fontSize',32)*w/1280*c.get('autoFit',1)
         font_size=font_pixels/ h * 100
+        if gs:
+            st=gs
+            box=general_box(c['text'],gs)
+            x=(box['x']+box['width']/2-w/2)/(w/2)
+            y=-(box['y']+box['height']/2-h/2)/(h/2)
+            line_width=gs.get('maxLineWidth',gs.get('layout',{}).get('maxWidth',box['width'])/w)
+        else:
+            y=-(1-2*(20+h*.04+font_pixels*.82)/h)
+            line_width=.47 if x else .9
+        border=None
+        if gs and gs.get('strokeWidthPx',0)>0:
+            # pyJianYingDraft exposes Jianying's 0..100 slider, not CSS px;
+            # map stroke/font ratio into its 0..0.2 exported range.
+            border=jy.TextBorder(color=rgb(gs.get('strokeColor','#000000')),alpha=rgba(gs.get('strokeColor','#000000'))[1]*gs.get('strokeOpacity',1),
+                width=min(100,max(0,gs['strokeWidthPx']/max(1,font_pixels)*500)))
         seg=jy.TextSegment(c['text'],tr(left,right-left),
             style=jy.TextStyle(size=font_size, bold=st.get('fontWeight',700)>=600,
                 italic=st.get('italic',False),underline=st.get('underline',False), color=rgb(st.get('color','#ffffff')),
-                align={'left':0,'center':1,'right':2}.get(st.get('align'),1),auto_wrapping=True,max_line_width=.47 if x else .9),
-            background=background_style(st),
-            clip_settings=jy.ClipSettings(transform_x=x,transform_y=-(1-2*(20+h*.04+font_pixels*.82)/h),
+                alpha=st.get('opacity',1),
+                letter_spacing=st.get('tracking',0)/.05 if gs else 0,
+                line_spacing=(st.get('lineHeight',1.02)-1-.02)/.05 if gs else 0,
+                align={'left':0,'center':1,'right':2}.get(st.get('align'),1),auto_wrapping=True,max_line_width=line_width),
+            border=border, background=general_background(st) if gs else background_style(st),
+            clip_settings=jy.ClipSettings(transform_x=x,transform_y=y,rotation=st.get('rotate',0),
                 scale_x=st.get('scale',1),scale_y=st.get('scale',1)))
+        if gs: general_captions[seg.material_id]={**gs,'runs':c.get('runs',gs.get('runs',[]))}
         lane_index=next((i for i,(_,end) in enumerate(caption_lanes) if end<=left),None)
         if lane_index is None:
             lane_index=len(caption_lanes)
@@ -345,11 +519,54 @@ if not font_file.exists():
     if fonts: shutil.copyfile(fonts[0],font_file)
 if font_file.exists():
     for material in content['materials']['texts']:
+        if material['id'] in general_captions: continue
         text=json.loads(material['content'])
         for style in text['styles']: style['font']={'id':'','path':str(font_file)}
         material['content']=json.dumps(text,ensure_ascii=False)
         material['font_path']=str(font_file)
         material['font_name']='PingFang SC'
+
+for material in content['materials']['texts']:
+    gs=general_captions.get(material['id'])
+    if not gs: continue
+    text=json.loads(material['content']); base=text['styles'][0]
+    base['fill']['content']['solid']['alpha']=rgba(gs.get('color','#ffffff'))[1]*gs.get('colorAlpha',1)
+    primary,fallback=general_fonts(gs)
+    styles=[]
+    for index,char in enumerate(text['text']):
+        style=copy.deepcopy(base)
+        font=character_font(primary,fallback,char)
+        for run in gs.get('runs',[]):
+            if run['start']<=index<run['end']:
+                if run.get('color'):
+                    color,alpha=rgba(run['color'])
+                    style['fill']['content']['solid']['color']=list(color)
+                    style['fill']['content']['solid']['alpha']=alpha*run.get('opacity',1)
+                if 'underline' in run: style['underline']=run['underline']
+                if run.get('fontFile'): font=packaged_font(run['fontFile'])
+        style['font']={'id':'','path':str(font)}
+        # Range uses Unicode code points, as TextSegment.export_material does.
+        if styles and {k:v for k,v in styles[-1].items() if k!='range'}=={k:v for k,v in style.items() if k!='range'}:
+            styles[-1]['range'][1]=index+1
+        else:
+            style['range']=[index,index+1]; styles.append(style)
+    text['styles']=styles or [base]
+    material['content']=json.dumps(text,ensure_ascii=False)
+    material['font_path']=str(primary)
+    material['font_name']=gs.get('fallbackFamily','') if gs.get('fontFile')==gs.get('fallbackFontFile') else gs.get('fontFamily','')
+    if fallback!=primary:
+        export_warnings.append('通用字幕按随包字体的实际字符表选择主字体及缺字回退；原生字形与浏览器自动回退需在剪映核对。')
+
+for track in content['tracks']:
+    for segment in track['segments']:
+        gs=general_captions.get(segment['material_id'])
+        if gs:
+            rank=70000+gs.get('renderOrder',0)
+            segment['render_index']=rank*1000
+            segment['track_render_index']=rank
+
+if general_captions:
+    export_warnings.append('通用字幕使用静态原生字幕；位置按随包字体离线度量，剪映与浏览器的字形、换行及行距可能有细微差异。字重按原生粗体开关近似；描边、背景圆角/边距及字间距按原生参数近似，请在剪映核对。')
 
 if general_adapter is not None:
     general_adapter.decorate(content, m, res)
@@ -363,7 +580,7 @@ if vp:
                 at=seg['target_timerange']['start']+seg['target_timerange']['duration']/2
                 card=card_at(at)
                 if track['name'].startswith('独立动效卡片') and card and (card.get('behindText') or card.get('layoutBaked')): continue
-                if track['name']=='字幕 · 可编辑' and (not card or card['presentation']['type']=='small'): continue
+                if track['name'].startswith(('字幕 ·', '字幕重叠 ')) and (not card or card['presentation']['type']=='small'): continue
             cs=seg.get('clip')
             if not cs: continue
             cs['transform']['x']=cs['transform']['x']*vp['scaleX']+(vp['x']+vp['width']/2-w/2)/(w/2)

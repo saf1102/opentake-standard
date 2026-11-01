@@ -1,4 +1,5 @@
 import {buildGeneralDraft,flatGeneralDraft} from './export-draft.ts';
+import {generalJianyingCaptions, splitJianyingText} from './jianying-captions.ts';
 import {encodeExportMedia} from './export-media.ts';
 import type {ExportSettings} from '../../src/types/editor.ts';
 /** Runs outside the agent sandbox, in one disposable export directory. */
@@ -36,9 +37,10 @@ try {
     progress('渲染画面',.05);
     await renderHyperframes(work,source,{fps,edits:layers?hfPageEdits(layers):undefined,onProgress:p=>progress('渲染画面',.05+.8*p)});
   } else if(kind==='film') {
-    progress('检查分轨和页面',.05);await filmCommand('check');
+    progress('检查分轨和页面',.05);
     if(format==='jianying'){await jianying();source='';}
     else {
+      await filmCommand('check');
       const film=JSON.parse(fs.readFileSync(path.join(work,'film.json'),'utf8')) as Film2;
       await renderAppFilm(film,work,{onProgress:p=>progress('渲染画面和转场',.15+.6*p)});
       progress('混合声音',.8);await filmCommand('mux');
@@ -55,7 +57,12 @@ try {
 } catch (error) { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; }
 
 async function jianying() {
-  const film = JSON.parse(fs.readFileSync(path.join(work, 'film.json'),'utf8')) as Film2;
+  // Native captions need structure/media validation, not a raster rendering of their text.
+  const {readFilm} = await import(pathToFileURL(path.join(KIT_DIR,'lib/film.mjs')).href);
+  const {checkLayered} = await import(pathToFileURL(path.join(KIT_DIR,'lib/compose.mjs')).href);
+  const film = readFilm(work) as Film2;
+  const problems = await checkLayered(film);
+  if (problems.length) throw Error(`film.json 有问题：\n- ${problems.join('\n- ')}`);
   const folder = path.join(output, '剪映工程'), res = path.join(folder, 'Resources');
   fs.mkdirSync(res, { recursive: true });
   const us = (x: number) => Math.round(x * 1e6);
@@ -64,7 +71,8 @@ async function jianying() {
   const copy = (source: string, file: string) => { fs.copyFileSync(source, path.join(res,file), fs.constants.COPYFILE_FICLONE); return file; };
   // one file per source, shared by every clip cut from it (as the 口播 package keeps one material per asset)
   const once = (source: string, file: string) => fs.existsSync(path.join(res, file)) ? file : copy(source, file);
-  const warnings: string[] = [];
+  const captions = await generalJianyingCaptions(film,res);
+  const warnings: string[] = [...captions.warnings];
   const general: Record<string, unknown> = { film };
   const footage = [];
   for (const c of film.footage) {
@@ -88,15 +96,20 @@ async function jianying() {
   }
   general.picture = picture;
   const textVideos = [];
-  for (const [i,c] of film.text.entries()) {
-    progress(`渲染独立文字 ${i+1}/${film.text.length}`, .6+.15*i/Math.max(1,film.text.length));
+  const visualText = splitJianyingText(film).textVideos;
+  for (const [i,{item:c,renderOrder}] of visualText.entries()) {
+    progress(`渲染独立文字 ${i+1}/${visualText.length}`, .6+.15*i/Math.max(1,visualText.length));
     const source = await renderAppFilm(film,work,{textId:c.id});
     const file=`text-${c.id}.mov`;
     prepareJianyingAlpha(source,path.join(res,file),path.join(work,'.tmp','alpha'));
-    textVideos.push({...span(c),file});
+    textVideos.push({...span(c),file,renderOrder});
   }
   general.textVideos = textVideos;
-  warnings.push('文字是渲染出来的画面，要改字回 OpenTake 改。');
+  if (textVideos.length) warnings.push('标题、标签是渲染出来的独立画面，要改字回 OpenTake 改；字幕可在剪映直接修改。');
+  // fades the person dragged on the timeline (at most half the clip each), baked into each clip's sound
+  const ownFades=(c:{fadeIn?:number;fadeOut?:number},len:number)=>[
+    ...(c.fadeIn?[`afade=t=in:st=0:d=${Math.min(c.fadeIn,len/2)}`]:[]),
+    ...(c.fadeOut?[`afade=t=out:st=${len-Math.min(c.fadeOut,len/2)}:d=${Math.min(c.fadeOut,len/2)}`]:[])];
   for (const kind of ['voice','music','sfx'] as const) {
     const clips = [];
     for (const c of film[kind]) {
@@ -104,6 +117,7 @@ async function jianying() {
       const fades = [];
       if(c.start === 0 && film.segments[0].transition === 'fade') fades.push('afade=t=in:st=0:d=0.5');
       if(c.end === film.duration && film.ending === 'fade') fades.push(`afade=t=out:st=${Math.max(0,duration-.5)}:d=0.5`);
+      fades.push(...ownFades(c,duration));
       // Like MP4, a longer edited clip has silence after EOF, never stretched audio.
       await ff(['-i',path.join(work,c.src),'-vn','-af', [`atrim=start=${c.in}:duration=${duration}`,'asetpts=PTS-STARTPTS','apad',`atrim=duration=${duration}`,...fades].join(','),'-ar','48000','-ac','2',path.join(res,file)]);
       clips.push({...span(c),file,sourceStart:0,gain:10**(volumeDb(c.volume)/20)});
@@ -116,6 +130,7 @@ async function jianying() {
     const file=`source-audio-${c.id}.wav`,tempo:string[]=[], fades:string[]=[];
     if(c.start===0&&film.segments[0].transition==='fade')fades.push('afade=t=in:st=0:d=0.5');
     if(c.end===film.duration&&film.ending==='fade')fades.push(`afade=t=out:st=${Math.max(0,c.end-c.start-.5)}:d=0.5`);
+    fades.push(...ownFades(c,c.end-c.start));
     for(let s=c.speed;Math.abs(s-1)>1e-6;){const n=Math.min(2,Math.max(.5,s));tempo.push(`atempo=${n}`);s/=n;}
     await ff(['-ss',String(c.in),'-t',String((c.end-c.start)*c.speed),'-i',path.join(output,'media',c.media),'-vn','-af',[...(c.reverse?['areverse']:[]),...tempo,'apad',`atrim=duration=${c.end-c.start}`,...fades].join(','),'-ar','48000','-ac','2',path.join(res,file)]);
     sourceAudio.push({...span(c),file,gain:10**(volumeDb(c.volume)/20)});
@@ -128,7 +143,8 @@ async function jianying() {
   if(film.segments.some(s=>s.transition!=='cut')) warnings.push('剪映原生叠化/闪黑/闪白仅用于相邻素材边界；跨画面页和文字的全合成转场、段间 fade 暂不能与 MP4 完全一致。');
   if(film.music.length && film.voice.length) warnings.push('剪映保留分轨音量，未烘焙 MP4 的旁白压低配乐处理。');
   await ff(['-f','lavfi','-i',`color=black:s=${film.width}x${film.height}`,'-frames:v','1',path.join(res,'background.png')]);
-  fs.writeFileSync(path.join(folder,'handoff.json'),JSON.stringify({name,duration:us(film.duration),settings:{width:film.width,height:film.height,fps:film.fps},videos:[],cards:[],subtitles:[],sfx:[],audio:{},generalLayers:general}));
+  fs.writeFileSync(path.join(folder,'handoff.json'),JSON.stringify({name,duration:us(film.duration),settings:{width:film.width,height:film.height,fps:film.fps},videos:[],cards:[],subtitles:captions.subtitles,sfx:[],audio:{},generalLayers:general}));
+  fs.writeFileSync(path.join(folder,'字幕样式对应.json'),JSON.stringify(captions.mappings,null,2));
   progress('生成剪映可编辑轨道',.85);
   await buildGeneralDraft(folder);
   fs.writeFileSync(path.join(folder,'通用剪辑兼容说明.txt'),warnings.join('\n'));

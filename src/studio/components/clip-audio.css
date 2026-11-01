@@ -1,0 +1,28 @@
+/* Fade dots and the volume line on a sounding timeline clip (ClipAudioHandles). */
+/* above the trim handles (z 8) so the dots win where they meet; the layer itself lets clicks through */
+.clip-audio { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+.clip-audio-ramp { position: absolute; top: 0; bottom: 0; height: 100%; fill: #0000008c; pointer-events: none; }
+.clip-audio-line, .clip-audio-dot { opacity: 0; transition: opacity .12s; }
+.timeline-clip:hover .clip-audio-line, .timeline-clip:hover .clip-audio-dot, .clip-audio[data-dragging] :is(.clip-audio-line, .clip-audio-dot) { opacity: 1; pointer-events: auto; }
+.clip-audio-line { position: absolute; left: 12px; right: 12px; height: 9px; margin-top: -4.5px; cursor: ns-resize; touch-action: none; }
+.clip-audio-line::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; border-top: 1.5px solid #fff; opacity: .9; box-shadow: 0 0 2px #0008; }
+.clip-audio-line i { pointer-events: none; position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; padding: 1px 5px; border-radius: 4px; background: #000c; color: #fff; font: 600 10px/1.4 var(--studio-font, system-ui); font-style: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.clip-audio-line i[data-loud] { color: #ffb27a; }
+.clip-audio-line i[data-below] { bottom: auto; top: 7px; }
+/* at the top of the fade ramp; an 18 px target around a 10 px dot */
+.clip-audio-dot { position: absolute; top: -4px; width: 18px; height: 18px; margin-left: -9px; cursor: ew-resize; touch-action: none; }
+.clip-audio-dot.is-out { margin: 0 -9px 0 0; }
+.clip-audio-dot::after { content: ""; position: absolute; left: 4px; top: 4px; width: 10px; height: 10px; box-sizing: border-box; border-radius: 50%; background: #fff; border: 2px solid var(--studio-accent, #f5b316); box-shadow: 0 0 2px #0009; transition: transform .1s; }
+.clip-audio-dot:hover::after, .clip-audio[data-dragging] .clip-audio-dot::after { transform: scale(1.25); }
+.clip-audio-tip { position: absolute; top: 1px; padding: 1px 5px; border-radius: 4px; background: #000c; color: #fff; font: 600 10px/1.4 var(--studio-font, system-ui); white-space: nowrap; pointer-events: none; }
+/* the waveform follows the line; what would clip shows orange at the edges */
+.timeline-media-strip { --clip-gain: var(--clip-gain-live, var(--clip-gain-saved, 1)); }
+.timeline-waveform-img { position: absolute; inset: 0; background-repeat: no-repeat; transform: scaleY(min(var(--clip-gain), 6)); }
+.timeline-waveform-hot { position: absolute; left: 0; right: 0; bottom: 0; height: 19px; z-index: 3; pointer-events: none; overflow: hidden;
+  opacity: clamp(0, calc((var(--clip-gain) - 1) * 40), 1);
+  -webkit-mask-image: linear-gradient(#000 0 16%, transparent 16% 84%, #000 84%); mask-image: linear-gradient(#000 0 16%, transparent 16% 84%, #000 84%); }
+.timeline-media-strip.is-audio .timeline-waveform-hot { height: 100%; }
+.timeline-waveform-hot > span { position: absolute; inset: 0; background: #ff8a3d; transform: scaleY(min(var(--clip-gain), 6)); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+/* video clips: the waveform sits on its own dark, see-through band under the picture (S先生 10-31) */
+html[data-ui-theme] .timeline-media-strip.is-video .timeline-waveform:not(.is-pending) { background-color: #0b0c0fb8; border-top: 1px solid #ffffff14; }
+html[data-ui-theme=warm] .timeline-media-strip.is-video .timeline-waveform:not(.is-pending) { background-color: #2a2219b0; border-top-color: #ffffff1f; }

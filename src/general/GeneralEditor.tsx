@@ -4,8 +4,9 @@
  * a text and its preset, keep or drop a clip's sound, volume in three steps, delete a clip. Each change is saved as
  * versions/vN/edited.json; the agent's layers.json stays as it delivered it.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { MessageSquare, Palette, RotateCcw, SlidersHorizontal, Volume2, VolumeX, Wand2 } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { MessageSquare, Palette, RotateCcw, Scissors, SlidersHorizontal, Volume2, VolumeX, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MediaLibrary, type LeftLibraryTab } from '@/studio/components/MediaLibrary'
 import { TimelineEditor } from '@/studio/components/TimelineEditor'
@@ -16,7 +17,7 @@ import type { Timeline, TimelineClip, TimelineTrack } from '@/types/editor'
 import type { LibraryStyle } from '@/workspace/style-library/style-library'
 import { errorText, generalApi, generalEditorApi, type TextPresets } from './general-api'
 import type { GeneralLayers, GeneralMedia, GeneralProject, GeneralSegment, GeneralVersion } from './general-contract'
-import { editProjectFor, mediaFileName } from './general-editor-model'
+import { editProjectFor, mediaFileName, soundAssetId } from './general-editor-model'
 import { styleNameOf } from './general-logic'
 import { GeneralPreview } from './GeneralPreview'
 import { type StageReference } from './GeneralStage'
@@ -24,6 +25,15 @@ import { grabArea } from './frame-grab'
 import { Spinner } from './GeneralBits'
 // the left column's 素材 / 风格库 tabs are styled with the motion library's sheet (the 口播 editor loads it through that panel)
 import '@/studio/components/motion-library-panel.css'
+import { NO_FIXED_TRACKS, copyTimelineClips, pasteTimelineClips } from '@/studio/timeline-clipboard'
+import { ClipSpeedControl } from '@/studio/components/ClipSpeedControl'
+import { RadialFades, RadialText, RadialVolume, type RadialItem } from '@/studio/components/ClipRadial'
+import { maxClipFade } from '@/studio/clip-audio'
+import { timingKey } from './hf-timing'
+import { setGeneralPlayhead } from './composer-tokens'
+import { followersOf, freezeAnchors, reanchor } from './hf-anchor'
+import { splitBySound } from './hf-split'
+import { SCENE_SPEED_MARKS, SCENE_SPEED_MAX, SCENE_SPEED_MIN, clipSpeed, isScene, sceneSpan, setSceneSpeed, speedToLength } from './hf-speed'
 
 const VOLUME_DB = { low: -8, mid: 0, high: 4 } as const
 type VolumeStep = keyof typeof VOLUME_DB
@@ -55,11 +65,15 @@ function useEditedLayers(projectId: string, version: GeneralVersion) {
   const history = useRef<{ past: GeneralLayers[]; future: GeneralLayers[] }>({ past: [], future: [] })
   const timer = useRef<number>(undefined)
   const [saving, setSaving] = useState(false)
+  // a HyperFrames film's page is served with the saved edits: after a save that changed its timing or sound the
+  // preview loads it again (words and moves apply live and need no reload)
+  const [pageRevision, setPageRevision] = useState(0)
+  const savedTiming = useRef<string>(undefined)
   useEffect(() => {
     let alive = true
     // the page keys this editor by version, so a new version is a new editor
     generalEditorApi.layers(projectId, version.n, version.layersUrl!).then(
-      value => { if (alive) setState(value) },
+      value => { if (alive) { if (value.layers?.engine === 'hyperframes') savedTiming.current = timingKey(value.layers); setState(value) } },
       failure => { if (alive) setState({ edited: false, error: errorText(failure) }) },
     )
     return () => { alive = false }
@@ -68,7 +82,11 @@ function useEditedLayers(projectId: string, version: GeneralVersion) {
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
       setSaving(true)
-      generalEditorApi.saveEdited(projectId, version.n, layers).then(noop, failure => toast.error(`改动没存上：${errorText(failure)}`)).finally(() => setSaving(false))
+      generalEditorApi.saveEdited(projectId, version.n, layers).then(() => {
+        if (layers.engine !== 'hyperframes') return
+        const key = timingKey(layers)
+        if (key !== savedTiming.current) { savedTiming.current = key; setPageRevision(n => n + 1) }
+      }, failure => toast.error(`改动没存上：${errorText(failure)}`)).finally(() => setSaving(false))
     }, 500)
   }, [projectId, version.n])
   useEffect(() => () => window.clearTimeout(timer.current), [])
@@ -93,7 +111,7 @@ function useEditedLayers(projectId: string, version: GeneralVersion) {
       return { ...current, layers: target, edited: true }
     })
   }, [save])
-  return { ...state, saving, commit, undo: () => step(true), redo: () => step(false) }
+  return { ...state, saving, pageRevision, commit, undo: () => step(true), redo: () => step(false) }
 }
 
 /** A footage clip's source: another of the project's media, and which stretch of it plays (in-point slider). */
@@ -128,9 +146,46 @@ function FootageSource({ clip, media, layers, onPatch }: { clip: TimelineClip; m
   </>
 }
 
-function ClipInspector({ timeline, clipId, presets, segments, media, layers, onCommit, onAsk, onRedoSegment }: {
+/**
+ * 动效卡变速 (S先生 11-01): the scene's whole animation played faster or slower, its length following; a scene that
+ * moves some other way (hf-speed.ts on the server says which) only trims.
+ */
+function SceneSpeed({ clip, track, speedable, onPatch, hint }: { clip: TimelineClip; track: TimelineTrack; speedable: boolean; onPatch: (change: (c: TimelineClip) => void) => void; hint?: boolean }) {
+  if (!speedable) return <p className="ge-insp-note">这段动画的写法不能变速：拖右边缘只会截取。要整段加快，让 Codex 用 CSS 动画或逐帧脚本重做这一段。</p>
+  const span = sceneSpan(clip)
+  const next = track.clips.filter(c => c.id !== clip.id && c.start >= clip.start + 1e-6).sort((a, b) => a.start - b.start)[0]
+  return <>
+    <ClipSpeedControl rate={clipSpeed(clip)} sourceSeconds={span} minRate={next ? span / Math.max(0.05, next.start - clip.start) : undefined}
+      range={[SCENE_SPEED_MIN, SCENE_SPEED_MAX]} marks={SCENE_SPEED_MARKS} animation onChange={rate => onPatch(c => setSceneSpeed(c, rate))} />
+    {hint && <div className="clip-radial-field"><p>按住 ⌥ 拖右边缘也能变速 · 双击滑条恢复 1×</p></div>}
+  </>
+}
+
+/**
+ * While a scene's end is ⌥ dragged: its speed above the end, and where its animation ran before, pressed into the
+ * clip (or the clip running past it, slower).
+ */
+function SpeedDragHint({ clipId, rate, from, to, pps }: { clipId: string; rate: number; from: number; to: number; pps: number }) {
+  const [box, setBox] = useState<DOMRect>()
+  useLayoutEffect(() => { setBox(document.querySelector(`[data-timeline-clip-id="${CSS.escape(clipId)}"]`)?.getBoundingClientRect()) }, [clipId, to, pps])
+  if (!box) return null
+  const pressed = (from - to) * pps
+  return createPortal(<>
+    {pressed > 2 && <div className="clip-speed-drag-ghost" style={{ left: box.right, top: box.top, width: pressed, height: box.height }} aria-hidden="true">{pressed > 64 && <span>‹‹ 压进来</span>}</div>}
+    <div className="clip-speed-drag-stem" style={{ left: box.right, top: box.top - 14 }} aria-hidden="true" />
+    <div className="clip-speed-drag-hint" style={{ left: box.right, top: box.top - 14 }} role="status">
+      <div><kbd>⌥</kbd><span>变速</span><b>{rate < 1 ? rate.toFixed(2).replace(/0$/, '') : rate.toFixed(1).replace(/\.0$/, '')}×</b></div>
+      <small>{from.toFixed(1)} 秒 → {to.toFixed(1)} 秒 · 动画完整播完</small>
+    </div>
+  </>, document.body)
+}
+
+function ClipInspector({ timeline, clipId, presets, segments, media, layers, speedable, onCommit, onAsk, onRedoSegment, onSplitSounds }: {
   timeline: Timeline; clipId?: string; presets: Record<string, unknown>; segments: GeneralSegment[]; media: GeneralMedia[]; layers: GeneralLayers
+  /** which scene pages can play at another speed, by path */
+  speedable: Record<string, boolean>
   onCommit: (change: (timeline: Timeline) => void) => void; onAsk: (line: string) => void; onRedoSegment: (segment: GeneralSegment, index: number) => void
+  onSplitSounds: (clip: TimelineClip) => void
 }) {
   const found = findClip(timeline, clipId)
   // keyed by clip, so another clip starts from its own text
@@ -148,13 +203,13 @@ function ClipInspector({ timeline, clipId, presets, segments, media, layers, onC
   const range = `${timecode(clip.start)} – ${timecode(clip.start + clip.duration)}`
   return <div className="ge-insp">
     <header><small>{track.name}</small><b title={clip.name}>{clip.name || '（未命名）'}</b><span>{range}</span></header>
-    {track.kind === 'subtitle' && clip.params.hf !== true && <>
+    {track.kind === 'subtitle' && (clip.params.hf !== true || clip.params.line === true) && <>
       <label className="ge-field"><span>文字</span>
         <textarea value={text} rows={3} onChange={event => setText(event.target.value)}
           onBlur={() => { if (text !== clip.text) patch(c => { c.text = text; c.name = text.replace(/[{}]/g, '').split('\n')[0] }) }} />
-        <small>用 {'{'}花括号{'}'} 包住的字会用强调色</small>
+        {clip.params.line !== true && <small>用 {'{'}花括号{'}'} 包住的字会用强调色</small>}
       </label>
-      {choices.length > 0 && <div className="ge-field"><span>样式</span>
+      {clip.params.line !== true && choices.length > 0 && <div className="ge-field"><span>样式</span>
         <div className="ge-chips">{choices.map(name => <button key={name} type="button" className={clip.params.preset === name ? 'active' : ''}
           onClick={() => patch(c => { c.params = { ...c.params, preset: name } })}>{name}</button>)}</div>
       </div>}
@@ -168,13 +223,25 @@ function ClipInspector({ timeline, clipId, presets, segments, media, layers, onC
       </div>
     </div>}
     {track.kind === 'video' && <FootageSource key={`${clip.params.media}:${clip.sourceStart}`} clip={clip} media={media} layers={layers} onPatch={patch} />}
+    {track.kind === 'video' && (() => {
+      const speed = Number(clip.params.speed ?? 1) || 1, source = clip.sourceDuration ?? clip.duration * speed
+      const next = track.clips.filter(c => c.id !== clip.id && c.start >= clip.start + 1e-6).sort((a, b) => a.start - b.start)[0]
+      return <ClipSpeedControl rate={speed} sourceSeconds={source} minRate={next ? source / Math.max(0.05, next.start - clip.start) : undefined}
+        onChange={rate => patch(c => { const span = c.sourceDuration ?? c.duration * (Number(c.params.speed ?? 1) || 1); c.sourceDuration = span; c.params = { ...c.params, speed: rate }; c.duration = span / rate })} />
+    })()}
+    {track.kind === 'page' && isScene(clip) && <div className="ge-field"><span>变速</span>
+      <SceneSpeed clip={clip} track={track} speedable={speedable[String(clip.params.sub)] !== false} onPatch={patch} /></div>}
     {(track.kind === 'page' || clip.params.hf === true) && Object.keys((clip.params.textEdits as Record<string, string> | undefined) ?? {}).length > 0 && <div className="ge-field"><span>{track.kind === 'subtitle' ? '改过的字幕' : '页面里改过的字'}</span>
       <ul className="ge-edits">{Object.entries(clip.params.textEdits as Record<string, string>).map(([name, value]) => <li key={name}><b>{value}</b>
         <button type="button" onClick={() => patch(c => { const next = { ...(c.params.textEdits as Record<string, string>) }; delete next[name]; c.params = { ...c.params, textEdits: next } })}>还原</button></li>)}</ul>
     </div>}
-    {['voice', 'music', 'sfx'].includes(track.kind) && <p className="ge-insp-note">音量在时间线左边的轨道头调，按分贝调整整条{track.name}。</p>}
+    {['voice', 'music', 'sfx'].includes(track.kind) && <p className="ge-insp-note">{clip.params.hf === true
+      ? `音量和淡入淡出在时间线的片段上直接拖；整条${track.name}的音量在左边轨道头调。${track.kind !== 'music' ? '挪动画面时，它跟着所属的那段画面走。' : ''}`
+      : `音量在时间线左边的轨道头调，按分贝调整整条${track.name}。`}</p>}
+    {canSplitSounds(clip, track) && <div className="ge-insp-actions"><button type="button" className="ge-insp-btn" onClick={() => onSplitSounds(clip)}><Scissors size={14} aria-hidden />按声音切开</button></div>}
     {track.kind === 'page' && clip.params.hf !== true && <p className="ge-insp-note">这是 Codex 做的{track.name}。里面的字和图形，在预览上单击可以移动、调大小、旋转，双击可以改字；要换整段画面，让 Codex 重做这一段。</p>}
-    {clip.params.hf === true && (track.kind === 'page' || track.kind === 'subtitle') && <p className="ge-insp-note">这是 Codex 做的{track.name}。里面的字在预览上双击可以直接改；要换整段画面，让 Codex 重做这一段。</p>}
+    {clip.params.hf === true && clip.params.line !== true && (track.kind === 'page' || track.kind === 'subtitle') && <p className="ge-insp-note">这是 Codex 做的{track.name}。里面的字在预览上双击可以直接改；要换整段画面，让 Codex 重做这一段。</p>}
+    {clip.params.line === true && <p className="ge-insp-note">字幕一句一条：可以挪、裁两头、删、复制；字在这里改，或在预览上双击改。样子跟着这条片子的字幕页走。</p>}
     <div className="ge-insp-actions">
       {segment && <button type="button" className="ge-insp-btn" onClick={() => onRedoSegment(segment, segmentIndex)}><Wand2 size={14} aria-hidden />让 Codex 重做这一段</button>}
       <button type="button" className="ge-insp-btn" onClick={() => onAsk(`改「${track.name}」里的「${clip.name}」（${range}）：`)}><MessageSquare size={14} aria-hidden />跟 Codex 说说这个片段</button>
@@ -182,20 +249,30 @@ function ClipInspector({ timeline, clipId, presets, segments, media, layers, onC
   </div>
 }
 
-type Drag = { clipId: string; start: number; duration: number; sourceStart: number }
+/**
+ * `followers`: the narration and effects that move with a scene (hf-anchor.ts), at their new starts. `speed`: a scene's
+ * end ⌥ dragged plays its whole animation in the new length (动效卡变速), `from` the length it had.
+ */
+type Drag = { clipId: string; start: number; duration: number; sourceStart: number; followers?: { id: string; start: number }[]; speed?: number; from?: number }
 /** Kinds whose clips must not overlap on their track (one picture at a time). */
 const SOLID = new Set(['page', 'video'])
+/** 按声音切开 is for a HyperFrames sound long enough to hold several (S先生 10-31). */
+const canSplitSounds = (clip: TimelineClip, track: TimelineTrack) => clip.params.hf === true && clip.params.tag === 'audio' && typeof clip.params.src === 'string' && (track.kind === 'sfx' || track.kind === 'voice') && clip.duration >= 1
 const withDrag = (layers: GeneralLayers, drag?: Drag): GeneralLayers => {
   if (!drag) return layers
   const timeline = structuredClone(layers.timeline)
   const hit = findClip(timeline, drag.clipId)
   if (hit) Object.assign(hit.clip, { start: drag.start, duration: drag.duration, sourceStart: drag.sourceStart })
+  if (hit && drag.speed !== undefined) hit.clip.params = { ...hit.clip.params, speed: drag.speed }
+  for (const follower of drag.followers ?? []) { const one = findClip(timeline, follower.id); if (one) one.clip.start = follower.start }
   return { ...layers, timeline }
 }
 
 export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegment, onProject, onQuote, reference }: Props) {
-  const { layers, edited, error, saving, commit, undo, redo } = useEditedLayers(project.id, version)
+  const { layers, edited, error, saving, pageRevision, commit, undo, redo } = useEditedLayers(project.id, version)
   const [time, setTime] = useState(0)
+  // for 「当前播放头」 in the composer's @ menu
+  useEffect(() => setGeneralPlayhead(time), [time])
   const [playing, setPlaying] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [zoom, setZoom] = useState(1)
@@ -219,9 +296,28 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
     generalEditorApi.textPresets(project.id).then(value => { if (alive) setPresets({ presets: value.presets, all: value.all ?? value.presets, fonts: value.fonts ?? [] }) }, noop)
     return () => { alive = false }
   }, [project.id])
+  // a HyperFrames film's sound files and their lengths: their waveforms on the 配音 / 配乐 / 音效 tracks
+  const [sounds, setSounds] = useState<Record<string, number>>({})
+  const hyperframes = layers?.engine === 'hyperframes'
+  useEffect(() => {
+    if (!hyperframes) return
+    let alive = true
+    generalEditorApi.soundFiles(project.id, version.n).then(value => { if (alive) setSounds(value) }, noop)
+    return () => { alive = false }
+  }, [project.id, version.n, hyperframes])
+  // 动效卡变速: which scene pages can play their whole animation faster or slower
+  const [speedable, setSpeedable] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    if (!hyperframes) return
+    let alive = true
+    generalEditorApi.sceneSpeeds(project.id, version.n).then(value => { if (alive) setSpeedable(value) }, noop)
+    return () => { alive = false }
+  }, [project.id, version.n, hyperframes])
   // where this project's media (and the agent's shots) are, registered before the library draws, so its first paint
   // already asks the right addresses; let go when the editor closes
   const resolveMedia = useMemo(() => (assetId: string, kind: MediaUrlKind | 'peaks'): string | undefined => {
+    const sound = Object.keys(sounds).find(src => soundAssetId(src) === assetId)
+    if (sound !== undefined) return kind === 'peaks' ? generalEditorApi.waveformUrl(project.id, version.n, sound, 'peaks') : kind === 'waveform' ? generalEditorApi.waveformUrl(project.id, version.n, sound, 'picture') : ''
     // a shot the agent made: its still, and its stretch of this version's film
     if (assetId.startsWith('shot-')) {
       const clip = layers?.timeline.tracks.find(t => t.id === 'g-page')?.clips.find(c => `shot-${c.id}` === assetId)
@@ -235,7 +331,7 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
     if (kind === 'thumbnail' || kind === 'filmstrip') return media.poster
     if (kind === 'peaks' || kind === 'waveform' || kind === 'cursor') return ''
     return generalEditorApi.fileUrl(project.id, `media/${mediaFileName(media, layers)}`)
-  }, [project.id, project.inputs.media, layers, version.videoUrl])
+  }, [project.id, project.inputs.media, layers, version.videoUrl, version.n, sounds])
   registerMediaUrls(project.id, resolveMedia)
   const unregister = useRef<() => void>(undefined)
   useEffect(() => { unregister.current = registerMediaUrls(project.id, resolveMedia) }, [project.id, resolveMedia])
@@ -260,9 +356,12 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
   const [drag, setDrag] = useState<Drag>()
   const [snapGuide, setSnapGuide] = useState<number>()
   const shown = useMemo(() => layers ? withDrag(layers, drag) : undefined, [layers, drag])
-  const editProject = useMemo(() => shown ? editProjectFor(project, shown, version.n) : undefined, [project, shown, version.n])
+  const editProject = useMemo(() => shown ? editProjectFor(project, shown, version.n, sounds) : undefined, [project, shown, version.n, sounds])
   const beginClip = (event: React.PointerEvent<HTMLElement>, clip: TimelineClip, track: TimelineTrack, edge?: 'left' | 'right') => {
     if (!layers || track.locked || event.button !== 0) return
+    // a HyperFrames page draws from its own second 0: it moves and its end trims, its head does not
+    // (a caption line is a line of words: its entrance starts from its own start, so its head trims too)
+    if (edge === 'left' && clip.params.hf === true && clip.params.line !== true && !['audio', 'video'].includes(String(clip.params.tag))) return
     event.stopPropagation()
     const fps = layers.fps, pps = 42 * zoom, originX = event.clientX
     const speed = Number(clip.params.speed ?? 1), sources = track.kind === 'video' || ['voice', 'music', 'sfx'].includes(track.kind)
@@ -271,25 +370,38 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
     const lo = SOLID.has(track.kind) ? Math.max(0, ...siblings.filter(c => c.start < clip.start).map(c => c.start + c.duration)) : 0
     const hi = SOLID.has(track.kind) ? Math.min(layers.duration, ...siblings.filter(c => c.start > clip.start).map(c => c.start)) : layers.duration
     const end = clip.start + clip.duration
+    // moving a scene of a HyperFrames film takes its narration and effects along; ⌥ moves the picture alone
+    const following = !edge && clip.params.hf === true && SOLID.has(track.kind) ? followersOf(layers.timeline, clip.id) : []
+    // ⌥ on a scene's end: the whole animation in the new length, faster or slower (动效卡变速)
+    const speeds = edge === 'right' && track.kind === 'page' && isScene(clip) && speedable[String(clip.params.sub)] !== false
+    const earliest = Math.min(clip.start, ...following.map(c => c.start))
     let moved = false, latest: Drag | undefined
     const move = (next: PointerEvent) => {
       const dx = next.clientX - originX
       if (!moved && Math.abs(dx) < 4) return
       moved = true; suppressClick.current = true; setPlaying(false)
-      let start = clip.start, duration = clip.duration, sourceStart = clip.sourceStart, guide: number | undefined
+      let start = clip.start, duration = clip.duration, sourceStart = clip.sourceStart, guide: number | undefined, rate: number | undefined
       if (!edge) {
         const snap = snapTimelineClipStart({ timeline: layers.timeline, movingClipId: clip.id, rawStart: snappedTimelineStart(clip.start, dx, pps, fps), duration, pixelsPerSecond: pps })
         start = Math.max(lo, Math.min(hi - duration, snap.start)); guide = snap.guide
+        // a sound can't go before the film's start
+        if (!next.altKey && following.length) start = Math.max(start, clip.start - earliest)
       } else if (edge === 'right') {
         const snap = snapTimelineClipEnd({ timeline: layers.timeline, movingClipId: clip.id, start, rawDuration: resizedTimelineDuration(clip.duration, dx, pps, fps, 0.2), pixelsPerSecond: pps, minimumDuration: 0.2 })
         duration = Math.min(hi - start, snap.duration); guide = snap.guide
+        if (speeds && next.altKey) {
+          duration = Math.min(hi - start, speedToLength(clip, duration))
+          rate = Math.round(sceneSpan(clip) / duration * 100) / 100
+          if (guide !== undefined && Math.abs(start + duration - guide) > 1e-3) guide = undefined
+        }
       } else {
         const snap = snapTimelineClipStart({ timeline: layers.timeline, movingClipId: clip.id, rawStart: snappedTimelineStart(clip.start, dx, pps, fps), duration: 0, pixelsPerSecond: pps })
         start = Math.max(lo, Math.min(end - 0.2, snap.start)); duration = end - start; guide = snap.guide
         // trimming the head of footage or a sound starts its source later (or earlier) by the same amount
         if (sources) sourceStart = Math.max(0, clip.sourceStart + (start - clip.start) * speed)
       }
-      latest = { clipId: clip.id, start, duration, sourceStart }
+      const delta = start - clip.start
+      latest = { clipId: clip.id, start, duration, sourceStart, ...(rate !== undefined ? { speed: rate, from: clip.duration } : {}), ...(!edge && following.length && !next.altKey ? { followers: following.map(c => ({ id: c.id, start: c.start + delta })) } : {}) }
       setDrag(latest); setSnapGuide(guide)
     }
     const up = () => {
@@ -301,8 +413,14 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
       commit(t => {
         const hit = findClip(t, done.clipId)
         if (!hit) return
+        if (clip.params.hf === true) freezeAnchors(t)
         Object.assign(hit.clip, { start: done.start, duration: done.duration, sourceStart: done.sourceStart })
-        if (hit.track.kind === 'video') hit.clip.sourceDuration = done.duration * speed
+        if (done.speed !== undefined) { hit.clip.sourceDuration = sceneSpan(clip); setSceneSpeed(hit.clip, sceneSpan(clip) / done.duration) }
+        // a trimmed scene at another speed plays less of its animation, at that speed
+        else if (hit.track.kind === 'video' || (edge === 'right' && isScene(hit.clip) && Math.abs(speed - 1) > 1e-3)) hit.clip.sourceDuration = done.duration * speed
+        for (const follower of done.followers ?? []) { const one = findClip(t, follower.id); if (one) one.clip.start = follower.start }
+        // a sound moved on its own now belongs to the scene it starts in
+        if (clip.params.hf === true && !edge) reanchor(t, [done.clipId])
       })
     }
     window.addEventListener('pointermove', move, true); window.addEventListener('pointerup', up, true); window.addEventListener('pointercancel', up, true)
@@ -317,6 +435,19 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
   const seek = (t: number) => setTime(Math.max(0, Math.min(layers.duration, t)))
   const selectedClip = selected.length === 1 ? selected[0] : undefined
   const segmentAt = layers.segments.findIndex(s => time >= s.start && time < s.end)
+  // 按声音切开: one clip per sound of a strip that holds several (hf-split.ts)
+  const splitSounds = async (clip: TimelineClip) => {
+    try {
+      const rate = Number(clip.params.speed ?? 1) || 1
+      const sounds = await generalEditorApi.sounds(project.id, version.n, String(clip.params.src), clip.sourceStart ?? 0, clip.duration * rate)
+      const count = splitBySound(structuredClone(layers.timeline), clip.id, sounds).length
+      if (count < 2) { toast('这一段里只听出一声，不用切'); return }
+      let ids: string[] = []
+      commit(t => { ids = splitBySound(t, clip.id, sounds) })
+      setTimeout(() => setSelected(ids))
+      toast.success(`切成了 ${count} 段，每一声可以单独挪、删、调音量`)
+    } catch (failure) { toast.error(`没能按声音切开：${errorText(failure)}`) }
+  }
 
   const upload = async (files: FileList | null) => {
     const list = [...(files ?? [])].filter(file => file.type.startsWith('video/') || file.type.startsWith('image/'))
@@ -348,8 +479,8 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
         </div>}
         onUpload={upload}
         onRemove={async asset => { try { onProject(await generalApi.removeMedia(project.id, asset.id)) } catch (failure) { toast.error(`没能移除：${errorText(failure)}`) } }}
-        onClassify={async () => {}} onRevealProject={noop} onPreviewOpen={() => setPlaying(false)} onBeginPointerDrag={noop} />
-      <GeneralPreview layers={shown ?? layers} mediaUrl={file => generalEditorApi.fileUrl(project.id, `media/${file}`)} pageOrigin={pageOrigin}
+        onClassify={async () => {}} onRevealProject={() => { generalEditorApi.revealProject(project.id).catch(failure => toast.error(`没能打开工程目录：${errorText(failure)}`)) }} onPreviewOpen={() => setPlaying(false)} onBeginPointerDrag={noop} />
+      <GeneralPreview pageRevision={pageRevision} layers={shown ?? layers} mediaUrl={file => generalEditorApi.fileUrl(project.id, `media/${file}`)} pageOrigin={pageOrigin}
         onQuote={onQuote ? (area, time) => {
           const film = { w: layers.width, h: layers.height }
           void grabArea(version.videoUrl, time, area, film).then(imageDataUrl => {
@@ -360,7 +491,12 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
         quoted={reference && reference.version === version.n ? { x: reference.fraction.x * layers.width, y: reference.fraction.y * layers.height, w: reference.fraction.w * layers.width, h: reference.fraction.h * layers.height } : undefined}
         presets={presets.all} fonts={presets.fonts} time={time} playing={playing} onTime={setTime} onPlaying={setPlaying} selectedClipId={selectedClip}
         onEditText={(clipId, text) => commit(t => { const hit = findClip(t, clipId); if (hit) { hit.clip.text = text; hit.clip.name = text.replace(/[{}]/g, '').split('\n')[0] } })}
-        onEditPageText={(clipId, name, text) => commit(t => { const hit = findClip(t, clipId); if (hit) hit.clip.params = { ...hit.clip.params, textEdits: { ...(hit.clip.params.textEdits as Record<string, string> | undefined), [name]: text } } })}
+        onEditPageText={(clipId, name, text) => commit(t => {
+          // a caption line shown as its own clip keeps its words itself
+          const line = t.tracks.flatMap(x => x.clips).find(c => c.params.line === true && c.params.host === clipId && c.id === name)
+          if (line) { line.text = text; line.name = text.split('\n')[0]; return }
+          const hit = findClip(t, clipId); if (hit) hit.clip.params = { ...hit.clip.params, textEdits: { ...(hit.clip.params.textEdits as Record<string, string> | undefined), [name]: text } }
+        })}
         onPickClip={clipId => { setSelected([clipId]); setTab('props') }}
         onSetPageElement={(clipId, selector, patch) => commit(t => {
           const hit = findClip(t, clipId)
@@ -393,8 +529,8 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
           <button className={tab === 'props' ? 'active' : ''} aria-pressed={tab === 'props'} onClick={() => setTab('props')}><SlidersHorizontal /> 属性</button>
         </nav>
         <div className="ge ge-insp-chat" hidden={tab !== 'chat'}>{chat}</div>
-        {tab === 'props' && <ClipInspector key={selectedClip ?? ''} timeline={layers.timeline} clipId={selectedClip} presets={presets.presets} segments={layers.segments} media={project.inputs.media} layers={layers}
-          onCommit={commit} onAsk={ask} onRedoSegment={redoSegment} />}
+        {tab === 'props' && <ClipInspector key={selectedClip ?? ''} timeline={layers.timeline} clipId={selectedClip} presets={presets.presets} segments={layers.segments} media={project.inputs.media} layers={layers} speedable={speedable}
+          onCommit={commit} onAsk={ask} onRedoSegment={redoSegment} onSplitSounds={splitSounds} />}
       </aside>
     </section>
     <div className="editor-resizer" title="拖动调整时间线高度" onPointerDown={event => {
@@ -403,14 +539,52 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
       const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
     }} onDoubleClick={() => setExtra(0)}><i /></div>
+    {drag?.speed !== undefined && drag.from !== undefined && <SpeedDragHint clipId={drag.clipId} rate={drag.speed} from={drag.from} to={drag.duration} pps={42 * zoom} />}
     <TimelineEditor project={editProject} timeline={timeline} zoom={zoom} onZoomChange={setZoom} playhead={time}
       selectedClipIds={selected} snappingEnabled onSnappingChange={noop}
+      onPasteClips={(clips, trackId, at) => { let ids: string[] = []; commit(timeline => { ids = pasteTimelineClips(timeline, clips, trackId, at, NO_FIXED_TRACKS); if (layers.engine === 'hyperframes') reanchor(timeline, ids) }); setTimeout(() => setSelected(ids)) }}
+      fixedTrackKinds={NO_FIXED_TRACKS}
+      radialItems={(clip, track) => {
+        // ⌘ 点击素材的圆盘 (S先生 10-31): the same edits as the 属性 panel, on the clip itself
+        const edit = (change: (c: TimelineClip) => void) => commit(t => { const c = t.tracks.filter(x => !x.locked).flatMap(x => x.clips).find(x => x.id === clip.id); if (c) change(c) })
+        const audio = (patch: Partial<Pick<TimelineClip, 'volume' | 'fadeIn' | 'fadeOut'>>) => edit(c => { Object.assign(c, patch); if (patch.volume !== undefined) { const { volumeStep: _step, ...rest } = c.params; c.params = rest } })
+        const sounding = track.kind !== 'video' || clip.params.sound === true
+        const volume: RadialItem = { id: 'volume', label: '音量', panel: <RadialVolume volume={sounding ? clip.volume : 0} onChange={gain => audio({ volume: gain })}
+          extra={track.kind === 'video' ? <div className="clip-radial-switch"><span>原声</span><button type="button" aria-pressed={Boolean(clip.params.sound)}
+            onClick={() => edit(c => { const on = !c.params.sound; c.params = { ...c.params, sound: on }; c.volume = on ? gain(((c.params.volumeStep as VolumeStep) || 'mid')) : 0 })}>{clip.params.sound ? '保留' : '静音'}</button></div> : undefined} /> }
+        const fades: RadialItem = { id: 'fades', label: '淡入淡出', panel: <RadialFades fadeIn={clip.fadeIn} fadeOut={clip.fadeOut} max={maxClipFade(clip)} onChange={audio} /> }
+        const copy: RadialItem = { id: 'copy', label: '复制', run: () => copyTimelineClips(layers.timeline, [clip.id], NO_FIXED_TRACKS) }
+        const remove: RadialItem = { id: 'delete', label: '删除', danger: true, run: () => { commit(t => { for (const row of t.tracks) if (!row.locked) row.clips = row.clips.filter(c => c.id !== clip.id) }); setSelected([]) } }
+        const props: RadialItem = { id: 'props', label: '在右侧打开', run: () => setTab('props') }
+        if (track.kind === 'video') {
+          const speed = Number(clip.params.speed ?? 1) || 1, source = clip.sourceDuration ?? clip.duration * speed
+          const next = track.clips.filter(c => c.id !== clip.id && c.start >= clip.start + 1e-6).sort((a, b) => a.start - b.start)[0]
+          return [{ id: 'speed', label: '变速', panel: <ClipSpeedControl rate={speed} sourceSeconds={source} minRate={next ? source / Math.max(0.05, next.start - clip.start) : undefined}
+            onChange={rate => edit(c => { const span = c.sourceDuration ?? c.duration * (Number(c.params.speed ?? 1) || 1); c.sourceDuration = span; c.params = { ...c.params, speed: rate }; c.duration = span / rate })} /> },
+            volume, fades, { ...props, label: '画面设置' }, copy, remove]
+        }
+        if (track.kind === 'voice' || track.kind === 'music' || track.kind === 'sfx') return [volume, fades, ...(canSplitSounds(clip, track) ? [{ id: 'split', label: '按声音切开', run: () => { void splitSounds(clip) } }] : []), copy, remove]
+        // a HyperFrames caption page draws its words itself: no text to change on the clip
+        if (track.kind === 'subtitle' && clip.params.hf === true && clip.params.line !== true) return [{ ...props, label: '文字设置' }, copy, remove]
+        if (track.kind === 'page' && isScene(clip)) return [{ id: 'speed', label: '变速', panel: <SceneSpeed clip={clip} track={track} speedable={speedable[String(clip.params.sub)] !== false} onPatch={edit} hint /> },
+          { ...props, label: '画面设置' }, copy, remove]
+        if (track.kind === 'subtitle') return [{ id: 'text', label: '改字', panel: <RadialText text={clip.text ?? ''} onCommit={text => edit(c => { c.text = text; c.name = text.replace(/[{}]/g, '').split('\n')[0] })} /> },
+          { ...props, label: '文字设置' }, copy, remove]
+        return undefined
+      }}
+      onClipAudio={(clipId, audio) => commit(timeline => {
+        const clip = timeline.tracks.filter(t => !t.locked).flatMap(t => t.clips).find(c => c.id === clipId)
+        if (!clip) return
+        Object.assign(clip, audio)
+        // a dragged volume is its own number of dB, no longer one of the three steps
+        if (audio.volume !== undefined) { const { volumeStep: _step, ...rest } = clip.params; clip.params = rest }
+      })}
       mainTrackLinked={false} onMainTrackLinkedChange={noop} onMarkCutEdge={noop} onCutBoundaryChange={noop} onRestoreCut={noop} onCancelCut={noop} onPreviewCut={noop} cutBusy={false}
       onSmartMusic={noop} onSmartRoughcut={noop} onGlobalMotion={noop} onGlobalSfx={noop} onSmartBroll={noop} onAutoPlace={noop}
       suppressTimelineClickRef={suppressClick} timelinePlayheadRef={playheadRef}
       onUndo={undo} onRedo={redo} onSplit={noop} onInsertDirectorGap={noop} onEditDirectorSlot={noop} onOpenDirectorSlot={noop}
       onDelete={() => {
-        const ids = selected.filter(id => { const hit = findClip(layers.timeline, id); return hit && !hit.track.locked && hit.track.kind !== 'page' })
+        const ids = selected.filter(id => { const hit = findClip(layers.timeline, id); return hit && !hit.track.locked && (hit.track.kind !== 'page' || hit.clip.params.hf === true) })
         if (!ids.length) { if (selected.length) toast('锁定轨道或画面页不能删除，请先解锁或让 Codex 重做这一段'); return }
         commit(t => { for (const track of t.tracks) track.clips = track.clips.filter(c => !ids.includes(c.id)) })
         setSelected([])

@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {connectionRequest,type ConnectionView} from '../connections';
 import {getAgentSettings} from '../api';
 import {AGENT_ROWS,EFFORT_LABELS,type AgentChoice,type AgentModule,type AgentSettingsView} from '../agent-settings';
-import {LIGHT_AGENT_MODULES,type AgentConnectionId} from '../../../shared/agent-connections';
+import {LIGHT_AGENT_MODULES,connectionReadyForLight,type AgentConnectionId} from '../../../shared/agent-connections';
 import './scoped-agent-choice.css';
 /** A choice supplied by the owner (project, draft or one operation), never a write to global defaults. */
 export function ScopedAgentChoice({work,value,onChange,disabled=false,label='智能体',requiresImages=false}:{work:AgentModule;value?:AgentChoice;onChange:(choice:AgentChoice|undefined)=>void;disabled?:boolean;label?:string;requiresImages?:boolean}){
@@ -12,21 +12,22 @@ export function ScopedAgentChoice({work,value,onChange,disabled=false,label='智
  const effective=value??inherited;
  const agent=effective?.agent||'codex';
  const choice=connections.find(item=>item.id===agent);
- const available=connections.filter(item=>item.kind==='agent'&&item.connected&&item.enabled&&(item.id==='codex'?(item.cliInstalled||!requiresImages&&(LIGHT_AGENT_MODULES as readonly string[]).includes(work)&&item.mode==='api'):!requiresImages&&(LIGHT_AGENT_MODULES as readonly string[]).includes(work)&&item.mode==='api'));
+ const available=connections.filter(item=>requiresImages?item.id==='codex'&&item.enabled&&item.connected&&item.cliInstalled:(LIGHT_AGENT_MODULES as readonly string[]).includes(work)?connectionReadyForLight(item):item.id==='codex'&&item.enabled&&item.connected&&item.cliInstalled);
  const unavailableDefault=!!settings&&!value&&!available.some(item=>item.id===agent);
  const codexModels=settings?.catalog?.models||[];
  const models=agent==='codex'&&choice?.mode==='cli'?codexModels:choice?.models||[];
  const codexModel=effective?.model==='default'?codexModels.find(item=>item.isDefault)||codexModels[0]:codexModels.find(item=>item.id===effective?.model);
+ const followsCliDefault=choice?.mode==='cli'&&agent!=='codex'&&agent!=='claude'&&choice.acpModelSelection!==true;
  const missing=!!value&&value.model!=='default'&&models.length>0&&!models.some(item=>item.id===value.model);
  useEffect(()=>setManual(value?.model||'default'),[value?.model,agent]);
  const changeModel=(model:string)=>{const info=codexModels.find(item=>item.id===model);onChange({agent,model,effort:agent==='codex'?(info?.efforts.includes(effective?.effort||'')?effective!.effort:info?.defaultEffort||effective?.effort||'medium'):'none'})};
  return <div className="scoped-agent-choice">
   <label>{label}<select aria-label={`${label} Agent`} value={value?agent:''} disabled={disabled||!settings} onChange={event=>{const id=event.target.value as AgentConnectionId;if(!id)return onChange(undefined);onChange({agent:id,model:'default',effort:id==='codex'?'medium':'none'})}}>
    <option value="" disabled={!!settings&&!available.some(item=>item.id===(settings.settings.modules[work].agent||'codex'))}>跟随设置{inherited?` · ${connections.find(item=>item.id===(inherited.agent||'codex'))?.name||inherited.agent||'Codex'}`:''}</option>
-   {value&&!available.some(item=>item.id===agent)&&<option value={agent} disabled>所选智能体当前不可用</option>}
+   {value&&!available.some(item=>item.id===agent)&&<option value={agent} disabled>所选智能体未接通</option>}
    {available.map(item=><option key={item.id} value={item.id}>{item.name} · {item.mode==='api'?'API 密钥':'命令行 · 账号登录'}{!item.cliInstalled?' · 仅轻活':''}</option>)}
   </select></label>
-  {value&&<label>模型{models.length?<select aria-label={`${label}模型`} value={value.model} disabled={disabled} onChange={event=>changeModel(event.target.value)}><option value="default">跟随 {choice?.name||agent} 默认</option>{missing&&<option value={value.model}>{value.model}（将回退默认）</option>}{models.map(model=><option key={model.id} value={model.id}>{model.name||model.id}</option>)}</select>:<input aria-label={`${label}模型`} disabled={disabled} value={manual} placeholder="default：跟随默认；也可以填模型名" onChange={event=>setManual(event.target.value)} onBlur={()=>{if(manual.trim()&&manual.trim()!==value.model)changeModel(manual.trim())}} onKeyDown={event=>{if(event.key==='Enter')event.currentTarget.blur()}}/>}</label>}
+  {value&&<label>模型{followsCliDefault?<span>跟随 {choice?.name||agent} 默认</span>:models.length?<select aria-label={`${label}模型`} value={value.model} disabled={disabled} onChange={event=>changeModel(event.target.value)}><option value="default">跟随 {choice?.name||agent} 默认</option>{missing&&<option value={value.model}>{value.model}（将回退默认）</option>}{models.map(model=><option key={model.id} value={model.id}>{model.name||model.id}</option>)}</select>:<input aria-label={`${label}模型`} disabled={disabled} value={manual} placeholder="default：跟随默认；也可以填模型名" onChange={event=>setManual(event.target.value)} onBlur={()=>{if(manual.trim()&&manual.trim()!==value.model)changeModel(manual.trim())}} onKeyDown={event=>{if(event.key==='Enter')event.currentTarget.blur()}}/>}</label>}
   {value&&agent==='codex'&&codexModel&&<label>推理强度<select aria-label={`${label}推理强度`} disabled={disabled} value={value.effort} onChange={event=>onChange({...value,effort:event.target.value})}>{codexModel.efforts.map(effort=><option key={effort} value={effort}>{EFFORT_LABELS[effort]||effort}</option>)}</select></label>}
   {unavailableDefault&&<p role="status" className="scoped-agent-note">设置中的默认智能体还没接通，或不支持这项工作，请选择下方已接通的智能体。</p>}
   {missing&&<p role="status" className="scoped-agent-note">所选模型不在当前列表，执行时改用该智能体默认模型。</p>}
