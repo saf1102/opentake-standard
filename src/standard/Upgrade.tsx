@@ -1,13 +1,28 @@
 import {Hourglass,Check} from 'lucide-react';
 import {useEffect,useState,useRef} from 'react';import * as Dialog from '@radix-ui/react-dialog';import './pro-flow.css';
+import {IS_MAC} from '../general/platform';
 export const openUpgrade=()=>window.dispatchEvent(new Event('opentake-upgrade'));
 type Plan='monthly'|'yearly'|'lifetime';type Account={name:string;username:string;purpose:string;createdAt:number;proStatus:string;kind?:string;plan?:Plan;intent?:Plan|null;message?:string;expiresAt?:number;downloadUrl?:string;downloadMessage?:string};type Config={mode:string;notice?:string;plans?:{id:Plan;label:string;price:string;badge?:string}[];buyUrl?:string};
 const purposes=['口播短视频','知识讲解','产品宣传片','电商带货','团队或公司商用','其他'];const labels={monthly:'按月',yearly:'按年',lifetime:'终身买断'};
 const mask=(s:string)=>s.includes('@')?s.slice(0,1)+'***@'+s.split('@')[1]:'***'+s.slice(-4);
 async function api(route:string,method='GET',body?:unknown){const r=await fetch('/api/upgrade/'+route,{method,headers:{'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});const value=await r.json();if(!r.ok)throw Error(value.error||'操作失败');return value}
-export function UpgradeButton(){const[notice,setNotice]=useState('');useEffect(()=>{const receive=(e:Event)=>setNotice((e as CustomEvent<string>).detail);window.addEventListener('opentake-upgrade-notice',receive);return()=>window.removeEventListener('opentake-upgrade-notice',receive)},[]);return <button className="home-entry__button" onClick={openUpgrade} title={notice||'升级到 Pro'}>{notice&&<i className="upgrade-dot"/>}升级到 Pro</button>}
+export function UpgradeButton(){const[notice,setNotice]=useState('');useEffect(()=>{const receive=(e:Event)=>setNotice((e as CustomEvent<string>).detail);window.addEventListener('opentake-upgrade-notice',receive);return()=>window.removeEventListener('opentake-upgrade-notice',receive)},[]);return <button type="button" className="home-entry__button" aria-haspopup="dialog" onClick={openUpgrade} title={notice||'升级到 Pro'}>{notice&&<i className="upgrade-dot"/>}升级到 Pro</button>}
 export function UpgradePreferences(){const[daily,setDaily]=useState(true);useEffect(()=>{void api('preferences').then(v=>setDaily(v.daily))},[]);return <label><input type="checkbox" checked={daily} onChange={e=>{const next=e.target.checked;void api('preferences','PUT',{daily:next}).then(()=>setDaily(next))}}/>每天启动时检查升级与申请进度（默认开启）</label>}
-export function UpgradeDialog(){
+export function UpgradeDialog(){return IS_MAC?<ProAccountDialog/>:<ProDevelopmentDialog/>}
+function ProDevelopmentDialog(){
+ const[open,setOpen]=useState(false);const trigger=useRef<HTMLElement|null>(null);
+ useEffect(()=>{
+  const show=()=>{trigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;setOpen(true)};
+  window.addEventListener('opentake-upgrade',show);
+  // Standard update checks continue independently of the local Pro notice.
+  let mounted=true;
+  const daily=async()=>{try{const v=await api('daily');if(mounted&&!v.skipped)window.dispatchEvent(new CustomEvent('standard-update-state',{detail:v.clientUpdate}))}catch{}};
+  void daily();const timer=setInterval(()=>void daily(),3600000);
+  return()=>{mounted=false;clearInterval(timer);window.removeEventListener('opentake-upgrade',show)};
+ },[]);
+ return <Dialog.Root open={open} onOpenChange={setOpen}><Dialog.Portal><Dialog.Overlay className="pro-flow-overlay"/><Dialog.Content className="pro-flow pro-flow-modal" onCloseAutoFocus={event=>{if(trigger.current?.isConnected){event.preventDefault();trigger.current.focus()}}}><div className="dialog"><div className="state"><div className="ring wait" aria-hidden="true"><Hourglass/></div><Dialog.Title asChild><h2>OpenTake Pro 开发中</h2></Dialog.Title><Dialog.Description asChild><p>Pro 版本正在开发中，敬请期待。</p></Dialog.Description><div className="row"><span className="sp"/><Dialog.Close className="primary">知道了</Dialog.Close></div></div></div></Dialog.Content></Dialog.Portal></Dialog.Root>;
+}
+function ProAccountDialog(){
  const[open,setOpen]=useState(false),[config,setConfig]=useState<Config>({mode:'beta'}),[account,setAccount]=useState<Account|null>(null),[login,setLogin]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[purpose,setPurpose]=useState(purposes[0]),[plan,setPlan]=useState<Plan>('yearly'),[granting,setGranting]=useState(false);const openedAt=useRef(Date.now());
  const refresh=async(route='state')=>{const v=await api(route);if(v.skipped)return;window.dispatchEvent(new CustomEvent('standard-update-state',{detail:v.clientUpdate}));setConfig(v.upgrade);setAccount(v.account);setError(v.error||'');window.dispatchEvent(new CustomEvent('opentake-upgrade-notice',{detail:v.upgrade.notice||''}));if(v.account?.proStatus==='active')setGranting(false)};
  useEffect(()=>{const show=()=>{openedAt.current=Date.now();setOpen(true);setError('');void refresh().catch(e=>setError(e.message))};window.addEventListener('opentake-upgrade',show);void refresh('daily').catch(()=>{});const timer=setInterval(()=>void refresh('daily').catch(()=>{}),3600000);return()=>{clearInterval(timer);window.removeEventListener('opentake-upgrade',show)}},[]);
