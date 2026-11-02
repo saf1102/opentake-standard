@@ -27,7 +27,11 @@ export async function restoreGeneralBackup(item:{projectId:string;sourceDir:stri
   const realSource=fs.realpathSync(sourceDir);
   const requireFile=(relative:string)=>{const file=path.resolve(sourceDir,relative);if(!file.startsWith(path.resolve(sourceDir)+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()||!fs.realpathSync(file).startsWith(realSource+path.sep))throw Error('原素材或成片缺失，无法恢复：'+relative)};
   for(const media of original.inputs.media){if(media.file)requireFile(path.join('media',media.file));else{const found=fs.readdirSync(path.join(sourceDir,'media')).find(name=>path.parse(name).name===media.id);if(!found)throw Error('原素材缺失，无法恢复：'+media.name);requireFile(path.join('media',found))}}
-  for(const version of original.versions){const prefix=fileUrl(original.id,'');if(!version.videoUrl.startsWith(prefix))throw Error('备份中的成片地址无效');requireFile(decodeURIComponent(version.videoUrl.slice(prefix.length).split('?')[0]))}
+  for(const version of original.versions){
+    // Editable HyperFrames versions can exist before their first rendered MP4.
+    const prefix=fileUrl(original.id,'');
+    for(const url of [version.videoUrl,version.layersUrl].filter(Boolean) as string[]){if(!url.startsWith(prefix))throw Error('备份中的成片或分轨地址无效');const relative=decodeURIComponent(url.slice(prefix.length).split('?')[0]);if(!documents.some(document=>document.path===relative))requireFile(relative)}
+  }
   const root=defaultProjectRoot();validateDirectory(root);
   const stem=original.name.replace(/[<>:"/\\|?*\x00-\x1f]/g,' ').slice(0,50)+' · 恢复副本';
   let name=stem;for(let n=2;fs.existsSync(path.join(root,name));n++)name=stem+' '+n;

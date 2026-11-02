@@ -54,12 +54,13 @@ test('backup-now includes both project kinds; general restoration preserves snap
   fs.writeFileSync(path.join(dir,'media','input.mp4'),'input bytes');fs.writeFileSync(path.join(dir,'versions','v1.mp4'),'video bytes');
   fs.mkdirSync(path.join(dir,'versions','v1'));const edited=path.join(dir,'versions','v1','edited.json');fs.writeFileSync(edited,JSON.stringify({text:'备份时字幕'}));
   project.inputs.media.push({id:'input',name:'原素材',file:'input.mp4',width:100,height:100,duration:1});project.versions.push({n:1,createdAt:project.createdAt,duration:1,videoUrl:fileUrl(project.id,'versions/v1.mp4'),posterUrl:'',segments:[]});project.current=1;saveGeneral(dir,project);
+  project.versions.push({n:2,createdAt:project.createdAt,duration:1,videoUrl:'',posterUrl:'',layersUrl:fileUrl(project.id,'versions/v1/edited.json'),segments:[]});saveGeneral(dir,project);
   const result=await api('/api/editor/system-settings/backup-now','POST');assert.equal(result.ok,true);assert.equal(result.result.count,2);
   const backup=listBackups().find(row=>row.projectId===project.id)!;assert.ok(backup);
   fs.writeFileSync(edited,JSON.stringify({text:'后来修改'}));trashGeneral(project.id);
   const restored=await restoreBackup(backup.id);assert.notEqual(restored.id,project.id);assert.equal(restored.kind,'general');
   const copy=findGeneral(restored.id).dir;assert.equal(JSON.parse(fs.readFileSync(path.join(copy,'versions/v1/edited.json'),'utf8')).text,'备份时字幕');
-  assert.match(restored.versions[0].videoUrl,new RegExp(restored.id));assert.equal(fs.readFileSync(path.join(copy,'media/input.mp4'),'utf8'),'input bytes');
+  assert.match(restored.versions[0].videoUrl,new RegExp(restored.id));assert.equal(restored.versions[1].videoUrl,'');assert.match(restored.versions[1].layersUrl!,new RegExp(restored.id));assert.equal(fs.readFileSync(path.join(copy,'media/input.mp4'),'utf8'),'input bytes');
   const original=findGeneral(project.id,true).dir;fs.unlinkSync(path.join(original,'media/input.mp4'));assert.equal(fs.readFileSync(path.join(copy,'media/input.mp4'),'utf8'),'input bytes');
   await assert.rejects(restoreBackup(backup.id),/缺失/);
 });
