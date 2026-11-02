@@ -10,6 +10,7 @@ const {APP_NAME, APP_ID, IS_WINDOWS_OFFLINE, sameOrigin, userDataPath, remembere
 const {distributionEnvironment}=require('./distribution.cjs');
 const {createRecordingControls} = require('./recording-controls.cjs');
 const {applicationMenu}=require('./menu.cjs');
+const {installNavigation}=require('./navigation.cjs');
 const {assetRoot}=require('./assets.cjs');
 const {SOURCE_OPTIONS,captureSources,installCaptureSourceBridge}=require('./capture-sources.cjs');
 const metadata=require('../package.json');
@@ -91,8 +92,7 @@ async function start() {
   });
   win.on('close',event=>{if(closing)return;event.preventDefault();if(recordingControls?.busy){quitAfterRecording=true;recordingControls.stop()}else app.quit()});
  }
- win.webContents.on('will-navigate',(event,url)=>{if(!sameOrigin(url,origin))event.preventDefault()});
- win.webContents.setWindowOpenHandler(({url})=>{if(sameOrigin(url,origin))void win.loadURL(url);return {action:'deny'}});
+ installNavigation({window:win,origin,shell,dialog});
  Menu.setApplicationMenu(Menu.buildFromTemplate(applicationMenu({platform:process.platform,app,recordingMenu:recordingControls?.menu})));
  await win.loadURL(origin);
  if(process.env.OPENTAKE_UPDATE_READY){const file=process.env.OPENTAKE_UPDATE_READY;setTimeout(async()=>{try{const r=await fetch(origin+'/api/upgrade/preferences');if(!r.ok||win.isDestroyed()||child.exitCode!==null)return;if(!await win.webContents.executeJavaScript('Boolean(document.getElementById("root")?.children.length)'))return;fs.writeFileSync(file,JSON.stringify({pid:process.pid,version:app.getVersion()}));}catch{}},10000);}
