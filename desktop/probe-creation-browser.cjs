@@ -1,6 +1,10 @@
 // Invoked by Codex's sandbox command: sample parameters only, never server-render parameters.
 // No model is started and no credentials are read.
-const {probeBrowser}=require('./creation-tools.cjs');
-probeBrowser(require('playwright-core').chromium,process.argv[2],process.env).then(()=>{
- console.log('OPENTAKE_BROWSER_READY');
-},()=>{console.error('出片沙盒中 Chromium 无法启动或截图');process.exitCode=1;});
+const {MARKER,browserDiagnostic}=require('./browser-diagnostic.cjs');
+(async()=>{
+ try{
+  const {probeBrowser}=require('./creation-tools.cjs');
+  await probeBrowser(require('playwright-core').chromium,process.argv[2],process.env);
+  console.log('OPENTAKE_BROWSER_READY');
+ }catch(error){console.error(MARKER+JSON.stringify(browserDiagnostic(error,'sandbox','script-load').diagnostic));process.exitCode=1;}
+})();

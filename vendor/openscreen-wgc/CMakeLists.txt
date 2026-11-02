@@ -48,6 +48,8 @@ add_executable(wgc-capture
   src/dshow_webcam_capture.cpp
   src/dshow_webcam_capture.h
   src/main.cpp
+  src/recording_video_format.cpp
+  src/recording_video_format.h
   src/mf_encoder.cpp
   src/mf_encoder.h
   src/mp4_clock.cpp
@@ -220,4 +222,9 @@ target_link_libraries(mf_encoder_color_test PRIVATE
 add_executable(mp4_clock_test src/mp4_clock.cpp src/mp4_clock.h src/mp4_clock_test.cpp)
 target_compile_definitions(mp4_clock_test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
 target_compile_options(mp4_clock_test PRIVATE /EHsc /W4 /utf-8)
+
+add_executable(recording_video_format_test src/recording_video_format_test.cpp src/recording_video_format.cpp src/mf_encoder.cpp src/audio_sample_utils.cpp src/mp4_clock.cpp)
+target_compile_definitions(recording_video_format_test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
+target_compile_options(recording_video_format_test PRIVATE /EHsc /W4 /utf-8)
+target_link_libraries(recording_video_format_test PRIVATE avrt d3d11 dxgi mf mfplat mfreadwrite mfuuid ole32 propsys)
 

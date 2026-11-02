@@ -11,9 +11,11 @@ const [output,mode]=process.argv.slice(2);
 fs.writeFileSync(output+'.env.json',JSON.stringify({runAsNode:process.env.ELECTRON_RUN_AS_NODE,compositor:process.env.OPENSCREEN_COMPOSITOR_VIEW_NODE,pid:process.pid}));
 const emit=value=>process.stdout.write(JSON.stringify(value)+'\\n');
 if(mode==='early-error'){emit({event:'done',success:false,error:'fixture capture failed'});process.exit(2)}
+if(mode==='native-init-failure')process.stderr.write('ERROR: SetInputMediaType failed (hr=0xc00d36b4)\\nERROR: Failed to initialize Media Foundation encoder\\n');
+if(mode==='native-init-retry')process.stderr.write('ERROR: SetInputMediaType failed (hr=0xc00d36b4)\\nWARNING: Default Media Foundation H.264 encoder setup failed; retrying\\n');
 if(mode==='invalid-events')process.stdout.write('null\\n[]\\n42\\n"ignored"\\n');
 if(mode==='split-error'){const b=Buffer.from(JSON.stringify({event:'done',success:false,error:'中文录制错误'}));const cut=b.indexOf(Buffer.from('中文'))+1;process.stdout.write(b.subarray(0,cut));setTimeout(()=>{process.stdout.write(b.subarray(cut));setTimeout(()=>process.exit(2),30)},30);}
-if(!['never-start','split-error'].includes(mode))setTimeout(()=>emit({event:'log',message:'Recording started'}),mode==='slow-start'?150:10);
+if(!['never-start','split-error','native-init-failure'].includes(mode))setTimeout(()=>emit({event:'log',message:'Recording started'}),mode==='slow-start'?150:10);
 let stops=0;
 readline.createInterface({input:process.stdin}).on('line',line=>{
  if(line!=='stop')return;stops++;
@@ -70,6 +72,24 @@ test('early recorder failure is reported without a successful saved take',async(
   f.start();await until(()=>!f.recorder.busy);
   assert.equal(f.recorder.state?.phase,'failed');assert.match(f.recorder.state?.error||'',/fixture capture failed/);
   assert.equal(fs.existsSync(f.projectFile),false);
+ }finally{await cleanup(f)}
+});
+
+test('terminal native encoder failure reports the HRESULT immediately instead of waiting for wrapper startup timeout',async()=>{
+ const f=fixture('native-init-failure',{startTimeoutMs:30_000});try{
+  const start=Date.now();f.start();await until(()=>!f.recorder.busy);
+  assert.ok(Date.now()-start<10_000);assert.equal(f.recorder.state?.phase,'failed');
+  assert.match(f.recorder.state?.error||'',/SetInputMediaType.*0xc00d36b4/);
+  assert.equal(fs.existsSync(f.projectFile),false);
+  assert.match(JSON.parse(fs.readFileSync(f.projectFile+'.diagnostic.json','utf8')).stderr,/Failed to initialize Media Foundation encoder/);
+ }finally{await cleanup(f)}
+});
+
+test('recoverable native encoder warning allows fallback to finish recording',async()=>{
+ const f=fixture('native-init-retry');try{
+  f.start();await until(()=>f.recorder.state?.phase==='recording');
+  f.recorder.stop('project-1','take-1');await until(()=>!f.recorder.busy);
+  assert.equal(f.recorder.state?.phase,'saved');
  }finally{await cleanup(f)}
 });
 

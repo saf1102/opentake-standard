@@ -4,6 +4,7 @@
 #include "frame_slot_clock.h"
 #include "realtime_scheduling.h"
 #include "mf_encoder.h"
+#include "recording_video_format.h"
 #include "monitor_utils.h"
 #include "wasapi_device_watcher.h"
 #include "wasapi_loopback_capture.h"
@@ -751,16 +752,8 @@ int wmain(int argc, wchar_t* argv[]) {
 
     reportCaptureAdapters(session.device(), capturedMonitor);
 
-    // WGC owns the captured texture size. Encoding must use that exact size
-    // until a dedicated GPU scaling pass is introduced; CopyResource requires
-    // matching resource dimensions.
-    int width = session.captureWidth();
-    int height = session.captureHeight();
-    width = (std::max(2, width) / 2) * 2;
-    height = (std::max(2, height) / 2) * 2;
-
-    const int pixels = width * height;
-    const int bitrate = pixels >= 3840 * 2160 ? 45'000'000 : pixels >= 2560 * 1440 ? 28'000'000 : 18'000'000;
+    // Capture dimensions are physical pixels, independent of desktop DPI or
+    // display bounds. Readback retains them even if encoding needs scaling.
 
     WebcamCapture webcamCapture;
     bool webcamActive = false;
@@ -930,20 +923,16 @@ int wmain(int argc, wchar_t* argv[]) {
         !config.preferSoftwareEncoder &&
         (!config.webcamEnabled || writeSeparateWebcam);
 
-    MFEncoder encoder;
-    if (!encoder.initialize(
-            utf8ToWide(config.outputPath),
-            width,
-            height,
-            config.fps,
-            bitrate,
-            session.device(),
-            session.context(),
-            audioFormat ? &encoderAudioFormat : nullptr,
-            encoderOptions)) {
+    RecordingVideoFormat selectedFormat{};
+    auto encoderOwner = initializeRecordingEncoder(utf8ToWide(config.outputPath),
+            session.captureWidth(), session.captureHeight(), config.fps, session.device(), session.context(),
+            audioFormat ? &encoderAudioFormat : nullptr, encoderOptions, selectedFormat);
+    if (!encoderOwner) {
         std::cerr << "ERROR: Failed to initialize Media Foundation encoder" << std::endl;
         return 1;
     }
+    MFEncoder& encoder = *encoderOwner;
+    config.fps = selectedFormat.fps;
     // `videoInput` reports what the encoder settled on, not what was asked for:
     // it silently degrades to the CPU readback on any machine the GPU path does
     // not fit, and a bug report that cannot tell the two apart is a bug report
@@ -951,7 +940,7 @@ int wmain(int argc, wchar_t* argv[]) {
     const bool usesDxgiInput = encoder.usesDxgiInput();
     std::cout << "{\"event\":\"encoder-selection\",\"schemaVersion\":2,\"video\":\""
               << encoder.videoEncoderSelection()
-              << "\",\"videoInput\":\"" << (usesDxgiInput ? "dxgi-nv12" : "cpu-rgb32")
+              << "\",\"videoInput\":\"" << (usesDxgiInput ? "dxgi-nv12" : "cpu-nv12")
               // Reported for the same reason `videoInput` is: the encoder falls
               // back to the plain container rather than failing a recording, and
               // "was this file supposed to survive a kill?" is unanswerable from

@@ -127,6 +127,14 @@ FunctionEnd
     SetErrorLevel 2
     Abort
   ${EndIf}
+  nsExec::ExecToStack /TIMEOUT=120000 '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -File "$INSTDIR\resources\app\desktop\sandbox-read-access.ps1" -InstallationRoot "$INSTDIR"'
+  Pop $otResult
+  Pop $otCheckOutput
+  DetailPrint "$otCheckOutput"
+  ${If} $otResult != "0"
+    IfSilent +2 0
+      MessageBox MB_ICONEXCLAMATION|MB_OK "应用已安装，但出片沙盒读取权限未配置成功。请在应用中重新检查出片环境。$\r$\n$otCheckOutput"
+  ${EndIf}
   !insertmacro MUI_HEADER_TEXT "安装文件已就绪" "第 3/4 步 · 应用入口已创建，即将完成"
   FileOpen $R0 "$INSTDIR\installation-result.txt" w
   FileWrite $R0 "OpenTake Standard$\r$\nOffline runtime files installed.$\r$\nScope: current user. Projects and settings are preserved on uninstall.$\r$\n"

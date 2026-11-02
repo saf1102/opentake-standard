@@ -4,7 +4,8 @@ const crypto=require('node:crypto');
 const {createReadStream}=require('node:fs');
 const MANIFEST='opentake-payload.json';
 const critical=new Set(['OpenTake Standard.exe','resources/app/package.json','resources/app/desktop/main.cjs','resources/app/desktop/service.mjs',
- 'resources/app/desktop/install-verify.py','resources/app/server/frame-render/index.ts','resources/app/server/general/hf-render.ts',
+ 'resources/app/desktop/install-verify.py','resources/app/desktop/sandbox-read-access.ps1','resources/app/desktop/browser-diagnostic.cjs',
+ 'resources/app/desktop/creation-tools.cjs','resources/app/desktop/probe-creation-browser.cjs','resources/app/server/frame-render/index.ts','resources/app/server/general/hf-render.ts',
  'resources/app/native/windows/wgc-capture.exe','resources/runtimes/manifest.json','resources/runtimes/python/python.exe',
  'resources/runtimes/ffmpeg/bin/ffmpeg.exe','resources/runtimes/ffmpeg/bin/ffprobe.exe','resources/runtimes/openscreen/Openscreen.exe',
  'resources/runtimes/openscreen/resources/electron/native/bin/win32-x64/wgc-capture.exe',

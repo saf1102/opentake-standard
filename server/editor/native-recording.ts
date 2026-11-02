@@ -16,7 +16,7 @@ type Launch = {
 type Active = {
   child: ChildProcessWithoutNullStreams; state: NativeRecordingState; projectFile: string;
   stopRequested: boolean; stopSent: boolean; successful: boolean; error: string;
-  stateError?: string; stderr: string; events: Record<string,unknown>[];
+  stateError?: string; fatalError?: string; stderr: string; events: Record<string,unknown>[];
   startupTimer?: ReturnType<typeof setTimeout>; stopTimer?: ReturnType<typeof setTimeout>;
 };
 
@@ -95,6 +95,14 @@ export class NativeRecordingController {
       const text=stderrDecoder.write(chunk);
       recording.stderr=(recording.stderr+text).slice(-64_000);
       recording.error=(recording.error+text).slice(-2_000);
+      // These are the helper's terminal startup failures, after its internal
+      // encoder fallbacks. Individual HRESULTs and warnings can be recoverable.
+      if(!recording.state.startedAt && !recording.fatalError && /ERROR: Failed to initialize (?:Media Foundation encoder|WGC (?:window|display) session)/.test(recording.stderr)){
+        const details=recording.stderr.split(/\r?\n/).filter(line=>/SetInputMediaType|encoder-format|capture-format|hr=0x|ERROR: Failed to initialize/.test(line)).slice(-8).join('\n');
+        recording.fatalError=`原生录制初始化失败：${details.slice(-1600)}；原始文件和诊断已保留。`;
+        clearTimeout(recording.startupTimer);
+        this.fail(recording,recording.fatalError);
+      }
     });
     child.stderr.once('end',()=>{recording.stderr=(recording.stderr+stderrDecoder.end()).slice(-64_000)});
     const receive=(text:string)=>{
@@ -145,7 +153,7 @@ export class NativeRecordingController {
       if(recording.stateError){saved=false;recording.error=recording.stateError;}
       recording.state.phase = saved ? 'saved' : 'failed';
       recording.state.finishedAt = Date.now();
-      if (!saved) recording.state.error = recording.error.trim().slice(-1_200) || `OpenScreen 录制退出（${code ?? '未知'}），工程及原始文件已保留。`;
+      if (!saved) recording.state.error = recording.fatalError || recording.error.trim().slice(-1_200) || `OpenScreen 录制退出（${code ?? '未知'}），工程及原始文件已保留。`;
       this.publish(recording);
       if(input.diagnosticFile){
         try{atomicJsonSync(input.diagnosticFile,{schemaVersion:1,projectId:input.projectId,id:input.id,

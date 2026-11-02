@@ -3,6 +3,7 @@
 #include "audio_sample_utils.h"
 #include "mp4_clock.h"
 #include "recording_clock_file.h"
+#include "recording_video_format.h"
 
 #include <codecapi.h>
 #include <d3d10.h>
@@ -918,6 +919,7 @@ bool MFEncoder::initialize(
         bool logCreateFailure,
         bool fragmented) {
         resetSinkWriterAttempt();
+        videoTypeRejected_ = false;
 
         // Before the sink writer, not inside configureAudioStream where this
         // used to live: MFCreateFMPEG4MediaSink takes the audio output type as
@@ -1005,9 +1007,9 @@ bool MFEncoder::initialize(
         if (SUCCEEDED(MFCreateAttributes(&encodingParameters, 1))) {
             encodingParameters->SetUINT32(CODECAPI_AVEncMPVDefaultBPictureCount, 0);
         }
-        if (!succeeded(
-                sinkWriter_->SetInputMediaType(videoStreamIndex_, inputType.Get(), encodingParameters.Get()),
-                "SetInputMediaType")) {
+        const HRESULT videoTypeHr = sinkWriter_->SetInputMediaType(videoStreamIndex_, inputType.Get(), encodingParameters.Get());
+        if (!succeeded(videoTypeHr, "SetInputMediaType")) {
+            videoTypeRejected_ = videoTypeHr == MF_E_INVALIDMEDIATYPE || videoTypeHr == E_INVALIDARG;
             return false;
         }
         if (!forceSoftwareEncoder) {
@@ -1175,14 +1177,17 @@ bool MFEncoder::configureAudioStream(const AudioInputFormat& audioFormat, const 
 }
 
 bool MFEncoder::ensureStagingTexture(ID3D11Texture2D* texture) {
-    if (stagingTexture_) {
-        return true;
-    }
-
     D3D11_TEXTURE2D_DESC desc{};
     texture->GetDesc(&desc);
-    desc.Width = static_cast<UINT>(width_);
-    desc.Height = static_cast<UINT>(height_);
+    if (desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM || !desc.Width || !desc.Height) {
+        std::cerr << "ERROR: Unexpected WGC readback texture format or dimensions" << std::endl;
+        return false;
+    }
+    if (stagingTexture_) {
+        D3D11_TEXTURE2D_DESC previous{};stagingTexture_->GetDesc(&previous);
+        if (previous.Width == desc.Width && previous.Height == desc.Height) return true;
+        stagingTexture_.Reset();
+    }
     desc.MipLevels = 1;
     desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -1221,14 +1226,15 @@ bool MFEncoder::copyFrameToBuffer(
     }
 
     auto* source = static_cast<const BYTE*>(mapped.pData);
-    if (webcamFrame) {
+    D3D11_TEXTURE2D_DESC captured{};texture->GetDesc(&captured);
+    const bool scaled = captured.Width != UINT(width_) || captured.Height != UINT(height_);
+    if (webcamFrame || scaled) {
         // The picture-in-picture is drawn in BGRA, so the frame goes through a
         // copy it can be drawn on before the conversion.
         bgraScratch_.resize(static_cast<size_t>(rowBytes) * height_);
-        for (int y = 0; y < height_; y += 1) {
-            std::memcpy(bgraScratch_.data() + rowBytes * y, source + mapped.RowPitch * y, rowBytes);
-        }
-        compositeWebcam(bgraScratch_.data(), width_, height_, *webcamFrame);
+        if (scaled) scaleRecordingBgra(source, int(mapped.RowPitch), int(captured.Width), int(captured.Height), bgraScratch_.data(), width_, height_);
+        else for (int y = 0; y < height_; y += 1) std::memcpy(bgraScratch_.data() + rowBytes * y, source + mapped.RowPitch * y, rowBytes);
+        if (webcamFrame) compositeWebcam(bgraScratch_.data(), width_, height_, *webcamFrame);
         convertBgraToNv12Bt709(bgraScratch_.data(), static_cast<int>(rowBytes), width_, height_, destination);
     } else {
         convertBgraToNv12Bt709(source, static_cast<int>(mapped.RowPitch), width_, height_, destination);

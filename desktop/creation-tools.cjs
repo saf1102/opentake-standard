@@ -5,6 +5,7 @@ const os = require('node:os');
 const {execFile} = require('node:child_process');
 const {promisify} = require('node:util');
 const installations = require('./agent-installation.cjs');
+const {browserDiagnostic}=require('./browser-diagnostic.cjs');
 
 const exec = promisify(execFile);
 const executable = file => { try { fs.accessSync(file, fs.constants.X_OK); return path.isAbsolute(file) && fs.statSync(file).isFile(); } catch { return false; } };
@@ -18,16 +19,27 @@ const fixes = {
 };
 // Default: only the agent sample mode. The server explicitly passes renderArgs().
 async function probeBrowser(chromium, file, env, args = sampleArgs(env.CW_CHROME_GL)) {
- let browser;
+ let browser,stage='launch';
  try {
   browser = await chromium.launch({executablePath:file, headless:true, args, env, timeout:10000});
+  stage='page';
   const page = await browser.newPage({viewport:{width:64,height:64}});
   page.setDefaultTimeout(5000);
   await page.setContent('<html><body>OpenTake</body></html>');
+  stage='screenshot';
   await page.screenshot({timeout:5000});
- } finally { await browser?.close(); }
+ } catch(error){error.stage=stage;throw error;} finally { await browser?.close().catch(()=>{}); }
 }
 async function probeSandbox(codex,file,env) {
+ if(process.platform==='win32'){
+  const installRoot=path.resolve(__dirname,'../../..');
+  if(fs.existsSync(path.join(installRoot,'opentake-payload.json'))){
+   try{await exec(path.join(env.SystemRoot||process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),
+    ['-NoProfile','-NonInteractive','-File',path.join(__dirname,'sandbox-read-access.ps1'),'-InstallationRoot',installRoot],
+    {env,windowsHide:true,timeout:30000,maxBuffer:65536});}
+   catch(error){error.stage='permission';throw error;}
+  }
+ }
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-browser-check-'));
  const tmp=path.join(root,'tmp');fs.mkdirSync(tmp);
  try {
@@ -39,7 +51,7 @@ async function probeSandbox(codex,file,env) {
    '-c','sandbox_workspace_write.exclude_tmpdir_env_var=true',
    '--',process.execPath,path.join(__dirname,'probe-creation-browser.cjs'),file],
    {cwd:root,env:{...env,TMPDIR:tmp,...(process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{}),...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{})},timeout:40000,maxBuffer:65536});
-  if(!result.stdout.includes('OPENTAKE_BROWSER_READY'))throw Error('未完成截图');
+  if(!result.stdout.includes('OPENTAKE_BROWSER_READY'))throw Object.assign(Error('未完成截图'),{stage:'protocol',stderr:result.stderr});
  } finally { fs.rmSync(root,{recursive:true,force:true}); }
 }
 async function doctor(options = {}) {
@@ -48,7 +60,7 @@ async function doctor(options = {}) {
  const items = [], tools = {};
  async function check(id,label,fn) {
   try { const result = await fn(); items.push({id,label,ok:true,...result}); }
-  catch(e) { items.push({id,label,ok:false,message:e.message,install:fixes[id],color:'#9869dc'}); }
+  catch(e) { items.push({id,label,ok:false,message:e.message,...(e.diagnostic?{diagnostic:e.diagnostic}:{}),install:fixes[id],color:'#9869dc'}); }
  }
  if (options.agentCheck) {
   await check('agent', options.agentLabel || '出片智能体', async()=>{
@@ -88,19 +100,19 @@ async function doctor(options = {}) {
   const file = override || (options.browserPath || require('playwright-core/lib/coreBundle').registry.registry.findExecutable('chromium-headless-shell').executablePath());
   if(!file || !executable(file)) throw Error('Chromium 不存在或不可执行：'+file);
   try { await probeBrowser(chromium,file,env,renderArgs()); }
-  catch { throw Error('Chromium 已找到，但服务端渲染模式启动或页面截图失败：'+file); }
+  catch(error) { throw browserDiagnostic(error,'host'); }
   if(options.agentCheck) {
    if(!tools.agent) throw Error('请先接通出片智能体，再重新检查 Chromium');
    if(tools.agent.id==='codex') {
-    try { await (options.probeSandbox || probeSandbox)(tools.agent.executable,file,env); } catch { throw Error('Chromium 在 Codex 出片沙盒中无法启动或截图：'+file); }
+    try { await (options.probeSandbox || probeSandbox)(tools.agent.executable,file,env); } catch(error) { throw browserDiagnostic(error,'sandbox'); }
     tools.chromium=file; return {path:file,version:'服务端渲染模式、出片沙盒单进程样张模式均已完成截图'};
    }
-   try { await probeBrowser(chromium,file,env,SAMPLE_ARGS); } catch { throw Error('Chromium 样张模式无法启动或截图：'+file); }
+   try { await probeBrowser(chromium,file,env,SAMPLE_ARGS); } catch(error) { throw browserDiagnostic(error,'host'); }
    tools.chromium=file; return {path:file,version:'服务端渲染、样张模式已完成截图；智能体沙盒在启动时强制检查'};
   }
   if(!tools.codex)throw Error('请先完成 Codex 安装及登录，再重新检查 Chromium');
   try { await (options.probeSandbox || probeSandbox)(tools.codex,file,env); }
-  catch { throw Error('Chromium 在出片沙盒中无法启动或截图：'+file+'。请保留此提示交给维护者检查；不会启动智能体。'); }
+  catch(error) { throw browserDiagnostic(error,'sandbox'); }
   tools.chromium=file; return {path:file,version:'服务端渲染模式、出片沙盒单进程样张模式均已完成截图'};
  });
  await check('ffmpeg','FFmpeg / ffprobe',async()=>{

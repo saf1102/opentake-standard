@@ -174,6 +174,7 @@ public:
     // call, or a machine that fell back would be fed DXGI samples the sink
     // writer was never configured for.
     bool usesDxgiInput() const;
+    bool videoTypeRejected() const { return videoTypeRejected_; }
     // A breadcrumb, not state: safe to read from another thread at any time.
     // One slot per writing thread, deliberately. encodeStage() names what the
     // video-writer thread is inside; audioStage() names what the audio-mixer
@@ -185,6 +186,7 @@ public:
     const char* audioStage() const;
 
 private:
+    bool videoTypeRejected_ = false;
     // Contended is not Failed: the bridge is a two-key handshake and a missed
     // acquire costs one frame, which is a better outcome than ending a
     // recording that is otherwise healthy.

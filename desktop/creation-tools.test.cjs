@@ -38,7 +38,8 @@ test('browser file present but launch or screenshot fails: blocks and closes own
  const f=fixture();try{
   let closed=false;
   f.options.chromium={launch:async()=>({close:async()=>{closed=true},newPage:async()=>({setDefaultTimeout(){},setContent:async()=>{},screenshot:async()=>{throw Error('failed')}})})};
-  const result=await doctor(f.options);assert.equal(result.ok,false);assert.equal(closed,true);assert.match(result.items.find(i=>i.id==='chromium').message,/启动或页面截图失败/);
+  const result=await doctor(f.options);assert.equal(result.ok,false);assert.equal(closed,true);assert.match(result.items.find(i=>i.id==='chromium').message,/页面截图失败/);
+  assert.equal(result.items.find(i=>i.id==='chromium').diagnostic.stage,'screenshot');
  }finally{f.close()}
 });
 test('pinned Playwright exposes matching headless shell registry without cache scans',()=>{
@@ -49,6 +50,24 @@ test('pinned Playwright exposes matching headless shell registry without cache s
 
 test('host browser success cannot conceal failure inside the agent sandbox',async()=>{
  const f=fixture();try{f.options.probeSandbox=async()=>{throw Error('sandbox denied')};const result=await doctor(f.options);assert.equal(result.ok,false);assert.match(result.items.find(i=>i.id==='chromium').message,/出片沙盒/);assert.equal(result.tools,undefined);}finally{f.close()}
+});
+
+test('sandbox script loading errors retain the denied path and stage without leaking secrets',async()=>{
+ const f=fixture();try{
+  f.options.probeSandbox=async()=>{throw Object.assign(Error('sandbox command failed'),{code:1,stderr:"EPERM: operation not permitted, stat 'C:\\Protected App\\desktop\\probe-creation-browser.cjs'\nMODULE_NOT_FOUND\nAuthorization: Bearer sk-privatekey1234567890"})};
+  const result=await doctor(f.options),item=result.items.find(i=>i.id==='chromium');
+  assert.equal(result.ok,false);assert.equal(item.diagnostic.stage,'script-load');
+  assert.match(item.message,/EPERM/);assert.match(item.message,/probe-creation-browser/);
+  assert.ok(!JSON.stringify(result).includes('sk-privatekey'));assert.equal(result.tools,undefined);
+ }finally{f.close()}
+});
+
+test('sandbox structured probe distinguishes screenshot failure from startup and bounds diagnostics',async()=>{
+ const f=fixture();try{
+  f.options.probeSandbox=async()=>{throw Object.assign(Error('child exit'),{stderr:'OPENTAKE_BROWSER_FAILURE '+JSON.stringify({stage:'screenshot',message:'capture failed '+ 'x'.repeat(20000)})})};
+  const item=(await doctor(f.options)).items.find(i=>i.id==='chromium');
+  assert.equal(item.diagnostic.stage,'screenshot');assert.match(item.message,/页面截图失败/);assert.ok(item.diagnostic.message.length<=8000);
+ }finally{f.close()}
 });
 
 test('沙盒仅允许单进程样张，服务端多进程渲染在沙盒外检查，整体通过',async()=>{
