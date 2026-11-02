@@ -12,6 +12,7 @@ import { EFFORT_LABELS, FOLLOW_DEFAULT, effectiveChoice, type AgentModel } from 
 import {connectionRequest, connectionReadyForFilm, type ConnectionView} from '@/studio/connections'
 import type { GeneralAgentChoice } from './general-contract'
 import { UNIFIED_AGENTS } from './platform'
+import {openSettings} from '../onboarding/onboarding-store'
 
 type Catalog = { models: AgentModel[]; standard: GeneralAgentChoice; connections:ConnectionView[] }
 /** Refresh on settings changes and every menu open: a disabled Claude must immediately disappear. */
@@ -84,6 +85,11 @@ function ConnectedAgentPicker({ value, onChange, compact, up, disabled, onResolv
       title={error || (value ? '这个工程自己选的模型' : '系统默认：跟设置里的「通用剪辑出片」一致')} onClick={() => setOpen(o => !o)}>
       <span className="dot" aria-hidden="true" /><span>{catalog ? label : error?'接入读取失败':'模型'}</span>{catalog && <i>{sub}</i>}<ChevronDown size={12} aria-hidden="true" />
     </button>
+    {open && !catalog && place && createPortal(<div className="ge"><div ref={pop} className="ge-model-pop" style={place} role="dialog" aria-label="选择模型和推理强度">
+      <div className="ge-model-grp" role={error?'alert':'status'}>{error||'正在读取智能体…'}</div>
+      {error&&<button type="button" className="ge-model-opt" onClick={()=>window.dispatchEvent(new Event('opentake:general-agent-changed'))}>重新读取</button>}
+      <button type="button" className="ge-model-opt" onClick={()=>{setOpen(false);openSettings('agents',value?.agent)}}>管理智能体接入 →</button>
+    </div></div>,document.body)}
     {open && catalog && place && createPortal(<div className="ge"><div ref={pop} className="ge-model-pop" style={place} role="dialog" aria-label="选择模型和推理强度">
       <button type="button" className="ge-model-opt" data-on={!value || undefined} disabled={!catalog.connections.some(c=>c.id===(standard?.agent||'codex')&&connectionReadyForFilm(c))} onClick={() => { onChange(undefined); setOpen(false) }}>
         <span><b>系统默认</b><small>跟设置里的「通用剪辑出片」一致</small></span><Check size={15} aria-hidden="true" />
@@ -91,6 +97,7 @@ function ConnectedAgentPicker({ value, onChange, compact, up, disabled, onResolv
       <div className="ge-model-sep" />
       <div className="ge-model-grp">已接通的智能体</div>
       {!catalog.connections.length&&<div className="ge-model-grp" style={{color:'#9869dc'}}>还没有接通的智能体，请先到设置接入。</div>}
+      <button type="button" className="ge-model-opt" onClick={()=>{setOpen(false);openSettings('agents',selectedId)}}>管理智能体接入 →</button>
       {catalog.connections.map(c=><button key={c.id} type="button" className="ge-model-opt" disabled={!connectionReadyForFilm(c)} data-on={selectedId===c.id||undefined} onClick={()=>onChange({agent:c.id as GeneralAgentChoice['agent'],model:'default',effort:'medium'})}>
         <span><b>{c.name}</b><small>{c.mode==='api'?'API 密钥':'命令行 · 账号登录'}{!c.cliInstalled?' · 仅轻活，出片需安装命令行':!c.heavySupported?' · 出片待适配':''}</small></span><Check size={15}/>
       </button>)}
@@ -181,7 +188,7 @@ function LegacyCodexPicker({ value, onChange, compact, up, disabled }: {
   </span>
 }
 
-/** Connections are a Mac-only rollout; other platforms keep their existing Codex settings/catalog path. */
+/** macOS and Windows use the same connection-aware picker. */
 export function AgentPicker(props: Parameters<typeof ConnectedAgentPicker>[0]) {
   return UNIFIED_AGENTS ? <ConnectedAgentPicker {...props} /> : <LegacyCodexPicker {...props} />
 }

@@ -1,5 +1,5 @@
 import {useSyncExternalStore} from 'react';
-import type {ConnectionId,ConnectionMode,ConnectionView} from '../studio/connections';
+import {connectionReadyForFilm,type ConnectionId,type ConnectionMode,type ConnectionView} from '../../shared/agent-connections';
 
 /** 一键部署：the rows of the check, the order they are shown and checked in, and which ones must pass before work starts. */
 export type CheckState='ok'|'warn'|'act'|'opt';
@@ -37,8 +37,8 @@ export async function recheck(id:DeployItemId){
 /** Update the shared deployment summary from an already checked connection, without probing every agent again. */
 export function syncDeployConnections(connections:ConnectionView[]){
  if(!connections.length)return;
- const agents=connections.filter(item=>item.kind==='agent'),ready=agents.filter(item=>item.enabled&&item.connected&&item.cliInstalled&&item.heavySupported);
- const result:CheckResult={id:'agent',state:ready.length?'ok':'act',text:`找到 ${agents.filter(item=>item.cliInstalled).length} 个，已接通 ${agents.filter(item=>item.connected).length} 个${ready.length?'':'；出片需接通 Codex 或 Claude Code'}`,agents:agents.map(item=>({id:item.id,name:item.name,line:item.cliInstalled?'已找到命令行':'没找到命令行',state:item.connected?'on':item.cliInstalled?'found':'off',status:item.connected?'已接通':item.cliAuthMessage||'未接通'})),action:{kind:'settings',label:'管理智能体',target:'agents'}};
+ const agents=connections.filter(item=>item.kind==='agent'),ready=agents.filter(connectionReadyForFilm);
+ const result:CheckResult={id:'agent',state:ready.length?'ok':'act',text:`找到 ${agents.filter(item=>item.cliInstalled).length} 个，已接通 ${agents.filter(item=>item.connected).length} 个${ready.length?'':'；请在设置里接通支持出片的智能体'}`,agents:agents.map(item=>({id:item.id,name:item.name,line:item.cliInstalled?'已找到命令行':'没找到命令行',state:item.connected?'on':item.cliInstalled?'found':'off',status:item.connected?'已接通':item.cliAuthMessage||'未接通'})),action:{kind:'settings',label:'管理智能体',target:'agents'}};
  setRow('agent',result.state,result);
 }
 let current:Promise<void>|null=null;
