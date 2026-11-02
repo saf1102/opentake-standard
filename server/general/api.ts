@@ -1,3 +1,4 @@
+import {assertStorageIdle} from '../editor/api/storage.ts';
 import {chooseExportDestination} from '../editor/settings-host.ts';
 import {videoExportCapabilities} from '../../shared/export-video.ts';
 import {readExportPreferences,writeExportPreferences} from '../export-preferences.ts';
@@ -20,7 +21,7 @@ import { pageHostPort } from './page-host.ts';
 import { readGeneralLayers, saveEdited, sceneSpeedsOf, soundFilesOf, soundsOf, soundWaveform, stylePresets, upgradeVersion } from './layers.ts';
 import { ffmpegPath, ffprobePath } from './kit-env.ts';
 import { switchRunAgent, answerNetwork, isLive, mediaFile, postMessage, reconcile, resumeRun, assertReady, startFirst, stopForDelete, stopRun, styleLibrary, readSession, writeSession } from './runner.ts';
-import { createGeneral, fileUrl, findGeneral, generalChanges, patchGeneral, scanGeneral, summarize, trashGeneral, updateGeneral } from './store.ts';
+import { createGeneral, fileUrl, findGeneral, generalChanges, patchGeneral, scanGeneral, summarize, trashGeneral, restoreGeneral, purgeGeneral, updateGeneral } from './store.ts';
 
 const exec = promisify(execFile);
 const MEDIA_TYPES = new Set(['.mp4', '.mov', '.m4v', '.webm', '.mkv', '.avi', '.mp3', '.wav', '.m4a', '.aac', '.flac', '.jpg', '.jpeg', '.png', '.webp']);
@@ -35,7 +36,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
     if (parts[0] === 'page-host' && method === 'GET') return ok(res, { port: await pageHostPort() });
     if (parts[0] !== 'projects') return sendJson(res, 404, { ok: false, error: '接口不存在' });
     if (parts.length === 1) {
-      if (method === 'GET') return ok(res, scanGeneral().map(l => summarize(reconcile(l))));
+      if (method === 'GET') return ok(res, scanGeneral(url.searchParams.get('includeDeleted')==='1').map(l => summarize(l.deletedAt ? l.project : reconcile(l), l.deletedAt)));
       if (method === 'POST') {
         const body = await bodyJson(req);
         const styleId = String(body.styleId || '');
@@ -63,6 +64,8 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
       }
       return sendJson(res, 405, { ok: false, error: '不支持的方法' });
     }
+    if(action==='restore'&&method==='POST'&&parts.length===3){assertStorageIdle();return ok(res,restoreGeneral(id));}
+    if(action==='purge'&&method==='POST'&&parts.length===3){const body=await bodyJson(req);if(body.confirmProjectId!==id)throw Object.assign(Error('请确认彻底删除的工程'),{status:400});assertStorageIdle();await purgeGeneral(id);return ok(res,null);}
     if(action==='agent-comparison'&&method==='GET'&&parts.length===3){const {compareProjectAgentRuns}=await import('../agent-comparison.ts');return ok(res,compareProjectAgentRuns(findGeneral(id).project.id));}
     if (action === 'events' && method === 'GET') return events(req, res, id);
     // 打开工程目录 in the editor's media column (S先生 10-31: it did nothing)

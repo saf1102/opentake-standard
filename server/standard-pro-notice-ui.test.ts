@@ -27,16 +27,16 @@ test('Windows Pro notice opens immediately, keeps updates independent, and repla
   const click=async(label:string,scope:ParentNode=document)=>{const button=[...scope.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.trim()===label);assert.ok(button,label);await h.act(async()=>{button.focus();button.click();await wait()});return button};
   const notice=()=>{const dialogs=[...document.querySelectorAll<HTMLElement>('[role="dialog"]')];assert.equal(dialogs.length,1);assert.match(dialogs[0].textContent||'',/OpenTake Pro 开发中/);assert.match(dialogs[0].textContent||'',/敬请期待/);assert.equal(dialogs[0].querySelector('form,input,a'),null);return dialogs[0]};
   app=h.createRoot(document.getElementById('root'));await h.act(async()=>app.render(React.createElement(h.Harness)));
-  const trigger=await click('升级到 Pro');notice();assert.deepEqual(calls,['/api/upgrade/daily'],'click must not wait for account or network state');
+  const trigger=await click('升级到 Pro');notice();assert.deepEqual(calls,['/api/upgrade/windows/daily'],'click must not wait for account or network state');
   let update:any;window.addEventListener('standard-update-state',(event:any)=>{update=event.detail},{once:true});
   await h.act(async()=>{resolveDaily(Response.json({upgrade:{mode:'paid'},account:{proStatus:'active'},clientUpdate:{currentVersion:'1.1.0',available:false}}));await wait()});
   notice();assert.equal(update.currentVersion,'1.1.0');await click('知道了');assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(document.activeElement,trigger);
   await h.act(async()=>{h.openUpgrade();h.openUpgrade();await wait()});notice();
   await h.act(async()=>{document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await wait()});assert.equal(document.querySelector('[role="dialog"]'),null);
   await click('预览 Pro 风格');const preview=document.querySelector<HTMLElement>('[role="dialog"]');assert.ok(preview);assert.doesNotMatch(preview.textContent||'',/开发中/);
-  await click('升级到 Pro',preview);notice();await click('知道了');assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(window.location.pathname,'/general/projects/qa');assert.deepEqual(calls,['/api/upgrade/daily']);
+  await click('升级到 Pro',preview);notice();await click('知道了');assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(window.location.pathname,'/general/projects/qa');assert.deepEqual(calls,['/api/upgrade/windows/daily']);
   await h.act(async()=>app.unmount());app=null;offline=true;
-  app=h.createRoot(document.getElementById('root'));await h.act(async()=>{app.render(React.createElement(h.Harness));await wait()});await click('升级到 Pro');notice();assert.deepEqual(calls,['/api/upgrade/daily','/api/upgrade/daily']);
+  app=h.createRoot(document.getElementById('root'));await h.act(async()=>{app.render(React.createElement(h.Harness));await wait()});await click('升级到 Pro');notice();assert.deepEqual(calls,['/api/upgrade/windows/daily','/api/upgrade/windows/daily']);
   await h.act(async()=>app.unmount());app=null;
  }finally{
   if(app)app.unmount();

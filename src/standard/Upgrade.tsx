@@ -16,7 +16,7 @@ function ProDevelopmentDialog(){
   window.addEventListener('opentake-upgrade',show);
   // Standard update checks continue independently of the local Pro notice.
   let mounted=true;
-  const daily=async()=>{try{const v=await api('daily');if(mounted&&!v.skipped)window.dispatchEvent(new CustomEvent('standard-update-state',{detail:v.clientUpdate}))}catch{}};
+  const daily=async()=>{try{const v=await api('windows/daily');if(mounted&&!v.skipped)window.dispatchEvent(new CustomEvent('standard-update-state',{detail:v.clientUpdate}))}catch{}};
   void daily();const timer=setInterval(()=>void daily(),3600000);
   return()=>{mounted=false;clearInterval(timer);window.removeEventListener('opentake-upgrade',show)};
  },[]);

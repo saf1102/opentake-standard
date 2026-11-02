@@ -117,6 +117,7 @@ export type GeneralProject = {
 export type GeneralAgentChoice = { agent?: AgentConnectionId; model: string; effort: string };
 /** One row of the shared project library (home page, /studio) for a general project. */
 export type GeneralProjectSummary = {
+  deletedAt?: string;
   id: string; kind: 'general'; name: string; styleId: string; updatedAt: string; createdAt: string;
   duration?: number; posterUrl?: string; runState?: GeneralRunState; versions: number;
 };

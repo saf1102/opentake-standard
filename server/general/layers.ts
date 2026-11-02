@@ -1,3 +1,4 @@
+import {autoBackup} from '../editor/project-backups.ts';
 import {removeWithRetrySync} from '../file-ops.ts';
 /**
  * A layered film (film.json version 2) becomes a version's tracks: a snapshot of the agent's work folder in
@@ -206,6 +207,7 @@ export function saveEdited(id: string, n: number, body: unknown) {
   const original = JSON.parse(fs.readFileSync(path.join(dir, 'versions', `v${n}`, 'layers.json'), 'utf8')) as GeneralLayers;
   const next: GeneralLayers = { ...original, segments: Array.isArray(layers.segments) ? layers.segments : original.segments, duration: timeline.duration, ending: layers.ending ?? original.ending, finish: layers.finish ?? original.finish, timeline };
   const file = path.join(dir, 'versions', `v${n}`, 'edited.json');
+  autoBackup(dir,'general');
   atomicJsonSync(file, next, {indent:1});
   return { saved: true, at: new Date().toISOString() };
 }

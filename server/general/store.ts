@@ -1,3 +1,4 @@
+import {autoBackup} from '../editor/project-backups.ts';
 import {AGENT_CONNECTION_IDS} from '../../shared/agent-connections.ts';
 import {canCreateLegacyProjectRoot} from './edition.ts';
 import {renameWithRetrySync} from '../file-ops.ts';
@@ -25,7 +26,7 @@ import type { GeneralAgentChoice, GeneralInputs, GeneralLength, GeneralProject, 
 export const GENERAL_FILE = 'general-project.json';
 const TRASH = '.Trash';
 type Stored = GeneralProject & { deletedAt?: string };
-export type GeneralLocation = { dir: string; project: GeneralProject };
+export type GeneralLocation = { dir: string; project: GeneralProject; deletedAt?: string };
 
 /** Every change to a saved project is announced here (the events stream listens). */
 export const generalChanges = new EventEmitter();
@@ -64,7 +65,7 @@ export function scanGeneral(includeDeleted = false): GeneralLocation[] {
     const stored = readStored(dir);
     if (!stored || (!includeDeleted && stored.deletedAt)) continue;
     locations.set(stored.id, dir);
-    out.push({ dir, project: publicProject(stored) });
+    out.push({ dir, project: publicProject(stored), ...(stored.deletedAt ? {deletedAt:stored.deletedAt} : {}) });
   }
   return out.sort((a, b) => b.project.updatedAt.localeCompare(a.project.updatedAt));
 }
@@ -83,8 +84,8 @@ function locate(id: string, includeDeleted = false): { dir: string; stored: Stor
 }
 const notFound = () => Object.assign(new Error('通用剪辑工程不存在'), { status: 404 });
 
-export function findGeneral(id: string): GeneralLocation {
-  const { dir, stored } = locate(id);
+export function findGeneral(id: string, includeDeleted = false): GeneralLocation {
+  const { dir, stored } = locate(id, includeDeleted);
   return { dir, project: publicProject(stored) };
 }
 
@@ -92,6 +93,7 @@ export function findGeneral(id: string): GeneralLocation {
 export function saveGeneral(dir: string, project: GeneralProject, { touch = true, restoring = false } = {}): GeneralProject {
   const stored = restoring ? undefined : readStored(dir);
   const next: Stored = { ...project, ...(touch ? { updatedAt: now() } : {}), ...(stored?.deletedAt ? { deletedAt: stored.deletedAt } : {}) };
+  if(fs.existsSync(path.join(dir,GENERAL_FILE)))autoBackup(dir,'general');
   writeAtomic(path.join(dir, GENERAL_FILE), next);
   locations.set(project.id, dir);
   const out = publicProject(next);
@@ -193,7 +195,8 @@ export function trashGeneral(id: string) {
 export function restoreGeneral(id: string): GeneralProject {
   const { dir, stored } = locate(id, true);
   if (!stored.deletedAt) return publicProject(stored);
-  const library = path.dirname(path.dirname(dir));
+  const library = path.basename(path.dirname(dir)) === TRASH ? path.dirname(path.dirname(dir)) : path.dirname(dir);
+  if (path.dirname(dir) === library) return saveGeneral(dir, publicProject(stored), { restoring: true });
   let target = path.join(library, path.basename(dir));
   for (let i = 2; fs.existsSync(target); i++) target = path.join(library, `${path.basename(dir)} ${i}`);
   renameWithRetrySync(dir, target);
@@ -212,11 +215,11 @@ export async function purgeGeneral(id: string) {
 export const fileUrl = (id: string, rel: string, version?: number | string) =>
   `${GENERAL_API}/projects/${id}/files/${rel.split(path.sep).join('/').split('/').map(encodeURIComponent).join('/')}${version !== undefined ? `?v=${encodeURIComponent(String(version))}` : ''}`;
 
-export function summarize(project: GeneralProject): GeneralProjectSummary {
+export function summarize(project: GeneralProject, deletedAt?: string): GeneralProjectSummary {
   const version = project.versions.find(v => v.n === project.current) || project.versions.at(-1);
   const poster = version?.posterUrl || project.inputs.media.find(m => m.poster)?.poster;
   return {
-    id: project.id, kind: 'general', name: project.name, styleId: project.styleId, updatedAt: project.updatedAt, createdAt: project.createdAt,
+    ...(deletedAt ? {deletedAt} : {}), id: project.id, kind: 'general', name: project.name, styleId: project.styleId, updatedAt: project.updatedAt, createdAt: project.createdAt,
     ...(version ? { duration: version.duration } : project.plan ? { duration: project.plan.duration } : {}),
     ...(poster ? { posterUrl: poster } : {}), ...(project.run ? { runState: project.run.state } : {}), versions: project.versions.length,
   };

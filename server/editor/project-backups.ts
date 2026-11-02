@@ -1,3 +1,5 @@
+import {generalBackupDocuments,checkedGeneralDocuments,restoreGeneralBackup} from '../general/backups.ts';
+import {atomicJsonSync} from '../file-ops.ts';
 import {migrationBackupRoots,placements,relocatedReferences} from './migration-state.ts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,30 +20,31 @@ function checkedRecordingFiles(value:unknown):RecordingFile[]{
  return value.map((item:RecordingFile)=>{if(!item||typeof item.path!=='string'||!item.path.startsWith('analysis/openscreen/')||item.path.includes('\\')||item.path.includes(':')||item.path.includes('\0')||path.posix.normalize(item.path)!==item.path||item.path.split('/').includes('..')||path.isAbsolute(item.path)||typeof item.text!=='string'||hash(item.text)!==item.sha256)throw Error('录屏备份校验失败');return item;});
 }
 function root(){const folder=readSystemSettings().preferences.paths.backups;if(!folder)throw Error('未设置备份目录');if(!fs.existsSync(folder)){const parts=path.resolve(folder).split(path.sep);if(parts[1]==='Volumes'&&(!parts[2]||!fs.existsSync(path.join(path.parse(folder).root,parts[1],parts[2]))))throw Error('备份所在硬盘未连接，请先连接原硬盘');fs.mkdirSync(folder,{recursive:true});}validateDirectory(folder);return folder;}
-export function backupProjectFile(dir:string,force=false){
+export function backupProjectFile(dir:string,force=false,kind:'screen'|'general'='screen'){
  const config=readSystemSettings().preferences.backup;if(!force&&!config.automatic)return;
- const text=fs.readFileSync(path.join(dir,'project.json'),'utf8'),project=JSON.parse(text);if(!validId(project.id))throw Error('工程 ID 无效');
+ const text=fs.readFileSync(path.join(dir,kind==='general'?'general-project.json':'project.json'),'utf8'),project=JSON.parse(text);if(!validId(project.id))throw Error('工程 ID 无效');
  const folder=path.join(root(),'snapshots',project.id);fs.mkdirSync(folder,{recursive:true});
  const files=fs.readdirSync(folder).filter(f=>/^\d+-[a-f0-9-]+\.json$/.test(f)).sort().reverse();
  if(!force&&files[0]&&Date.now()-Number(files[0].split('-')[0])<config.intervalMinutes*60000)return;
- const id=`${Date.now()}-${crypto.randomUUID()}`,file=path.join(folder,id+'.json'),temp=file+'.tmp';
- const value={version:1,id,createdAt:Date.now(),projectId:project.id,name:project.name,sourceDir:dir,sha256:hash(text),text,recordingFiles:recordingFiles(dir)};
- try{fs.writeFileSync(temp,JSON.stringify(value),{mode:0o600});fs.renameSync(temp,file);}finally{fs.rmSync(temp,{force:true});}
+ const id=`${Date.now()}-${crypto.randomUUID()}`,file=path.join(folder,id+'.json');
+ const value={version:kind==='general'?2:1,kind,id,createdAt:Date.now(),projectId:project.id,name:project.name,sourceDir:dir,sha256:hash(text),text,...(kind==='general'?{generalDocuments:generalBackupDocuments(dir)}:{recordingFiles:recordingFiles(dir)})};
+ atomicJsonSync(file,value,{mode:0o600});
  failures.delete(project.id);
  for(const old of files.slice(config.keep-1)){const candidate=path.join(folder,old);if(fs.lstatSync(candidate).isFile())fs.unlinkSync(candidate);}
  return id;
 }
-export function autoBackup(dir:string){try{backupProjectFile(dir);}catch(e){try{failures.set(JSON.parse(fs.readFileSync(path.join(dir,'project.json'),'utf8')).id,String(e));}catch{/* Unreadable project identity: report the original backup failure below. */}console.warn('[backup]',String(e));}}
+export function autoBackup(dir:string,kind:'screen'|'general'='screen'){try{backupProjectFile(dir,false,kind);}catch(e){try{failures.set(JSON.parse(fs.readFileSync(path.join(dir,kind==='general'?'general-project.json':'project.json'),'utf8')).id,String(e));}catch{/* Unreadable project identity: report the original backup failure below. */}console.warn('[backup]',String(e));}}
 export function listBackups(strict=false){
  const settings=readSystemSettings();const roots=[...new Set([...migrationBackupRoots(),settings.preferences.paths.backups,...settings.backupRoots])];const rows:{id:string;projectId:string;name:string;createdAt:number;bytes:number;root:string}[]=[];
  for(const root of roots){const base=path.join(root,'snapshots');if(!fs.existsSync(base))continue;for(const id of fs.readdirSync(base)){if(!validId(id))continue;const folder=path.join(base,id);if(!fs.lstatSync(folder).isDirectory())continue;
- for(const file of fs.readdirSync(folder)){if(!/^\d+-[a-f0-9-]+\.json$/.test(file))continue;try{const target=path.join(folder,file);if(!fs.lstatSync(target).isFile())continue;const item=JSON.parse(fs.readFileSync(target,'utf8'));if(item.version!==1||item.projectId!==id||hash(item.text)!==item.sha256)throw Error('备份校验失败：'+target);checkedRecordingFiles(item.recordingFiles);rows.push({id:item.id,projectId:id,name:item.name,createdAt:item.createdAt,bytes:fs.statSync(target).size,root});}catch(e){if(strict)throw e}}
+ for(const file of fs.readdirSync(folder)){if(!/^\d+-[a-f0-9-]+\.json$/.test(file))continue;try{const target=path.join(folder,file);if(!fs.lstatSync(target).isFile())continue;const item=JSON.parse(fs.readFileSync(target,'utf8'));if((item.version!==1&&!(item.version===2&&item.kind==='general'))||item.projectId!==id||hash(item.text)!==item.sha256)throw Error('备份校验失败：'+target);if(item.kind==='general')checkedGeneralDocuments(item.generalDocuments);else checkedRecordingFiles(item.recordingFiles);rows.push({id:item.id,projectId:id,name:item.name,createdAt:item.createdAt,bytes:fs.statSync(target).size,root});}catch(e){if(strict)throw e}}
  }}return rows.filter((row,i)=>rows.findIndex(r=>r.id===row.id)===i).sort((a,b)=>b.createdAt-a.createdAt);
 }
 export async function restoreBackup(id:string){
  const entry=listBackups().find(e=>e.id===id);if(!entry)throw Error('备份不存在或校验失败');
  if(placements()[entry.projectId]&&!fs.existsSync(placements()[entry.projectId].dir))throw Error('工程所在硬盘未连接，请先连接再恢复');
  const item=JSON.parse(fs.readFileSync(path.join(entry.root,'snapshots',entry.projectId,id+'.json'),'utf8'));
+ if(item.kind==='general')return restoreGeneralBackup(item);
  const recordings=checkedRecordingFiles(item.recordingFiles);
  const {findProject,save,dirs,scan}=await import('./store.ts');
  let sourceDir=item.sourceDir;try{sourceDir=findProject(entry.projectId,true).dir;}catch{/* No live placement: retain the snapshot source directory. */}

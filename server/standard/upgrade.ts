@@ -1,4 +1,5 @@
 import {clientHeaders,updateView,dismissUpdate} from './client-update.ts';
+import {windowsUpdateApi} from './windows-update.ts';
 import platform from '../platform.ts';
 import {atomicJsonSync} from '../file-ops.ts';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import type {IncomingMessage,ServerResponse} from 'node:http';import {bodyJson,sendJson} from '../http.ts';
@@ -18,6 +19,7 @@ async function remote(route:string,method='GET',body?:unknown){const r=await fet
 async function config(){for(const url of [local?local+'/standard/upgrade.json':UPGRADE_URL,fallback]){if(!url)continue;try{const r=await fetch(url,{headers:url===fallback?undefined:clientHeaders(true),credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(5000)});if(!r.ok)continue;const v=await r.json();if(v.mode==='beta'||v.mode==='paid'&&Array.isArray(v.plans)&&v.plans.length===3)return v}catch{/* offline default */}}return {mode:'beta',notice:'',offline:true}}
 function publicView(value:Record<string,unknown>){const {token:_token,...rest}=value;return rest}
 export async function upgradeApi(req:IncomingMessage,res:ServerResponse){const route=new URL(req.url||'/','http://localhost').pathname.replace('/api/upgrade','');try{
+ if(route.startsWith('/windows/'))return await windowsUpdateApi(req,res,route.slice('/windows'.length));
  if(req.method==='GET'&&route==='/client')return sendJson(res,200,updateView());
  if(req.method==='POST'&&route==='/dismiss'){const b=await bodyJson(req) as {action:string};return sendJson(res,200,dismissUpdate(b.action))}
  if(req.method==='GET'&&route==='/preferences')return sendJson(res,200,{daily:saved.daily!==false});
