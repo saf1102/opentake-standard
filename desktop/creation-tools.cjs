@@ -34,8 +34,8 @@ async function probeSandbox(codex,file,env) {
  if(process.platform==='win32'){
   const installRoot=path.resolve(__dirname,'../../..');
   if(fs.existsSync(path.join(installRoot,'opentake-payload.json'))){
-   try{await exec(path.join(env.SystemRoot||process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),
-    ['-NoProfile','-NonInteractive','-File',path.join(__dirname,'sandbox-read-access.ps1'),'-InstallationRoot',installRoot],
+   try{await exec(path.join(installRoot,'resources/runtimes/python/python.exe'),
+    ['-I','-S','-B',path.join(__dirname,'sandbox-read-access.py'),installRoot],
     {env,windowsHide:true,timeout:30000,maxBuffer:65536});}
    catch(error){error.stage='permission';throw error;}
   }

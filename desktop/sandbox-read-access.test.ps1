@@ -13,7 +13,8 @@ $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,'Full
 Set-Acl -LiteralPath $appRoot -AclObject $acl
 $outsideBefore=(Get-Acl -LiteralPath $root).Sddl
 try{
- & (Join-Path $PSScriptRoot 'sandbox-read-access.ps1') -InstallationRoot $appRoot
+ & (Join-Path $PSScriptRoot '..\..\runtime-payload\python\python.exe') -I -S -B (Join-Path $PSScriptRoot 'sandbox-read-access.py') $appRoot
+ if($LASTEXITCODE -ne 0){throw 'Application access configuration failed'}
  $group=([Security.Principal.NTAccount]::new($env:COMPUTERNAME,'CodexSandboxUsers')).Translate([Security.Principal.SecurityIdentifier])
  foreach($target in @($appRoot,(Join-Path $app 'package.json'))){
   $rules=@((Get-Acl -LiteralPath $target).Access | Where-Object {$_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq $group.Value})
@@ -21,7 +22,8 @@ try{
   foreach($rule in $rules){if($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::Write){throw 'Unexpected sandbox write access'}}
  }
  $first=(Get-Acl -LiteralPath $appRoot).Sddl
- & (Join-Path $PSScriptRoot 'sandbox-read-access.ps1') -InstallationRoot $appRoot
+ & (Join-Path $PSScriptRoot '..\..\runtime-payload\python\python.exe') -I -S -B (Join-Path $PSScriptRoot 'sandbox-read-access.py') $appRoot
+ if($LASTEXITCODE -ne 0){throw 'Application access recheck failed'}
  if((Get-Acl -LiteralPath $appRoot).Sddl -ne $first){throw 'Permission update is not idempotent'}
  if((Get-Acl -LiteralPath $root).Sddl -ne $outsideBefore){throw 'Parent directory permissions changed'}
  Write-Output 'PASS application-only inherited RX, existing owner preserved, repeat/upgrade idempotent, parent unchanged'

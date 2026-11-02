@@ -127,7 +127,7 @@ FunctionEnd
     SetErrorLevel 2
     Abort
   ${EndIf}
-  nsExec::ExecToStack /TIMEOUT=120000 '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -File "$INSTDIR\resources\app\desktop\sandbox-read-access.ps1" -InstallationRoot "$INSTDIR"'
+  nsExec::ExecToStack /TIMEOUT=120000 '"$INSTDIR\resources\runtimes\python\python.exe" -I -S -B "$INSTDIR\resources\app\desktop\sandbox-read-access.py" "$INSTDIR"'
   Pop $otResult
   Pop $otCheckOutput
   DetailPrint "$otCheckOutput"
