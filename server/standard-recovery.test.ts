@@ -12,6 +12,9 @@ import {handleGeneralApi} from './general/api.ts';
 import {handleSystemSettingsApi} from './editor/api/system-settings.ts';
 import {backupProjectFile,listBackups,restoreBackup} from './editor/project-backups.ts';
 import {checkedGeneralDocuments} from './general/backups.ts';
+import {EventEmitter} from 'node:events';
+import {trackStorageRequest,desktopHost} from './editor/storage-activity.ts';
+import {assertStorageIdle} from './editor/api/storage.ts';
 async function fixture(t:any){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'standard-recovery-'));const previous=new Map<string,string|undefined>();
   for(const [key,value] of Object.entries({OPENTAKE_STANDARD_USER_DATA:path.join(root,'profile'),LINK_READER_PROJECTS_DIR:root,LINKREADER_SYSTEM_SETTINGS_FILE:path.join(root,'settings.json')})){previous.set(key,process.env[key]);process.env[key]=value}
@@ -21,6 +24,13 @@ async function fixture(t:any){
   const api=async(route:string,method='GET',body?:unknown)=>{const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}${route}`,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});return {status:response.status,...await response.json()}};
   return {root,api};
 }
+test('Windows storage operations wait for concurrent writes and release tracking once on close or finish',async t=>{
+  await fixture(t);const first=new EventEmitter(),second=new EventEmitter();
+  trackStorageRequest({method:'PUT'} as any,first as any);trackStorageRequest({method:'POST'} as any,second as any);
+  assert.equal(desktopHost().activeRequests,2);assert.throws(assertStorageIdle,/等待/);
+  first.emit('finish');first.emit('close');assert.equal(desktopHost().activeRequests,1);
+  second.emit('close');assert.equal(desktopHost().activeRequests,0);assert.doesNotThrow(assertStorageIdle);
+});
 test('Windows screen trash restores new and legacy in-place deletions; purge requires explicit matching confirmation',async t=>{
   const {root,api}=await fixture(t),project=createScreenProject('录屏 中文 空格'),dir=findProject(project.id).dir,route=`/api/editor/projects/${project.id}`;
   fs.writeFileSync(path.join(dir,'media','fixture.bin'),'original');

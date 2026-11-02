@@ -13,7 +13,7 @@ export async function standardApi(req:IncomingMessage,res:ServerResponse,next:()
  if(!url.pathname.startsWith('/api/'))return next();
  // Vite only binds loopback. Reject cross-site writes to the local filesystem service.
  const origin=req.headers.origin;if(origin&&origin!==`http://${req.headers.host}`&&origin!==`https://${req.headers.host}`)return sendJson(res,403,{ok:false,error:'不接受跨站请求'});
- if(process.platform==='darwin'){trackStorageRequest(req,res);scheduleStorageMaintenance();}
+ trackStorageRequest(req,res);if(process.platform==='darwin')scheduleStorageMaintenance();
  try{if(req.method==='GET'&&url.pathname==='/api/environment')return sendJson(res,200,await checkCreationEnvironment());if(url.pathname.startsWith('/api/upgrade/'))return await upgradeApi(req,res);if(url.pathname.startsWith('/api/general/')){req.url=req.url!.slice('/api/general'.length);return await handleGeneralApi(req,res)}
  if(url.pathname.startsWith('/api/editor/')){if(await handleSharedSettings(req,res,url.pathname.slice('/api/editor/'.length).split('/').map(decodeURIComponent)))return;return await handleEditorApi(req,res);}
  if(url.pathname==='/api/agent-settings'){const result=req.method==='PUT'?await saveAgentSettings(await bodyJson(req)):req.method==='GET'?await agentSettingsView():undefined;if(result)return sendJson(res,200,{ok:true,result});}

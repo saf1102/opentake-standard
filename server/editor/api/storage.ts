@@ -1,4 +1,5 @@
 import {assertNoMigration} from '../migration-state.ts';
+import {nativeRecordingBusy} from '../openscreen-host.ts';
 import fs from 'node:fs';import path from 'node:path';
 import {rootDir} from '../store.ts';
 import type {IncomingMessage,ServerResponse} from 'node:http';
@@ -8,6 +9,7 @@ import {cleanStorage,storageOverview,storagePolicy,setStoragePolicy} from '../st
 
 export function assertStorageIdle(){
  assertNoMigration();
+ if(nativeRecordingBusy())throw Error('请先停止录制并等待保存完成，再管理工程或存储');
  const host=desktopHost();
  if((host?.activeJobs?.()||0)>0||(host?.activeRequests||0)>1||activeDesktopJobs()>0)throw Error('请等待生成、识别或导出任务结束，再管理缓存');
 }

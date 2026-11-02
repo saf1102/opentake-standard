@@ -103,6 +103,7 @@ function managedCandidateFile(session: Pick<OpenScreenHostSession,'projectId'|'i
   return path.join(sessionDir(session.projectId), `${session.id}.import.openscreen`);
 }
 export const nativeRecordingStatus = () => ({supported:process.platform === 'win32', active:nativeRecorder.state});
+export const nativeRecordingBusy = () => nativeRecorder.busy;
 export const stopNativeRecording = (projectId:string, id:string) => nativeRecorder.stop(projectId,id);
 if (typeof process.send === 'function') process.on('message', message => {
   const request = (message as {recordingStop?:{projectId?:string;id?:string}})?.recordingStop;
