@@ -1,6 +1,7 @@
 import {buildGeneralDraft,flatGeneralDraft} from './export-draft.ts';
 import {generalJianyingCaptions, splitJianyingText} from './jianying-captions.ts';
 import {encodeExportMedia} from './export-media.ts';
+import {assertVideoExportSupported} from '../../shared/export-video.ts';
 import type {ExportSettings} from '../../src/types/editor.ts';
 /** Runs outside the agent sandbox, in one disposable export directory. */
 import fs from 'node:fs';
@@ -30,6 +31,7 @@ const ff = (args: string[]) => run(ffmpegPath(), ['-v','error','-y',...args]);
 try {
   const request=JSON.parse(fs.readFileSync(path.join(output,'request.json'),'utf8')) as {settings:ExportSettings;kind:string;media:{width:number;height:number;fps:number;duration:number}};
   const {settings,kind,media}=request;
+  if(format!=='jianying')assertVideoExportSupported(settings.video,process.platform);
   const layers=fs.existsSync(path.join(output,'layers.json'))?JSON.parse(fs.readFileSync(path.join(output,'layers.json'),'utf8')) as GeneralLayers:undefined;
   const fps=format==='jianying'?media.fps:typeof settings.fps==='number'?settings.fps:media.fps;
   let source=path.join(work,'out.mp4');
@@ -51,6 +53,7 @@ try {
     else {
       progress('编码成片',.9);
       const result=await encodeExportMedia(source,path.join(output,`成片.${settings.video.codec==='prores422'?'mov':settings.video.container}`),settings);
+      fs.writeFileSync(path.join(output,'编码信息.json'),JSON.stringify(result.encoding,null,2));
       console.log(`EXPORT:${JSON.stringify({media:{width:result.width,height:result.height,fps:result.fps}})}`);
     }
   }

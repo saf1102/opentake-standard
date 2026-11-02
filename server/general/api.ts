@@ -1,4 +1,5 @@
 import {chooseExportDestination} from '../editor/settings-host.ts';
+import {videoExportCapabilities} from '../../shared/export-video.ts';
 import {readExportPreferences,writeExportPreferences} from '../export-preferences.ts';
 import {requireCreationTools} from '../creation-tools.ts';
 import {extraStyle,styleError,revealPath} from './edition.ts';
@@ -88,7 +89,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
         const source=await generalExportSource(id,Number(url.searchParams.get('version')));
         const destination=path.join(dir,'exports');fs.mkdirSync(destination,{recursive:true});
         const stats=fs.statfsSync(destination);
-        return ok(res,{defaultDestination:destination,freeBytes:stats.bavail*stats.bsize,jianying:{available:false,warning:'完成后可从导出文件夹导入剪映'},canvas:{width:source.media.width,height:source.media.height,fps:source.media.fps}});
+        return ok(res,{video:videoExportCapabilities(process.platform),defaultDestination:destination,freeBytes:stats.bavail*stats.bsize,jianying:{available:false,warning:'完成后可从导出文件夹导入剪映'},canvas:{width:source.media.width,height:source.media.height,fps:source.media.fps}});
       }
       if(parts[3]==='destination'&&method==='POST') {
         return ok(res,{path:await chooseExportDestination('选择导出位置')});

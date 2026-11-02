@@ -367,6 +367,7 @@ export const ExportJobSchema = z.object({
 export type ExportJob = z.infer<typeof ExportJobSchema>
 
 export const ExportCapabilitiesSchema = z.object({
+  video: z.object({codecs:z.array(ExportVideoSettingsSchema.shape.codec),unavailable:z.record(z.string(),z.string())}).optional(),
   defaults: z.object({preset:ExportPresetSchema,resolution:z.enum(['original','4k','1080p','720p']),revealWhenDone:z.boolean(),container:z.enum(['mp4','mov']),quality:z.enum(['fast','balanced','high'])}).optional(),
   defaultDestination: z.string(),
   freeBytes: z.number().nonnegative().optional(),

@@ -41,7 +41,7 @@ async function fixture() {
    if(!a.importer)return;
    if(a.path==='../file-ops.ts'||a.path==='../platform.ts')return {path:path.resolve('server/editor',a.path),external:true};
    if(a.path==='node:child_process')return {path:'child',namespace:'fixture'};
-   if(a.path.endsWith('src/types/editor.ts'))return {path:path.resolve(path.dirname(a.importer),a.path),external:true};
+   if(a.path.endsWith('src/types/editor.ts')||a.path.endsWith('shared/export-video.ts'))return {path:path.resolve(path.dirname(a.importer),a.path),external:true};
    if(a.path.startsWith('.'))return {path:a.path,namespace:'fixture'};
   });
   b.onLoad({filter:/.*/,namespace:'fixture'},a=>{
@@ -67,6 +67,13 @@ async function fixture() {
  return {data,api:mod.exports,close(){delete(globalThis as any)[key];fs.rmSync(root,{recursive:true,force:true});}};
 }
 const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
+
+test('Windows HEVC is rejected before starting OpenScreen or reserving export files',{skip:process.platform!=='win32'},async()=>{
+ const f=await fixture();try{
+  assert.throws(()=>f.api.startOpenScreenExport('p','d',{settings:{video:{codec:'h265'}}}),/Windows HEVC/);
+  assert.deepEqual(f.data.args,[]);assert.deepEqual(fs.readdirSync(f.data.root),[]);
+ }finally{f.close();}
+});
 test('S08：准备失败持久化 failed，并删除暂存目录与本次输出目录',async()=>{
  const f=await fixture();try{
   f.data.document.document.legacyEditor={wallpaper:'/wallpapers/wallpaper99999.jpg'};
@@ -93,7 +100,7 @@ test('T05：编码收尾阶段取消也清理目标，并终止编码信号',asy
     fs.writeFileSync(target,'partial');encoding=true;
     await new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('停止')),{once:true}));
   };
-  const job=f.api.startOpenScreenExport('p','d',{settings:{video:{codec:'h265'}}});
+  const job=f.api.startOpenScreenExport('p','d',{settings:{video:{codec:'h264'}}});
   fs.writeFileSync(f.data.args[f.data.args.indexOf('-o')+1],'native');f.data.child.emit('close',0,null);await tick();assert(encoding);
   await f.api.cancelOpenScreenExport('p','d',job.id);await tick();
   assert.equal(f.api.readOpenScreenExport('p','d',job.id).status,'cancelled');assert(!fs.existsSync(job.outputDir));assert.equal(f.api.activeOpenScreenExports(),0);

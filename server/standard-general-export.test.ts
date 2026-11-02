@@ -48,6 +48,12 @@ test('cancel stops the owned worker tree, ignores late output and permits a fres
     fs.writeFileSync(path.join(version, 'layers.json'), JSON.stringify({ engine: 'hyperframes' }));
     project.versions = [{ n: 1, layersUrl: 'layers.json' }] as any;
     saveGeneral(dir, project);
+    if(process.platform==='win32'){
+      await assert.rejects(startExport(project.id,1,'mp4',{video:{codec:'h265'}}),/Windows HEVC/);
+      assert.equal(children.length,0);assert.equal(exportRunning(project.id),false);
+      assert.equal(fs.existsSync(path.join(dir,'exports','.active')),false);
+      assert.equal(fs.existsSync(path.join(dir,'exports','.preferences.json')),false);
+    }
     const task = await startExport(project.id, 1, 'mp4');
     const output = path.join(dir, 'exports', task.id);
     await until(() => fs.existsSync(path.join(output, 'pids.json')) && findGeneral(project.id).project.exportTask?.progress === 0.2);

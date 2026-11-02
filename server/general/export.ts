@@ -19,6 +19,7 @@ import {HF_ENTRY,isHyperframesWork,readHyperframes} from './hf-project.ts';
 import {editedCaptionPage,editedCaptionPages,editedHyperframes} from './hf-timeline.ts';
 import {editedSpeedPages,withSpeedScripts} from './hf-speed.ts';
 import {validateDirectory} from '../system-settings.ts';
+import {assertVideoExportSupported} from '../../shared/export-video.ts';
 
 export function readGeneralExport(dir:string,id:string):GeneralExport {
  if(!/^[0-9a-f-]{36}$/.test(id))throw Error('导出记录编号无效');
@@ -79,11 +80,12 @@ export async function startExport(id: string, version: number, format: unknown, 
   if (active.has(id) || running(project.exportTask)) return active.get(id)?.task ?? project.exportTask!;
   if (format !== 'mp4' && format !== 'jianying') throw Object.assign(new Error('导出格式只能是 mp4 或 jianying'), { status: 400 });
   if(!Number.isSafeInteger(version))throw Object.assign(Error('版本编号无效'),{status:400});
-  const {work,layers,kind,media}=await generalExportSource(id,version);
-  if(active.has(id))return active.get(id)!.task;
   const parsed=ExportSettingsSchema.safeParse(value ?? exportSettingsForPreset(format==='jianying'?'jianying':'quick'));
   if(!parsed.success)throw Object.assign(Error('导出参数无效'),{status:400});
   const settings=parsed.data;
+  if(format==='mp4')assertVideoExportSupported(settings.video,process.platform);
+  const {work,layers,kind,media}=await generalExportSource(id,version);
+  if(active.has(id))return active.get(id)!.task;
   if(kind==='video'&&typeof settings.fps==='number'&&settings.fps>media.fps&&format!=='jianying')
     throw Object.assign(Error('这一版只保留了成片，没有动效源码，无法按更高帧率重新渲染；请选跟工程或重新生成版本'),{status:400});
   const destination=settings.destinationDir.trim()?validateDirectory(settings.destinationDir):path.join(dir,'exports');

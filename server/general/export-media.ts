@@ -1,8 +1,9 @@
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import type {ExportSettings} from '../../src/types/editor.ts';
-import {videoEncodeArgs} from '../editor/video-encode.ts';
-import {exportResolution} from '../editor/export-resolution.ts';
+import {runVideoEncode} from '../editor/video-encode.ts';
+import {assertVideoExportSupported} from '../../shared/export-video.ts';
+import {exportResolution,exportVideoFilter} from '../editor/export-resolution.ts';
 import {ffmpegPath,ffprobePath} from './kit-env.ts';
 const exec=promisify(execFile);
 export async function probeExportMedia(file:string) {
@@ -14,11 +15,12 @@ export async function probeExportMedia(file:string) {
 }
 /** Encode only after the renderer has sampled animations at the requested frame clock. */
 export async function encodeExportMedia(source:string,target:string,settings:ExportSettings,signal?:AbortSignal) {
+ assertVideoExportSupported(settings.video,process.platform);
  const media=await probeExportMedia(source),size=exportResolution(media,settings.resolution);
  const fps=typeof settings.fps==='number'?settings.fps:media.fps;
- await exec(ffmpegPath(),['-hide_banner','-v','error','-y','-i',source,'-map','0:v:0','-map','0:a?',
-  '-vf',`scale=${size.width}:${size.height}:flags=lanczos`,...videoEncodeArgs(settings.video,{...size,fps}),
+ const encoding=await runVideoEncode(settings.video,{...size,fps},args=>exec(ffmpegPath(),['-hide_banner','-nostats','-v','info','-y','-i',source,'-map','0:v:0','-map','0:a?',
+  '-vf',exportVideoFilter(media,settings.resolution),...args,
   '-r',String(fps),'-c:a',settings.video.codec==='prores422'?'pcm_s16le':'aac',
-  ...(settings.video.codec==='prores422'?[]:['-b:a','192k']),'-movflags','+faststart',target],{maxBuffer:8<<20,timeout:3600000,signal});
- return probeExportMedia(target);
+  ...(settings.video.codec==='prores422'?[]:['-b:a','192k']),'-movflags','+faststart',target],{maxBuffer:8<<20,timeout:3600000,signal,windowsHide:true}));
+ return {...await probeExportMedia(target),encoding};
 }

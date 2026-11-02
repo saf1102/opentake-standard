@@ -11,6 +11,7 @@ export {encodeScreenExportMedia} from './openscreen-encode.ts';
 import {flatGeneralDraft} from '../general/export-draft.ts';
 import {writeExportPreferences} from '../export-preferences.ts';
 import {validateDirectory} from '../system-settings.ts';
+import {assertVideoExportSupported} from '../../shared/export-video.ts';
 import {screenPublishingEnabled, screenSpawnOptions, stopScreenExport, revealScreenCommand, registerPublishedAsset} from './openscreen-export-edition.ts';
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
@@ -334,11 +335,12 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   const current = readOpenScreenDocument(projectId, documentId);
   // Revision validation is read-only; staging failures below become persisted failed jobs.
   if(input.useSavedDocument===true && input.documentRevision!==current.revision)throw Error('已保存版本已变化，请关闭并重新打开导出窗口');
-  const runner = resolveOpenScreenExportRunner(current.document, process.platform === 'win32' ? undefined : {env:{...process.env,OPENSCREEN_USER_DATA_DIR:openScreenProjectProfile(projectId)}});
   const purpose = input.purpose === 'publish' && screenPublishingEnabled ? 'publish' : 'export';
   const settings=purpose==='publish'?undefined:input.settings===undefined
     ? ['hevc','h265','prores422'].includes(String(input.codec)) ? ExportSettingsSchema.parse({fps:input.mp4Fps===24||input.mp4Fps===60?input.mp4Fps:'project',video:{codec:input.codec==='hevc'?'h265':input.codec}}) : undefined
     : ExportSettingsSchema.parse(input.settings);
+  if(settings&&settings.preset!=='jianying')assertVideoExportSupported(settings.video,process.platform);
+  const runner = resolveOpenScreenExportRunner(current.document, process.platform === 'win32' ? undefined : {env:{...process.env,OPENSCREEN_USER_DATA_DIR:openScreenProjectProfile(projectId)}});
   const requestedFps=screenExportFrameRate(settings,found.project.settings.fps,current.document);
   if(settings)writeExportPreferences(found.dir,settings);
   const publishedAssetId = purpose === 'publish' ? `osout_${crypto.randomUUID()}` : undefined;
@@ -485,13 +487,15 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
       try {
         preserveStaging=true;
         let generated=workingOutput;
+        let encoding:Awaited<ReturnType<typeof encodeScreenExportMedia>>['encoding']|undefined;
         if(settings){
           generated=path.join(stagingDir,settings.preset==='jianying'?'剪映工程':path.basename(resultFile));
           if(settings.preset==='jianying')await flatGeneralDraft(workingOutput,generated,current.ref.title,await probeExportMedia(workingOutput),controller.signal);
-          else await encodeScreenExportMedia(workingOutput,generated,settings,requestedFps,current.ref.duration,controller.signal);
+          else encoding=(await encodeScreenExportMedia(workingOutput,generated,settings,requestedFps,current.ref.duration,controller.signal))?.encoding;
         }
         if(controller.signal.aborted||live.get(id)?.cancelling){job.status='cancelled';job.completedAt=Date.now();persistFromProcess(job);preserveStaging=false;return;}
         renameWithRetrySync(generated,resultFile);
+        if(encoding)fs.writeFileSync(path.join(outputDir,'编码信息.json'),JSON.stringify(encoding,null,2));
         preserveStaging=false;
         job.status = "completed";
         job.progress = 100;
