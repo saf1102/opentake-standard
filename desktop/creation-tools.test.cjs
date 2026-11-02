@@ -48,6 +48,17 @@ test('pinned Playwright exposes matching headless shell registry without cache s
  assert.ok(path.isAbsolute(file));assert.match(file,/headless[-_]shell/);
 });
 
+for(const persistent of [false,true])test(`temporary compositor surface failure retries once; persistent=${persistent}`,async()=>{
+ let screenshots=0,closed=false;
+ const chromium={launch:async()=>({close:async()=>{closed=true},newPage:async()=>({setDefaultTimeout(){},setContent:async()=>{},screenshot:async()=>{
+  screenshots++;if(persistent||screenshots===1)throw Error('page.screenshot: Protocol error (Page.captureScreenshot): Unable to capture screenshot');
+  return Buffer.from('png');
+ }})})};
+ if(persistent)await assert.rejects(probeBrowser(chromium,'/fixture/chrome',{}),error=>error.stage==='screenshot'&&/Unable to capture screenshot/.test(error.message));
+ else await probeBrowser(chromium,'/fixture/chrome',{});
+ assert.equal(screenshots,2);assert.equal(closed,true);
+});
+
 test('host browser success cannot conceal failure inside the agent sandbox',async()=>{
  const f=fixture();try{f.options.probeSandbox=async()=>{throw Error('sandbox denied')};const result=await doctor(f.options);assert.equal(result.ok,false);assert.match(result.items.find(i=>i.id==='chromium').message,/出片沙盒/);assert.equal(result.tools,undefined);}finally{f.close()}
 });

@@ -21,13 +21,22 @@ const fixes = {
 async function probeBrowser(chromium, file, env, args = sampleArgs(env.CW_CHROME_GL)) {
  let browser,stage='launch';
  try {
-  browser = await chromium.launch({executablePath:file, headless:true, args, env, timeout:10000});
+  browser = await chromium.launch({executablePath:file, headless:true, args, env, timeout:process.platform==='win32'?20000:10000});
   stage='page';
   const page = await browser.newPage({viewport:{width:64,height:64}});
   page.setDefaultTimeout(5000);
   await page.setContent('<html><body>OpenTake</body></html>');
   stage='screenshot';
-  await page.screenshot({timeout:5000});
+  // Chromium can briefly have no compositor surface after setContent. A
+  // successful launch/DOM is not sufficient: require an actual screenshot,
+  // retrying only this specific transient protocol failure once.
+  for(let attempt=0;;attempt++){
+   try { await page.screenshot({timeout:5000}); break; }
+   catch(error){
+    if(attempt!==0 || !/Page\.captureScreenshot.*Unable to capture screenshot/.test(error.message||''))throw error;
+    await new Promise(resolve=>setTimeout(resolve,250));
+   }
+  }
  } catch(error){error.stage=stage;throw error;} finally { await browser?.close().catch(()=>{}); }
 }
 async function probeSandbox(codex,file,env) {
@@ -50,7 +59,7 @@ async function probeSandbox(codex,file,env) {
    '-c','sandbox_workspace_write.exclude_slash_tmp=true',
    '-c','sandbox_workspace_write.exclude_tmpdir_env_var=true',
    '--',process.execPath,path.join(__dirname,'probe-creation-browser.cjs'),file],
-   {cwd:root,env:{...env,TMPDIR:tmp,...(process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{}),...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{})},timeout:40000,maxBuffer:65536});
+   {cwd:root,env:{...env,TMPDIR:tmp,...(process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{}),...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{})},timeout:process.platform==='win32'?60000:40000,maxBuffer:65536});
   if(!result.stdout.includes('OPENTAKE_BROWSER_READY'))throw Object.assign(Error('未完成截图'),{stage:'protocol',stderr:result.stderr});
  } finally { fs.rmSync(root,{recursive:true,force:true}); }
 }
