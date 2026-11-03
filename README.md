@@ -2,6 +2,8 @@
 
 # OpenTake Standard
 
+维护者双平台 1.1.0 发布交接见 [RELEASE-HANDOFF-1.1.0.md](RELEASE-HANDOFF-1.1.0.md)，Mac DMG 构建见 [BUILD-MACOS.md](BUILD-MACOS.md)，Windows 离线包见 [BUILD-WINDOWS.md](BUILD-WINDOWS.md)。安装包是否已公开、支持范围和实测结果以官方 Release 为准。
+
 免费的本地视频工具：通用剪辑与录屏运镜。编辑不需要 OpenTake 账号；出片可接入 Codex 或 Claude Code 命令行，并支持 API 密钥方式（仍需对应命令行执行出片）；Claude Code 默认关闭。只有 API 密钥、没装命令行时只能做轻量文字任务。Pro 功能不包含在本仓库。
 
 **[下载最新官方源码 ZIP](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip)** · [核对 SHA-256](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip.sha256) · [查看每日下载统计](https://github.com/saf1102/opentake-standard/tree/repository-stats)
@@ -147,7 +149,7 @@ Standard editing requires no account. Upgrade checks fetch public configuration 
 
 ## 支持平台
 
-官方上游支持 macOS（Apple 芯片）。此 Windows 分支同步官方 v1.1.0（786d226），并保留本地 Windows 离线安装、原生采集与 RenderFix 修复。Windows 构建与使用见 [BUILD-WINDOWS.md](BUILD-WINDOWS.md) 和 [WINDOWS-INSTALLER.md](WINDOWS-INSTALLER.md)。
+官方 v1.1.0（786d226）以 macOS Apple 芯片为基线；当前整合保留 Windows 离线安装、原生采集和最终 QA 修复。Windows 构建与使用见 [BUILD-WINDOWS.md](BUILD-WINDOWS.md) 和 [WINDOWS-INSTALLER.md](WINDOWS-INSTALLER.md)，合并评估与待验收平台见 [发布交接](RELEASE-HANDOFF-1.1.0.md)。
 
 ### FFmpeg 环境检查
 
@@ -195,4 +197,4 @@ node desktop/sign-local-app.cjs "$PWD/release/mac-arm64/OpenTake Standard.app"
 
 Windows 10 22H2 x64 与 Windows 11 x64 使用同一安装器。本分支重建 OpenScreen 原生 compositor，在 D3D11 硬件解码初始化失败（hwdevice_ctx_init）时使用软件解码，继续通过原生合成器预览和导出；源码补丁、原始组件和构建回执随包保留。Win10、Win11 的实际录制、预览与导出结果见随包验收报告，不能仅据构建通过推断兼容性。H.264 是 Windows 验证编码；HEVC 在 Windows 返回明确未适配提示。Windows ARM64、32 位和 macOS 本轮不作为实测通过平台。
 
-升级使用新安装包，保留旧版安装包、工程与设置；没有实现 Windows 一键自动更新或数字签名。源码身份见 desktop/windows-version.json 与生成的 release-source.json；该分支不冒充未经修改的上游官方二进制。
+升级使用新安装包，保留旧版安装包、工程与设置；没有实现 Windows 一键自动更新或数字签名。源码身份见 desktop/windows-version.json、release-source.json 及安装包旁的 .build.json。官方出包从已合并 main 的同一提交构建，流程见 RELEASE-HANDOFF-1.1.0.md。

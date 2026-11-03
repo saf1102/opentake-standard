@@ -2,6 +2,15 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {OFFLINE_CHANNEL,distributionIdentity,distributionEnvironment,unsignedBuildEnvironment}=require('./distribution.cjs');
 const {assetRoot}=require('./assets.cjs');
 const {applicationMenu}=require('./menu.cjs');
+const vm=require('node:vm');
+
+test('Mac assembly never includes Windows native capture executables from a shared checkout',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'builder.config.cjs'),'utf8');
+ const load=platform=>{const context={module:{exports:{}},process:{platform}};vm.runInNewContext(source,context);return context.module.exports};
+ assert.ok(load('win32').files.includes('native/windows/wgc-capture.exe'));
+ assert.ok(!load('darwin').files.some(file=>file.startsWith('native/windows/')));
+ assert.equal(load('darwin').mac.identity,null);
+});
 test('offline metadata preserves the product name and separates runtime mode from visible branding',()=>{
  const normal=distributionIdentity({},'win32'),offline=distributionIdentity({opentakeDistribution:OFFLINE_CHANNEL},'win32');
  assert.equal(offline.APP_NAME,'OpenTake Standard');assert.equal(offline.APP_ID,normal.APP_ID);assert.equal(offline.IS_WINDOWS_OFFLINE,true);

@@ -19,6 +19,7 @@ async function afterPack(context){
  const publicDir=path.join(app,'public');try{await fs.access(publicDir);throw Error('Duplicate public assets must not be packaged')}catch(error){if(error.code!=='ENOENT')throw error}
  for(const file of ['dist/index.html','dist/opentake-icon-512.png','dist/openscreen/linkreader.html','dist/openscreen/wallpapers/wallpaper1.jpg','desktop/main.cjs','server/editor/openscreen-export.ts'])await fs.access(path.join(app,file));
  const evidence=path.resolve(context.packager.projectDir,'../evidence/production-pack.json');
+ await fs.mkdir(path.dirname(evidence),{recursive:true});
  await fs.writeFile(evidence,JSON.stringify({removed,staticAssetsSingleCopy:true,iconResourceEditing:true},null,2));
 }
 // electron-builder's Windows resource editing happens after afterPack. This hook

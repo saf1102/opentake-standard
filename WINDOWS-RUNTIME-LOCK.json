@@ -129,6 +129,10 @@
       "licenseFiles": "jianying-python/*dist-info/licenses or LICENSE*"
     }
   ],
+  "runtimeFiles": [
+    {"file":"codex-LICENSE","target":"codex/LICENSE","url":"https://raw.githubusercontent.com/openai/codex/rust-v0.165.0/LICENSE","sha256":"d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"},
+    {"file":"codex-NOTICE","target":"codex/NOTICE","url":"https://raw.githubusercontent.com/openai/codex/rust-v0.165.0/NOTICE","sha256":"9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915"}
+  ],
   "runtimeSourceArchives": [
     {
       "file": "ffmpeg-92611900bb.tar.gz",

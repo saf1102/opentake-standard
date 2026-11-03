@@ -91,5 +91,6 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
     ...(styleOf(projectDir) ? { CW_STYLE: styleOf(projectDir) } : {}),
   };
   delete env.CODEX_THREAD_ID;
-  return platform.environmentWithPath(env, `${bin}${path.delimiter}${platform.environmentPath(base)}`);
+  const inheritedPath = platform.environmentPath(base) || (process.platform === 'win32' ? '' : '/usr/bin:/bin:/usr/sbin:/sbin');
+  return platform.environmentWithPath(env, `${bin}${path.delimiter}${inheritedPath}`);
 }

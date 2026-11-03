@@ -7,8 +7,8 @@ import {createRequire} from 'node:module';
 import {createWindowsUpdater} from './standard/windows-update.ts';
 import metadata from '../desktop/windows-version.json' with {type:'json'};
 import pkg from '../package.json' with {type:'json'};
-const {windowsRelease,newerWindows,endpoint}=createRequire(import.meta.url)('../desktop/windows-update-manifest.cjs');
-function release(version=pkg.version,windowsBuild=metadata.windowsBuild+1){return {schemaVersion:1,product:'opentake-standard',platform:'win32',arch:'x64',channel:'stable',version,windowsBuild,revision:'qa',notes:'修订说明',url:`https://github.com/steven90s/opentake-standard/releases/download/windows-v${version}-${windowsBuild}/OpenTake-Standard-Setup-${version}-x64.exe`,sha256:'ab'.repeat(32),size:123456};}
+const {windowsRelease,newerWindows,endpoint,repository}=createRequire(import.meta.url)('../desktop/windows-update-manifest.cjs');
+function release(version=pkg.version,windowsBuild=metadata.windowsBuild+1){return {schemaVersion:1,product:'opentake-standard',platform:'win32',arch:'x64',channel:'stable',version,windowsBuild,revision:'qa',notes:'修订说明',url:`https://github.com/${repository}/releases/download/desktop-v${version}-${windowsBuild}/OpenTake-Standard-Setup-${version}-x64.exe`,sha256:'ab'.repeat(32),size:123456};}
 test('Windows manifest rejects foreign products, platforms, prereleases and unpinned or unsafe downloads',()=>{
   assert.ok(windowsRelease(release()));
   for(const change of [{product:'other'},{platform:'darwin'},{arch:'arm64'},{channel:'preview'},{version:'1.1.0-beta'},{windowsBuild:0},{windowsBuild:1.5},{size:-1},{sha256:'z'.repeat(64)},{url:'file:///C:/bad.exe'},{url:'https://github.com/other/repo/releases/download/v1/setup.exe'},{url:release().url+'?token=secret'},{url:release().url.replace('.exe','.zip')},{url:release().url.replace('/download/','/latest/download/')}])assert.equal(windowsRelease({...release(),...change}),null,JSON.stringify(change));

@@ -3,10 +3,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import runtime from './bundled-runtimes.cjs';
+import runtimePaths from './runtime-paths.cjs';
 import {verifyWindowsCompositor} from '../scripts/build-windows-compositor.mjs';
 import {prepareWindowsExportRuntimes} from '../scripts/prepare-windows-export-runtimes.mjs';
 export async function prepareRuntimeManifest(source){
- const root=path.resolve(source,'../runtime-payload');
+ const root=runtimePaths.windowsRuntimeRoot(source);
  await prepareWindowsExportRuntimes(root);
  const origins=JSON.parse(await fs.readFile(path.join(root,'provenance.json'),'utf8'));
  if(origins.schema!==1||origins.components.length<10)throw Error('运行库来源清单不完整。');

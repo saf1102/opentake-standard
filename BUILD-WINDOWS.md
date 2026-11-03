@@ -2,7 +2,7 @@
 
 源码基于官方 v1.1.0 / 786d2264db0fb29385c354a9890e96e961e2d57d，整合此前本地 Windows 树 9c66a205740c5f9120d61a2f031815091b404b92。Windows 适配、原生录屏时钟、渲染异常修复和安装器优化均保留。
 
-目录：source 与 runtime-payload 同级。运行库按 WINDOWS-RUNTIME-LOCK.json、provenance.json 和 manifest.json 校验；不从用户 AppData 或工程复制凭据。固定官方 OpenScreen app.asar 的 SHA256 为 d325092fa699ae2d9eb2ef4a9dad930abde7b89a68ae07e3a8a0706d5c063537。
+默认在源码同级准备 runtime-payload。npm run prepare:windows-runtimes 或安装器构建按 WINDOWS-RUNTIME-LOCK.json 从固定 HTTPS 归档下载、核对 SHA-256、提取并验证运行库，无需复制交接人的目录。下载缓存为同级 runtime-downloads。已有目录必须通过 provenance.json 和 manifest.json 逐文件校验，损坏时停止、不覆盖；可用绝对路径环境变量 OPENTAKE_WINDOWS_RUNTIME_ROOT 指定独立目录。不从用户 AppData 或工程复制凭据。固定官方 OpenScreen app.asar 的 SHA256 为 d325092fa699ae2d9eb2ef4a9dad930abde7b89a68ae07e3a8a0706d5c063537。
 
 构建依赖 Node 24.x、Visual Studio 2022/2026 C++ x64、CMake 和 Windows SDK，以及 Rust MSVC、Git、LLVM/libclang。原生合成器重建会按固定版本及 SHA256 获取 OpenScreen 源码和 FFmpeg SDK；已有合成器仅在源码/二进制回执一致时复用。使用锁定依赖：
 
@@ -14,10 +14,11 @@ node node_modules/electron/install.js
 npx --no-install playwright-core install chromium
 npm run typecheck
 npm test
+npm run test:release
 npm run build:installer
 ```
 
-build:installer 编译 WGC、固定补丁的 OpenScreen 原生合成器、两套前端，更新独立运行库副本内的采集器及校验清单，然后生成 release/windows/OpenTake-Standard-Setup-1.1.0-x64.exe。其 win-unpacked 目录可单独启动验收。build:app 保留目录构建入口。
+build:installer 编译 WGC、固定补丁的 OpenScreen 原生合成器、两套前端，准备并更新独立运行库副本内的采集器及校验清单，再生成 release/windows/OpenTake-Standard-Setup-1.1.0-x64.exe 和 .exe.build.json。win-unpacked 可单独启动验收，build:app 保留目录构建入口。正式出包须使用已提交的干净源码；汇总工具会拒绝脏构建凭据。
 
 Windows 导出运行库由 `scripts/prepare-windows-export-runtimes.mjs` 按 `desktop/windows-export-runtime-lock.json` 下载并校验。它使用官方 Node.js ZIP 和 PyPI wheels，准备独立的 `export-node` 与 `jianying-python`；不执行 pip、不安装到系统 Python。安装器构建会自动调用此步骤。缓存位于同级 `runtime-downloads`，完整离线重建需预先准备锁定缓存。
 

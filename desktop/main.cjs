@@ -65,7 +65,7 @@ async function start() {
  let previous;try{previous=JSON.parse(fs.readFileSync(path.join(profile,'startup.json'),'utf8'))}catch{}
  child = spawn(process.execPath,[path.join(__dirname,'service.mjs'),app.isPackaged?'production':'development',String(rememberedPort(previous))],{cwd:root,env,detached:true,stdio:['ignore','inherit','inherit','ipc']});
  if(process.platform==='win32')installCaptureSourceBridge(child,async()=>captureSources(await desktopCapturer.getSources(SOURCE_OPTIONS),screen.getAllDisplays().map(display=>String(display.id))));
- installFileDialogBridge(child,dialog,()=>win);
+ if(process.platform==='win32')installFileDialogBridge(child,dialog,()=>win);
  recordServiceEvent(profile,'desktop-service-start');
  try{origin = await waitForService(child,{onPhase:stage=>recordServiceEvent(profile,'startup-phase',{stage})});}
  catch(error){recordServiceEvent(profile,'startup-failed',{error});throw error;}

@@ -10,7 +10,7 @@ test('Windows update controls use the installer feed and expose only a manual do
  values.getComputedStyle=dom.window.getComputedStyle.bind(dom.window);values.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);values.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
  for(const[key,value]of Object.entries(values)){saved.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true})}
  const oldFetch=globalThis.fetch;const calls:string[]=[];let app:any;
- const release={version:'1.1.0',windowsBuild:2026110302,notes:'测试修订',sha256:'ab'.repeat(32),size:123456,url:'https://github.com/steven90s/opentake-standard/releases/download/windows-v1.1.0-2026110302/OpenTake-Standard-Setup-1.1.0-x64.exe'};
+ const release={version:'1.1.0',windowsBuild:2026110304,notes:'测试修订',sha256:'ab'.repeat(32),size:123456,url:'https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110304/OpenTake-Standard-Setup-1.1.0-x64.exe'};
  let next:any={currentVersion:'1.1.0',currentBuild:2026110301,release,available:true,notify:true};
  globalThis.fetch=(async(input:any,init:any)=>{calls.push(String(input));assert.ok(String(input).startsWith('/api/upgrade/windows/'));const route=String(input).split('/').at(-1);return Response.json(route==='preferences'?{daily:init?.body?JSON.parse(init.body).daily:true}:route==='state'?{clientUpdate:next}:route==='dismiss'?{...next,notify:false}:next)}) as typeof fetch;
  try{

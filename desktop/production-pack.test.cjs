@@ -5,7 +5,7 @@ test('package cleanup removes dependency fixtures/maps/types and preserves runti
  const needed=['dist/index.html','dist/opentake-icon-512.png','dist/openscreen/linkreader.html','dist/openscreen/wallpapers/wallpaper1.jpg','desktop/main.cjs','server/editor/openscreen-export.ts','node_modules/example/runtime.js','node_modules/example/LICENSE','node_modules/example/schema.json'];
  const discarded=['node_modules/example/tests/fixture.js','node_modules/example/__snapshots__/value.snap','node_modules/example/lib/parse.spec.ts','node_modules/example/lib/runtime.js.map','node_modules/example/lib/runtime.d.mts'];
  try{
-  await fs.mkdir(path.join(dir,'evidence'),{recursive:true});await fs.mkdir(path.join(dir,'source'));
+  await fs.mkdir(path.join(dir,'source'));
   for(const name of [...needed,...discarded]){const file=path.join(app,name);await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,'fixture')}
   await afterPack({appOutDir:out,packager:{projectDir:path.join(dir,'source')}});
   for(const name of needed)assert.equal(await fs.readFile(path.join(app,name),'utf8'),'fixture');

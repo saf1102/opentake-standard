@@ -17,6 +17,8 @@
     "build:app": "npm run build:live && node desktop/build-app.mjs",
     "build:installer": "npm run build && node desktop/build-installer.mjs",
     "test:desktop": "node --test desktop/*.test.cjs",
+    "test:release": "node --test scripts/*.test.mjs",
+    "prepare:windows-runtimes": "node scripts/prepare-windows-runtimes.mjs",
     "build:openscreen": "npm --prefix vendor/openscreen run build:linkreader",
     "test:openscreen": "npm --prefix vendor/openscreen run test:standard",
     "doctor": "node scripts/doctor.cjs",
