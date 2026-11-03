@@ -42,8 +42,7 @@ jobs:
       - run: npm test
       - run: npm run test:release
       # Native Windows compilation and the official same-SHA release run in the manual workflow.
-      - run: npm run build:openscreen
-      - run: npx --no-install vite build
+      - run: node scripts/build-desktop-ui.mjs
       - name: Prepare an explicitly non-publishable macOS candidate receipt
         if: runner.os == 'macOS'
         shell: bash

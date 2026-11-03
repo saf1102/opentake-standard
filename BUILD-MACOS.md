@@ -22,6 +22,8 @@ npm run build:installer
 
 产物为 release/OpenTake-Standard-1.1.0-mac-arm64.dmg 及 .dmg.build.json。构建先生成 release/mac-arm64/OpenTake Standard.app，保留 framework 相对链接，执行本机临时签名、严格验签，再用 ditto/hdiutil 生成并校验 DMG。已有同名 DMG 时停止，先保留旧候选包到其他位置。
 
+打包入口使用 .build/ui-public-* 临时目录重编译编辑器，再生成 dist，保留仓库跟踪的 public/openscreen 快照。这避免不同系统的构建哈希改变源码，源码凭据校验仍会检查所有跟踪文件。
+
 仅需本机 App 时仍运行 npm run build:app。没有 receipt 的 Git checkout 须位于干净的官方版本标签；新标签为 desktop-v{version}-{build}，不能把旧 v1.1.0 移到新提交。
 
 双击 DMG，在独立候选位置验证首页、旧工程副本、Codex 出片、录屏与导出。hdiutil verify、本机签名校验和 CI 构建通过不代表功能、公证或分发策略验收通过。完整流程见 RELEASE-HANDOFF-1.1.0.md。

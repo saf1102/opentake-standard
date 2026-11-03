@@ -1,6 +1,6 @@
 # Windows 1.1.0 官方发布与手动更新
 
-本轮将 Windows 最终 QA 修复交回 saf1102/opentake-standard，应用版本保持 1.1.0，构建号为 desktop/windows-version.json 中的 2026110304。新标签为 desktop-v1.1.0-2026110304。不移动已有 v1.1.0，不覆盖已有 Release 附件。
+本轮将 Windows 最终 QA 修复交回 saf1102/opentake-standard，应用版本保持 1.1.0，构建号为 desktop/windows-version.json 中的 2026110305。新标签为 desktop-v1.1.0-2026110305。不移动已有 v1.1.0，不覆盖已有 Release 附件。
 
 完整交接、macOS 影响预评估、验收范围和负责人操作见 [RELEASE-HANDOFF-1.1.0.md](RELEASE-HANDOFF-1.1.0.md)。合并后运行官方 main 的 .github/workflows/desktop-release.yml，汇总同一 SHA 的源码、Mac DMG、Windows EXE 和凭据并创建草稿。负责人完成验收后发布并设为 Latest。
 
