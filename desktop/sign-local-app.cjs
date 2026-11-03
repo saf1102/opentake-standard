@@ -32,7 +32,13 @@ async function signLocalApp(app,{run=command,sign}={}){
  try{
   // Do this after assembly/renaming/Info.plist edits and before the final seal.
   run('/usr/bin/xattr',['-cr',target]);
-  if(!sign){const dependency=createRequire(require.resolve('electron-builder/package.json'));sign=dependency('@electron/osx-sign').signAsync;}
+  if(!sign){
+   const dependency=createRequire(require.resolve('electron-builder/package.json'));
+   // osx-sign probes bundle files concurrently. Queue EMFILE retries before its
+   // binary detector captures fs.open; keep every file in the signing traversal.
+   dependency('graceful-fs').gracefulify(fs);
+   sign=dependency('@electron/osx-sign').signAsync;
+  }
   // Same signer and runtime entitlements used by Pro. osx-sign signs nested code inside out.
   // identityValidation:false avoids consulting a signing identity/keychain; '-' is local ad-hoc.
   await sign({app:target,platform:'darwin',identity:'-',identityValidation:false,type:'development',

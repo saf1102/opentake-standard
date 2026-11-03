@@ -24,6 +24,8 @@ npm run build:installer
 
 打包入口使用 .build/ui-public-* 临时目录重编译编辑器，再生成 dist，保留仓库跟踪的 public/openscreen 快照。这避免不同系统的构建哈希改变源码，源码凭据校验仍会检查所有跟踪文件。
 
+本机签名使用锁定构建依赖中的 graceful-fs 对文件句柄耗尽进行排队重试，避免同时探测大量 SVG/依赖时出现 EMFILE；不跳过文件遍历、严格验签或隔离标记检查，不提高系统限制。
+
 仅需本机 App 时仍运行 npm run build:app。没有 receipt 的 Git checkout 须位于干净的官方版本标签；新标签为 desktop-v{version}-{build}，不能把旧 v1.1.0 移到新提交。
 
 双击 DMG，在独立候选位置验证首页、旧工程副本、Codex 出片、录屏与导出。hdiutil verify、本机签名校验和 CI 构建通过不代表功能、公证或分发策略验收通过。完整流程见 RELEASE-HANDOFF-1.1.0.md。
