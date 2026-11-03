@@ -393,7 +393,9 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   });
   persist(job);
 
-  const stagingDir = path.join(exportJobsDir(found.dir, documentId), `.staging-${id}`);
+  // Stage beside the final output so file and directory promotion stay on the
+  // destination volume, even when the project lives on another disk.
+  const stagingDir = path.join(outputDir, `.staging-${id}`);
   const stagedProject = path.join(stagingDir, "project.openscreen");
   try {
   fs.mkdirSync(stagingDir, { recursive: true });
@@ -412,7 +414,9 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
   }
 
   const workingOutput=path.join(stagingDir,`output.${format}`);
-  let preserveStaging=false;
+  const encodingInfoFile=path.join(outputDir,'编码信息.json');
+  let ownsEncodingInfo=false;
+  let promoted=false;
   job.status='running';job.startedAt=Date.now();job.progress=1;persist(job);
   const args = [
     ...runner.argsPrefix,
@@ -487,7 +491,6 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     if(job.status==='failed'){persistFromProcess(job);return;}
     if (code === 0 && fs.existsSync(workingOutput) && fs.statSync(workingOutput).size > 0) {
       try {
-        preserveStaging=true;
         let generated=workingOutput;
         let encoding:Awaited<ReturnType<typeof encodeScreenExportMedia>>['encoding']|undefined;
         if(settings){
@@ -495,20 +498,27 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
           if(settings.preset==='jianying')await flatGeneralDraft(workingOutput,generated,current.ref.title,await probeExportMedia(workingOutput),controller.signal);
           else encoding=(await encodeScreenExportMedia(workingOutput,generated,settings,requestedFps,current.ref.duration,controller.signal))?.encoding;
         }
-        if(controller.signal.aborted||live.get(id)?.cancelling){job.status='cancelled';job.completedAt=Date.now();persistFromProcess(job);preserveStaging=false;return;}
+        if(controller.signal.aborted||live.get(id)?.cancelling){job.status='cancelled';job.completedAt=Date.now();persistFromProcess(job);return;}
+        // Finish fallible metadata writes before replacing the final media.
+        // This job owns only the newly created sidecar; never remove an old one.
+        if(encoding){
+          const fd=fs.openSync(encodingInfoFile,'wx');
+          ownsEncodingInfo=true;
+          try{fs.writeFileSync(fd,JSON.stringify(encoding,null,2));}
+          finally{fs.closeSync(fd);}
+        }
         renameWithRetrySync(generated,resultFile);
-        if(encoding)fs.writeFileSync(path.join(outputDir,'编码信息.json'),JSON.stringify(encoding,null,2));
-        preserveStaging=false;
+        promoted=true;
         job.status = "completed";
         job.progress = 100;
         job.completedAt = Date.now();
         job.wallS = job.wallS ?? Math.max(0, (job.completedAt - (job.startedAt || job.createdAt)) / 1000);
       } catch (error) {
         if(controller.signal.aborted||live.get(id)?.cancelling){
-          job.status='cancelled';job.completedAt=Date.now();preserveStaging=false;
+          job.status='cancelled';job.completedAt=Date.now();
         }else{
           job.status = "failed";
-          job.error = `成片已生成，但写入目标失败：${error instanceof Error ? error.message : String(error)}；临时成片保留：${workingOutput}`;
+          job.error = `导出失败：${error instanceof Error ? error.message : String(error)}；已有成品保留，请重试。`;
         }
       }
     } else {
@@ -519,7 +529,13 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     }
     persistFromProcess(job);
     }catch(error){job.status='failed';job.error=`导出收尾失败：${error instanceof Error?error.message:String(error)}`;persistFromProcess(job);}
-    finally{live.delete(id);if(!preserveStaging)cleanupPathSync(stagingDir,{recursive:true});if(job.status==='failed'||job.status==='cancelled')releaseEmptyOutputDirectory();finish();}
+    finally{
+      live.delete(id);
+      if(ownsEncodingInfo&&!promoted)cleanupPathSync(encodingInfoFile);
+      cleanupPathSync(stagingDir,{recursive:true});
+      if(job.status==='failed'||job.status==='cancelled')releaseEmptyOutputDirectory();
+      finish();
+    }
   });
 
   return job;
