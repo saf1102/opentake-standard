@@ -41,6 +41,38 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:release
-      # Native Windows compilation and both installers run in the manual release workflow.
+      # Native Windows compilation and the official same-SHA release run in the manual workflow.
       - run: npm run build:openscreen
       - run: npx --no-install vite build
+      - name: Prepare an explicitly non-publishable macOS candidate receipt
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          import release from './desktop/release-contract.cjs';
+          const git=args=>execFileSync('git',args,{encoding:'utf8'}).trim();
+          if(git(['status','--porcelain']))throw Error('Candidate source must be clean');
+          const files=Object.fromEntries(git(['ls-tree','-rz','HEAD']).split('\0').filter(Boolean).map(line=>{
+            const entry=/^(100644|100755) blob ([a-f0-9]+)\t([\s\S]+)$/.exec(line);
+            if(!entry)throw Error('Unsupported candidate source entry');
+            return [entry[3],entry[2]];
+          }));
+          const version=JSON.parse(fs.readFileSync('package.json','utf8')).version;
+          fs.writeFileSync('release-source.json',JSON.stringify({repository:release.REPOSITORY,commit:git(['rev-parse','HEAD']),version,localCandidate:true,files}));
+          NODE
+      - name: Build and verify the macOS candidate DMG
+        if: runner.os == 'macOS'
+        run: |
+          node node_modules/electron/install.js
+          npm run build:installer
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: runner.os == 'macOS'
+        with:
+          name: macos-installer-candidate-${{ github.sha }}
+          path: |
+            release/*.dmg
+            release/*.dmg.build.json
+          if-no-files-found: error
+          retention-days: 14
