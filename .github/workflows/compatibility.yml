@@ -53,7 +53,8 @@ jobs:
           import {execFileSync} from 'node:child_process';
           import release from './desktop/release-contract.cjs';
           const git=args=>execFileSync('git',args,{encoding:'utf8'}).trim();
-          if(git(['status','--porcelain']))throw Error('Candidate source must be clean');
+          const dirty=git(['status','--porcelain']);
+          if(dirty)throw Error('Candidate source must be clean:\n'+dirty);
           const files=Object.fromEntries(git(['ls-tree','-rz','HEAD']).split('\0').filter(Boolean).map(line=>{
             const entry=/^(100644|100755) blob ([a-f0-9]+)\t([\s\S]+)$/.exec(line);
             if(!entry)throw Error('Unsupported candidate source entry');
