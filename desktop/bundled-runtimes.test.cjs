@@ -8,10 +8,10 @@ function fixture(){
  return {dir,resources,root,dispose(){assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));assert.ok(path.basename(dir).startsWith('opentake-bundled-test-'));fs.rmSync(dir,{recursive:true,force:true})}};
 }
 test('full installer resolves tools relative to a Chinese/space install path without host tools',()=>{
- const f=fixture();try{const input={Path:'host-path'},env=bundledRuntimeEnvironment(input,f.resources);
+ const f=fixture();try{const input={PATH:'host-path'},env=bundledRuntimeEnvironment(input,f.resources);
   for(const key of ['LINKREADER_PYTHON','OPENSCREEN_BIN','PLAYWRIGHT_CHROMIUM_EXECUTABLE','LINKREADER_CODEX_EXECUTABLE'])assert.ok(env[key].startsWith(f.root+path.sep));
   for(const key of ['OPENTAKE_EXPORT_NODE','OPENTAKE_JIANYING_PYTHON','OPENTAKE_JIANYING_PACKAGES'])assert.ok(env[key].startsWith(f.root+path.sep));
-  assert.equal(env.PLAYWRIGHT_BROWSERS_PATH,path.join(f.root,'browsers'));assert.ok(env.PATH.endsWith('host-path'));assert.equal(env.Path,undefined);assert.deepEqual(input,{Path:'host-path'});
+  assert.equal(env.PLAYWRIGHT_BROWSERS_PATH,path.join(f.root,'browsers'));assert.ok(env.PATH.endsWith('host-path'));assert.equal(env.Path,undefined);assert.deepEqual(input,{PATH:'host-path'});
  }finally{f.dispose()}
 });
 test('a stale manual-path file cannot break a self-contained installation',()=>{

@@ -4,6 +4,9 @@ const fs=require('node:fs');const os=require('node:os');const path=require('node
 const {revealPath}=require('./platform.cjs');
 
 function revealFixture(t){
+ const systemRoot=process.env.SystemRoot;
+ process.env.SystemRoot ||= 'C:\\Windows';
+ t.after(()=>{if(systemRoot===undefined)delete process.env.SystemRoot;else process.env.SystemRoot=systemRoot;});
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-reveal-'));
  const file=path.join(dir,'成片 & 空格.mp4');fs.writeFileSync(file,'synthetic fixture');
  t.after(()=>{assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));assert.ok(path.basename(dir).startsWith('opentake-reveal-'));fs.rmSync(dir,{recursive:true,force:true});});
