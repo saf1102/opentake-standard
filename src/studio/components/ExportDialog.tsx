@@ -169,6 +169,8 @@ export function ExportDialog({
   const setSettings = (update: (current: ExportSettings) => ExportSettings) =>
     setExportState(current => updateExportDialogSettings(current, update(current.settings)));
   const filmOptionsEnabled = isFilmExportPreset(settings.preset);
+  const codecUnavailable = filmOptionsEnabled ? capabilities?.video?.unavailable[settings.video.codec] : undefined;
+  const padsOriginal = filmOptionsEnabled && (!settings.resolution || settings.resolution === 'original') && canvas && (canvas.width % 2 !== 0 || canvas.height % 2 !== 0);
   const dialogRef=useRef<HTMLDivElement>(null);
   const defaultsApplied=useRef(false);
   const [loaded, setLoaded] = useState(false);
@@ -224,6 +226,7 @@ export function ExportDialog({
   const [allowUnfinished,setAllowUnfinished]=useState(false);
   useEffect(()=>setAllowUnfinished(false),[unfinishedCards]);
   const submit = async () => {
+    if(codecUnavailable){setError(codecUnavailable);return;}
     if(unfinishedCards&&!allowUnfinished){setError('请确认是否跳过尚未完成的动效卡');return;}
     if (!hasSelectedExport(settings.selection)) {
       setError("至少选择一项导出内容");
@@ -232,7 +235,8 @@ export function ExportDialog({
     setError(undefined);
     try {
       await persist();
-      await onStart(exportDialogSubmission(exportState));
+      const submission=exportDialogSubmission(exportState);
+      await onStart({...submission,importToJianying:submission.importToJianying&&Boolean(capabilities?.jianying.available)});
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "无法启动导出");
     }
@@ -285,11 +289,12 @@ export function ExportDialog({
                     ))}
                   </div>
                   <p>保持画面比例，不提高工程原始分辨率。此选择独立于预览画质。</p>
+                  {padsOriginal && <p role="status">原片尺寸为奇数，导出时仅在右侧或底部补齐 1 像素，输出 {Math.ceil(canvas.width/2)*2} × {Math.ceil(canvas.height/2)*2}，不拉伸画面。</p>}
                   <h3 className="export-option-heading">编码</h3>
                   <div role="group" aria-label="编码">
                     {([['h264','H.264','兼容性最好 · 推荐'],['h265','HEVC','体积更小 · 新设备'],['prores422','ProRes 422','交给剪辑软件 · 文件很大']] as const).map(([codec,label,detail]) =>
-                      <button key={codec} type="button" disabled={!filmOptionsEnabled} aria-pressed={settings.video.codec === codec}
-                        onClick={() => setSettings(current => ({...current,video:{...current.video,codec,container:codec === 'prores422' ? 'mov' : 'mp4'}}))}><b>{label}</b><small>{detail}</small></button>)}
+                      <button key={codec} type="button" disabled={!filmOptionsEnabled || Boolean(capabilities?.video && !capabilities.video.codecs.includes(codec))} aria-pressed={settings.video.codec === codec}
+                        onClick={() => setSettings(current => ({...current,video:{...current.video,codec,container:codec === 'prores422' ? 'mov' : 'mp4'}}))}><b>{label}</b><small>{capabilities?.video?.unavailable[codec] || detail}</small></button>)}
                   </div>
                   <p>发抖音、小红书、B 站选 H.264；要在 Final Cut、达芬奇里继续调色选 ProRes。</p>
                   <h3 className="export-option-heading">帧率</h3>
@@ -316,7 +321,7 @@ export function ExportDialog({
             <footer className="export-footer">
               <div><ExportMethodIcon kind={settings.preset==='jianying'?'jianying':'video'} /><span><b>{copy[settings.preset].label}</b><small>导出会在后台执行，可继续编辑</small></span></div>
               <button type="button" className="export-secondary" onClick={() => void close()}>取消</button>
-              <button type="button" className="export-primary" disabled={!loaded || starting || !hasSelectedExport(settings.selection)} onClick={() => void submit()}><Download /> {starting ? "正在启动…" : settings.preset === "jianying" ? mode === "koubo" ? "导出并导入剪映" : "导出剪映草稿" : "导出成片"}</button>
+              <button type="button" className="export-primary" disabled={!loaded || starting || Boolean(codecUnavailable) || settings.preset==='jianying'&&capabilities?.jianying.draftBuilderReady===false || !hasSelectedExport(settings.selection)} onClick={() => void submit()}><Download /> {starting ? "正在启动…" : settings.preset === "jianying" ? mode === "koubo" ? "导出并导入剪映" : "导出剪映草稿" : "导出成片"}</button>
             </footer>
           </>
         )}

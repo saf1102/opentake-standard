@@ -5,6 +5,8 @@ import {connectionDefinition,type AgentConnectionId} from '../../shared/agent-co
 import type {CreationTools} from '../../shared/creation-tools.ts';
 import {requireCreationTools} from '../creation-tools.ts';
 import {standardEdition,extraStyle,includeStyle,recordCodexUsage} from './edition.ts';
+import {renameWithRetrySync,removeWithRetrySync} from '../file-ops.ts';
+import {atomicJsonSync} from '../file-ops.ts';
 /**
  * 通用剪辑的一次运行：一轮做片（读需求、设计、写、自己看一遍、渲染）→ OpenTake 机检（不过才改一轮）→ 交付第 N 版。
  * 由 Agent 自己看接触表；另开一个 Codex 看图审片（agentReview）默认关掉，它又慢又费 token。
@@ -24,6 +26,7 @@ import { carryTimeline, describeTimeline } from './hf-timeline.ts';
 import { quarantineSoftware } from './net-guard.ts';
 import { hyperframesToLayers, isHyperframesWork } from './hf-project.ts';
 import { renderHyperframes } from './hf-render.ts';
+import { PageExecutionError, type PageExecutionDiagnostic } from '../frame-render/page-execution.ts';
 import { h264Encode } from '../editor/video-encode.ts';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -57,18 +60,15 @@ export type GeneralRuntime = {
   busyRetryDelayMs: number;
   /** a second Codex looks at the frames and judges the cut (off: the agent's own look plus OpenTake's machine checks) */
   agentReview: boolean;
+  renderFilm: typeof renderHyperframes;
 };
 let runtime: GeneralRuntime = {
   creationTools: requireCreationTools,
-  render: renderHyperframes,
+  render: (work,output,options) => runtime.renderFilm(work,output,options),
   resolveCodex: async choice => {
     const { resolveAgent } = await import('../agent-runtime.ts');
     const { readAgentSettings } = await import('../agent-settings.ts');
     const settings = readAgentSettings();
-    if (process.platform !== 'darwin') {
-      const agent = await resolveAgent('generalEditing', choice ? { ...settings, modules: { ...settings.modules, generalEditing: choice } } : settings);
-      return { executable: agent.executable, model: agent.model, effort: agent.effort, ...(agent.requested ? {requested: agent.requested} : {}) };
-    }
     const selected=choice ?? settings.modules.generalEditing;
     const id=filmAgentId(selected);
     assertAgentExecutionAllowed(id);
@@ -89,6 +89,7 @@ let runtime: GeneralRuntime = {
   maxTurns: 6,
   busyRetryDelayMs: 3000,
   agentReview: false,
+  renderFilm: renderHyperframes,
 };
 export function setGeneralRuntime(patch: Partial<GeneralRuntime>) { runtime = { ...runtime, ...patch }; }
 
@@ -123,6 +124,9 @@ export type Session = {
   lastAgentMessage?: string;
   /** the agent's last words after making or changing the film: they go on the version card */
   filmMessage?: string;
+  pageFailure?: PageExecutionDiagnostic;
+  /** One automatic code repair per run; an explicit repair/retry starts one further authored turn. */
+  pageRepairAttempted?: boolean;
   turns: { runId: string; phase: string; startedAt: string; endedAt?: string; code?: number | null; threadId?: string; usage?: Usage; error?: string }[];
 };
 const sessionFile = (dir: string) => path.join(dir, 'agent', 'session.json');
@@ -131,11 +135,7 @@ export function readSession(dir: string): Session {
   catch { return { autoName: true, reviewRounds: 0, polished: false, extraTurns: 0, networkAllowed: false, queue: [], turns: [] }; }
 }
 export function writeSession(dir: string, session: Session) {
-  const file = sessionFile(dir);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(session, null, 2));
-  fs.renameSync(tmp, file);
+  atomicJsonSync(sessionFile(dir), session);
 }
 function editSession(dir: string, change: (s: Session) => void) { const s = readSession(dir); change(s); writeSession(dir, s); return s; }
 
@@ -196,10 +196,10 @@ export function startFirst(id: string, options: { request?: boolean; tools?: Cre
   if(options.tools) checkedTools.set(id,options.tools); else checkedTools.delete(id);
   const work = path.join(dir, 'work');
   if (fs.existsSync(work) && fs.readdirSync(work).some(f => !f.startsWith('.') || f === '.opentake')) {
-    fs.renameSync(work, path.join(dir, 'agent', `work-${Date.now()}`));
+    renameWithRetrySync(work, path.join(dir, 'agent', `work-${Date.now()}`));
   }
   fs.mkdirSync(work, { recursive: true });
-  editSession(dir, s => Object.assign(s, { threadId: undefined, pending: 'make', resumed: false, reviewRounds: 0, polished: false, extraTurns: 0, review: undefined, networkAllowed: false, networkAnswer: undefined, revision: undefined }));
+  editSession(dir, s => Object.assign(s, { threadId: undefined, pending: 'make', resumed: false, reviewRounds: 0, polished: false, extraTurns: 0, review: undefined, pageFailure: undefined, pageRepairAttempted: false, networkAllowed: false, networkAnswer: undefined, revision: undefined }));
   const out = updateGeneral(id, p => {
     if (options.request) p.messages.push(message('person', requestText(p)));
     p.run = newRun('first', p); p.run.queued = readSession(dir).queue.length;
@@ -269,7 +269,15 @@ export function resumeRun(id: string, options: {handoff?:boolean} = {}): General
   if (!run || !['stopped', 'failed'].includes(run.state)) throw Object.assign(new Error('没有可以接着做的运行'), { status: 409 });
   const session = readSession(dir);
   if (!session.pending) throw Object.assign(new Error('这次运行已经做完了'), { status: 409 });
-  editSession(dir, s => { s.resumed = (options.handoff || !!s.threadId || !!s.resumed) && ['plan', 'make', 'polish', 'revise'].includes(s.pending!); });
+  editSession(dir, s => {
+    // Also recover old projects saved before structured page diagnostics existed.
+    if (s.pending === 'review' && isHyperframesWork(path.join(dir, 'work')) &&
+        (run.failure?.kind === 'generated-page' || /Maximum call stack size exceeded|too much recursion|生成页面执行失败/i.test(run.error || ''))) {
+      s.pending = 'polish'; s.pageRepairAttempted = true;
+      s.review = pageRepairPrompt(s.pageFailure, run.error);
+    }
+    s.resumed = (options.handoff || !!s.threadId || !!s.resumed) && ['plan', 'make', 'polish', 'revise'].includes(s.pending!);
+  });
   const steps = run.steps.map(s => s.state === 'done' || s.state === 'skipped' ? s : { ...s, state: 'waiting' as const, detail: undefined, progress: undefined });
   const out = updateGeneral(id, p => { p.run = { ...newRun('resume', p, steps), queued: session.queue.length }; });
   void drive(id);
@@ -281,7 +289,7 @@ const handoffs=new Set<string>();
 export async function switchRunAgent(id:string,input:unknown):Promise<GeneralProject>{
  if(handoffs.has(id))throw Object.assign(Error('正在检查新的智能体，请稍候'),{status:409});
  const choice=parseAgent(input);if(!choice?.agent)throw Object.assign(Error('请选择要接着做的智能体'),{status:400});
- const target=filmAgentId(choice);assertAgentExecutionAllowed(target);
+ assertAgentExecutionAllowed(choice.agent);const target=filmAgentId(choice);
  const {dir,project}=findGeneral(id),run=project.run;
  if(!run||!['failed','stopped'].includes(run.state)||isLive(id))throw Object.assign(Error('请等出片停止后再切换智能体'),{status:409});
  if(!readSession(dir).pending)throw Object.assign(Error('没有尚未完成的出片步骤'),{status:409});
@@ -331,9 +339,9 @@ function ensureRevisionWork(dir: string, version: number) {
     // rmdir is deliberately non-recursive: concurrent/unsaved files must survive.
     let removedEmpty=false;
     if(standardEdition && fs.existsSync(work)){fs.rmdirSync(work);removedEmpty=true;}
-    try{fs.renameSync(staging,work);}catch(error){if(removedEmpty&&!fs.existsSync(work))fs.mkdirSync(work);throw error;}
+    try{renameWithRetrySync(staging,work);}catch(error){if(removedEmpty&&!fs.existsSync(work))fs.mkdirSync(work);throw error;}
   } finally {
-    if (fs.existsSync(staging)) fs.rmSync(staging, {recursive: true, force: true});
+    if (fs.existsSync(staging)) removeWithRetrySync(staging, {recursive: true, force: true});
   }
 }
 
@@ -356,7 +364,7 @@ export function postMessage(id: string, body: { text?: unknown; reference?: unkn
   const current = project.current ?? project.versions.at(-1)?.n;
   if (standardEdition ? current !== undefined : !!current) {
     ensureRevisionWork(dir, current!);
-    editSession(dir, s => Object.assign(s, { pending: 'revise', resumed: false, reviewRounds: 0, polished: false, extraTurns: 0, review: undefined, networkAnswer: undefined, revision: { version: current, text, reference: note.reference } }));
+    editSession(dir, s => Object.assign(s, { pending: 'revise', resumed: false, reviewRounds: 0, polished: false, extraTurns: 0, review: undefined, pageFailure: undefined, pageRepairAttempted: false, networkAnswer: undefined, revision: { version: current, text, reference: note.reference } }));
     const out = updateGeneral(id, p => { p.messages.push(msg); p.run = { ...newRun('revision', p), queued: readSession(dir).queue.length }; });
     void drive(id);
     return out;
@@ -424,7 +432,15 @@ async function drive(id: string) {
       if (!step) { patchRun(id, r => { r.state = 'done'; r.endedAt = now(); }); return; }
       if (step === 'review') {
         if (session.queue.length && session.extraTurns < 2) { editSession(dir, s => { s.pending = 'polish'; s.extraTurns++; s.review = undefined; }); continue; }
-        const verdict = await review(id, dir, runId);
+        let verdict: Verdict | undefined;
+        try { verdict = await review(id, dir, runId); }
+        catch (error) {
+          if (!(error instanceof PageExecutionError) || entry.stopRun === runId || session.pageRepairAttempted) throw error;
+          preservePageFailure(dir, runId, error);
+          editSession(dir, s => { s.pending = 'polish'; s.pageFailure = error.diagnostic; s.pageRepairAttempted = true; s.review = pageRepairPrompt(error.diagnostic); });
+          updateGeneral(id, p => { p.messages.push(message('system', `${error.message}。正在让 Agent 修复已有页面后重试，工程内容已保留。`)); });
+          continue;
+        }
         if (entry.stopRun === runId) { finishStopped(id, runId); return; }
         const s = readSession(dir);
         // one more round only when the cut failed; no forced polish, to avoid unnecessary time and model usage
@@ -440,7 +456,7 @@ async function drive(id: string) {
           // words that arrived after the last turn: they become the next version
           const text = left.map(n => n.text).join('\n');
           const current = findGeneral(id).project.current!;
-          editSession(dir, s => Object.assign(s, { queue: [], filmMessage: undefined, pending: 'revise', resumed: false, reviewRounds: 0, polished: false, extraTurns: 0, review: undefined, revision: { version: current, text, reference: left.find(n => n.reference)?.reference } }));
+          editSession(dir, s => Object.assign(s, { queue: [], filmMessage: undefined, pending: 'revise', resumed: false, reviewRounds: 0, polished: false, extraTurns: 0, review: undefined, pageFailure: undefined, pageRepairAttempted: false, revision: { version: current, text, reference: left.find(n => n.reference)?.reference } }));
           updateGeneral(id, p => { p.run = newRun('revision', p); });
           continue;
         }
@@ -457,9 +473,14 @@ async function drive(id: string) {
     const text = error instanceof Error ? error.message : String(error);
     const failure=classifyAgentFailure(error);
     try {
+      if (error instanceof PageExecutionError) { preservePageFailure(findGeneral(id).dir, runId!, error); editSession(findGeneral(id).dir, s => { s.pageFailure = error.diagnostic; s.pending = 'review'; }); }
       patchRun(id, r => {
         if (r.id !== runId || !['running', 'stopping'].includes(r.state)) return;
         r.state = 'failed'; r.endedAt = now(); r.error = text; r.errorKind = failure.kind;
+        if (error instanceof PageExecutionError) {
+          const {kind, operation, file, line, column, frame} = error.diagnostic;
+          r.failure = {kind, operation, file, line, column, frame, ...(error.diagnosticFile ? {diagnosticFile: path.relative(findGeneral(id).dir, error.diagnosticFile).split(path.sep).join('/')} : {})};
+        }
         r.steps = r.steps.map(s => s.state === 'running' ? { ...s, state: 'failed', detail: text.slice(0, 200) } : s);
       });
     } catch { /* the project itself is gone */ }
@@ -469,6 +490,22 @@ async function drive(id: string) {
     if (entry.again) { entry.again = false; void drive(id); }
     else if (live.get(id) === entry && !entry.proc) { live.delete(id); checkedTools.delete(id); }
   }
+}
+
+function preservePageFailure(dir: string, runId: string, error: PageExecutionError) {
+  if (error.diagnosticFile) return;
+  try {
+    const file = path.join(dir, 'agent', 'diagnostics', `page-execution-${runId}-${crypto.randomUUID()}.json`);
+    atomicJsonSync(file, {version: 1, at: now(), ...error.diagnostic}); error.diagnosticFile = file;
+  } catch { /* State transition must still report the original failure if diagnostic I/O fails. */ }
+}
+
+function pageRepairPrompt(failure?: PageExecutionDiagnostic, legacyError?: string) {
+  return ['生成页面执行失败；这是已有网页代码的问题，先修复源码，不要直接重渲染同一份文件，也不要重建工程。',
+    failure ? `${failure.file}，${failure.operation}：${failure.message}\n${failure.stack}\n堆栈中的 HTML 行号包含注入的运行时，请按函数名核对原始源码，不要直接套用行号。` : legacyError || '',
+    /Maximum call stack|too much recursion|\bseek\b/i.test(failure?.stack || legacyError || '') ? '普通 script 的全局 function seek 与 window.seek 是同一绑定；包装 window.seek 时不得再通过同名全局 seek 调用自身。内部函数用 renderFilmAt 等独立名称或放入闭包。' : '只修复报告的代码错误，不改无关页面。',
+    '保留对外接口、现有素材、文案与 data-hf-id。',
+    '修改后先 hfx check、hfx look，检查开头、中间、结尾时间跳转及样张；通过后再结束这一轮，由 OpenTake 重新渲染。'].join('\n\n');
 }
 
 function afterTurn(id: string, dir: string, phase: Phase) {
@@ -541,7 +578,7 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   });
   // 联网: the project's switch; projects from before it follow the agent's request answered in this session
   const network = project.network ?? session.networkAllowed;
-  const tools = process.platform==='darwin' ? (checkedTools.get(id) ?? await runtime.creationTools(project.agent)) : undefined;
+  const tools = checkedTools.get(id) ?? await runtime.creationTools(project.agent);
   if (stopped()) return 'stopped';
   if(tools) { checkedTools.set(id,tools); if(agentId==='codex' && tools.codex) codex.executable=tools.codex; }
   const env = prepareWork(dir, {...runtime.baseEnv(),...codex.env}, network, tools);
@@ -569,7 +606,7 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   const startedAt = now();
   const record = editSession(dir, s => { s.turns.push({ runId, phase, startedAt, threadId: s.threadId }); }).turns.length - 1;
   const agentRecord = agentRunRecord(codex, startedAt, id);
-  fs.rmSync(path.join(work, 'network-request.json'), { force: true });
+  removeWithRetrySync(path.join(work, 'network-request.json'), { force: true });
 
   let steps = findGeneral(id).project.run!.steps;
   let usage: Usage | undefined, failure: string | undefined, dirty = false;
@@ -675,7 +712,7 @@ function readNetworkRequest(work: string, dir: string): GeneralRun['networkReque
     const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
     const hosts = (Array.isArray(raw.hosts) ? raw.hosts : []).map(String).filter(h => /^[a-z0-9.-]+(:\d+)?$/i.test(h)).slice(0, 12);
     const reason = String(raw.reason || '').trim().slice(0, 500);
-    fs.renameSync(file, path.join(dir, 'agent', `network-request-${Date.now()}.json`));
+    renameWithRetrySync(file, path.join(dir, 'agent', `network-request-${Date.now()}.json`));
     return reason && hosts.length ? { reason, hosts } : undefined;
   } catch { return undefined; }
 }
@@ -695,9 +732,9 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
   if (isHyperframesWork(path.join(dir, 'work'))) {
     // export B: OpenTake's own frame renderer draws the HyperFrames page, then mixes the sound
     patchRun(id, r => { r.steps = setStep(r.steps, 'render', { state: 'running', startedAt: now(), endedAt: undefined, detail: '逐帧渲染', progress: undefined }); });
-    fs.rmSync(video, { force: true });
+    removeWithRetrySync(video, { force: true });
     let last = 0;
-    await runtime.render(path.join(dir, 'work'), video, { browserExecutable:checkedTools.get(id)?.chromium, onActivity: detail => { patchRun(id, r => { r.steps = setStep(r.steps, 'render', { detail }); }); }, onProgress: p => { const pct = Math.round(p * 100); if (pct - last >= 5) { last = pct; patchRun(id, r => { r.steps = setStep(r.steps, 'render', { progress: { done: pct, total: 100 } }); }); } } });
+    await runtime.render(path.join(dir, 'work'), video, { browserExecutable:checkedTools.get(id)?.chromium, diagnosticFile: path.join(dir, 'agent', 'diagnostics', `page-execution-${runId}-${round}.json`), onActivity: detail => { patchRun(id, r => { r.steps = setStep(r.steps, 'render', { detail }); }); }, onProgress: p => { const pct = Math.round(p * 100); if (pct - last >= 5) { last = pct; patchRun(id, r => { r.steps = setStep(r.steps, 'render', { progress: { done: pct, total: 100 } }); }); } } });
     patchRun(id, r => { r.steps = setStep(r.steps, 'render', { state: 'done', endedAt: now(), detail: '渲染成片', progress: { done: 100, total: 100 } }); });
   }
   patchRun(id, r => { r.steps = setStep(r.steps, 'review', { state: 'running', startedAt: now(), endedAt: undefined, detail: round > 1 ? '复审改过的版本' : '抽帧、机检' }); });
@@ -825,7 +862,7 @@ export async function deliverVideo(src: string, dest: string) {
   const [num, den] = String(stream.r_frame_rate || '30/1').split('/').map(Number);
   const tmp = `${dest}.${process.pid}.tmp.mp4`;
   await exec(ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-y', '-i', src, '-map', '0:v:0', '-map', '0:a?', ...h264Encode({ fps: num / (den || 1), quality: 70 }), '-c:a', 'copy', '-movflags', '+faststart', tmp]);
-  fs.renameSync(tmp, dest);
+  renameWithRetrySync(tmp, dest);
 }
 
 /** Segments from film.json: each shot's name and time, transitions overlapping the previous shot. */

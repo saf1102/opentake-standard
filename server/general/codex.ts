@@ -18,6 +18,9 @@ export type ReviewArgs = CodexChoice & { dir: string; lastMessage: string; schem
 
 function shared({ model, effort }: CodexChoice) {
   return ['--json', '--ignore-user-config', '--ignore-rules', '--skip-git-repo-check', '-m', model, '-c', `model_reasoning_effort="${effort}"`,
+    // Ignoring user config also drops the native Windows sandbox selection.
+    // Keep the workspace/read-only policy below and use the provisioned native sandbox.
+    ...(process.platform === 'win32' ? ['-c', 'windows.sandbox="elevated"'] : []),
     '-c', 'approval_policy="never"', '-c', 'web_search="disabled"', '-c', 'skills.include_instructions=false',
     ...DISABLED_FEATURES.flatMap(f => ['--disable', f])];
 }
@@ -45,20 +48,25 @@ export function startCodex(executable: string, args: string[], options: { cwd: s
   const child = spawn(executable, args, { cwd: options.cwd, env: options.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
   let stderr = '';
   const redact=options.redact || ((text:string)=>text);
+  let callbackError:Error|undefined;
   const log = options.eventLog ? fs.createWriteStream(options.eventLog, { flags: 'a' }) : undefined;
+  const failCallback=(error:Error)=>{callbackError??=error;stderr+=`\n记录 Agent 运行失败：${redact(error.message)}`;group('SIGTERM');};
+  log?.on('error',failCallback);
   child.stderr!.on('data', chunk => { if (stderr.length < 200_000) stderr += String(chunk); });
   const lines = createInterface({ input: child.stdout! });
   lines.on('line', line => {
     line=redact(line);
     log?.write(`${line}\n`);
     if (!line.trim().startsWith('{')) return;
-    try { options.onEvent(JSON.parse(line)); } catch { /* a malformed line is kept in the log, not fatal */ }
+    let event:unknown;try{event=JSON.parse(line)}catch{return;}
+    if(!event||typeof event!=='object'||Array.isArray(event))return;
+    try{options.onEvent(event as Record<string,unknown>)}catch(error){failCallback(error instanceof Error?error:Error(String(error)))}
   });
   child.stdin!.on('error', () => { /* Codex may exit before reading all of stdin */ });
   child.stdin!.end(options.prompt);
   const done = new Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }>(resolve => {
     let settled = false;
-    const finish = (code: number | null, signal: NodeJS.Signals | null) => { if (settled) return; settled = true; lines.close(); log?.end(); resolve({ code, signal, stderr:redact(stderr) }); };
+    const finish = (code: number | null, signal: NodeJS.Signals | null) => { if (settled) return; settled = true; lines.close(); log?.end(); resolve({ code:callbackError?-1:code, signal, stderr:redact(stderr) }); };
     child.on('error', error => { stderr += `\n${redact(error.message)}`; finish(-1, null); });
     child.on('close', finish);
   });

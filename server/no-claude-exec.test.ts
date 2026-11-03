@@ -38,7 +38,7 @@ test('Claude execution is confined to explicit gated adapters',()=>{
  const found:string[]=[];
  const gated=new Set(['server/general/agent-adapter.ts','shared/agent-connections.ts','server/agent-connections.ts','desktop/agent-installation.cjs','scripts/standard/overlays/desktop/agent-installation.cjs']);
  for(const file of files){
-  const text=fs.readFileSync(file,'utf8'),name=path.relative(root,file),isTest=/\.test\.[cm]?[jt]s$/.test(name);
+  const text=fs.readFileSync(file,'utf8'),name=path.relative(root,file).split(path.sep).join('/'),isTest=/\.test\.[cm]?[jt]s$/.test(name);
   text.split('\n').forEach((line,i)=>{
    if(startsClaude.test(line))found.push(`${name}:${i+1} starts claude: ${line.trim().slice(0,120)}`);
    if(!isTest&&!gated.has(name)&&claudeOnly.test(line))found.push(`${name}:${i+1} Claude Code option: ${line.trim().slice(0,120)}`);
@@ -72,8 +72,8 @@ test('closed switch: settings, connectivity and film launch never start Claude C
  // The login shell OpenTake reads PATH from: a stand-in that answers at once, so no real shell profile runs.
  const shell=path.join(home,'login-shell');
  fs.writeFileSync(shell,`#!/bin/sh\nprintf '__CW_LOGIN_ENV_7B31__\\0PATH=${bin}:/usr/bin:/bin\\0'\n`,{mode:0o755});
- const saved={HOME:process.env.HOME,PATH:process.env.PATH,SHELL:process.env.SHELL,LINKREADER_AGENT_SETTINGS_FILE:process.env.LINKREADER_AGENT_SETTINGS_FILE,LINKREADER_CLAUDE_EXECUTABLE:process.env.LINKREADER_CLAUDE_EXECUTABLE,LINKREADER_CONNECTION_SETTINGS_FILE:process.env.LINKREADER_CONNECTION_SETTINGS_FILE};
- Object.assign(process.env,{HOME:home,PATH:`${bin}:${process.env.PATH}`,SHELL:shell,LINKREADER_AGENT_SETTINGS_FILE:path.join(settingsDir,'agent-settings.json'),LINKREADER_CLAUDE_EXECUTABLE:onPath,LINKREADER_CONNECTION_SETTINGS_FILE:path.join(settingsDir,'connections.json')});
+ const saved={USERPROFILE:process.env.USERPROFILE,HOME:process.env.HOME,PATH:process.env.PATH,SHELL:process.env.SHELL,LINKREADER_AGENT_SETTINGS_FILE:process.env.LINKREADER_AGENT_SETTINGS_FILE,LINKREADER_CLAUDE_EXECUTABLE:process.env.LINKREADER_CLAUDE_EXECUTABLE,LINKREADER_CONNECTION_SETTINGS_FILE:process.env.LINKREADER_CONNECTION_SETTINGS_FILE};
+ Object.assign(process.env,{HOME:home,USERPROFILE:home,PATH:`${bin}${path.delimiter}${process.env.PATH}`,SHELL:shell,LINKREADER_AGENT_SETTINGS_FILE:path.join(settingsDir,'agent-settings.json'),LINKREADER_CLAUDE_EXECUTABLE:onPath,LINKREADER_CONNECTION_SETTINGS_FILE:path.join(settingsDir,'connections.json')});
 
  // Watch every way child_process starts a program, before any workbench module captures it.
  const require=createRequire(import.meta.url);
@@ -117,6 +117,11 @@ test('closed switch: settings, connectivity and film launch never start Claude C
  proto.spawn=function(this:unknown,options){if(isClaude(options?.file,options?.args?.slice(1))){claudeStarts.push(`ChildProcess ${options?.file}`);throw blocked();}return lowSpawn.call(this,options)};
  syncBuiltinESMExports();
  try{
+  // Windows can answer every disabled-agent route without starting a login shell.
+  // Probe the watch itself so zero legitimate starts cannot masquerade as a broken watch.
+  const canary=path.join(home,'watch-canary');
+  assert.equal(cp.spawnSync(canary,[]).error?.code,'ENOENT');
+  assert.ok(started.some(line=>line.includes(canary)),'the process-start watch must record its synthetic probe');
   const isStandard=!fs.existsSync(path.join(root,'server/editor/api/root.ts'));
   const routeModule=isStandard?'./standard/settings-api.ts':'./editor/api/root.ts';
   const handlers=await import(routeModule);
@@ -156,7 +161,6 @@ test('closed switch: settings, connectivity and film launch never start Claude C
   assert.throws(()=>startFilmAgent({agent:'kimi',executable:onPath,model:'default',effort:'medium'},['acp'],{cwd:home,env:{PATH:bin},prompt:'不应执行',onEvent(){}}),/不能通过通用 ACP/);
   // The rest of Settings › AI 与 Agent and the system settings page, run the same way.
   for(const route of ['agent-settings/installation/codex','agent-settings/roster','agent-settings','system-settings'])await call('GET',route);
-  assert.ok(started.length>0,'the watch saw no program start at all');
   assert.deepEqual(claudeStarts,[]);
   assert.equal(fs.existsSync(ran),false,`Claude Code was started: ${fs.existsSync(ran)?fs.readFileSync(ran,'utf8'):''}`);
   assert.equal(fs.readFileSync(legacyConfig,'utf8'),legacyText,'the old enhanced-agent.json stays as it was');

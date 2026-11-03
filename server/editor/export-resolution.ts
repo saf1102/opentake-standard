@@ -2,11 +2,20 @@ import type { EditProject, ExportSettings } from '../../src/types/editor.ts';
 
 /** Output size only; never mutate authored timelines or the preview preference. */
 export function exportResolution(canvas: Pick<EditProject['settings'], 'width' | 'height'>, resolution: ExportSettings['resolution']) {
-  if (!resolution || resolution === 'original') return {...canvas};
+  if (!Number.isSafeInteger(canvas.width)||!Number.isSafeInteger(canvas.height)||canvas.width<1||canvas.height<1) throw Error('导出画面尺寸无效');
+  if (!resolution || resolution === 'original') return {...canvas,width:Math.ceil(canvas.width/2)*2,height:Math.ceil(canvas.height/2)*2};
   const shortEdge = resolution === '4k' ? 2160 : resolution === '1080p' ? 1080 : 720;
   const scale = Math.min(1, shortEdge / Math.min(canvas.width, canvas.height));
   const even = (n: number) => Math.max(2, Math.round(n * scale / 2) * 2);
   return {width: even(canvas.width), height: even(canvas.height)};
+}
+
+/** Pad the right/bottom edge of source-sized video; never stretch odd dimensions. */
+export function exportVideoFilter(canvas:Pick<EditProject['settings'],'width'|'height'>,resolution:ExportSettings['resolution']) {
+  const size=exportResolution(canvas,resolution);
+  return !resolution||resolution==='original'
+    ? `pad=${size.width}:${size.height}:0:0:color=black`
+    : `scale=${size.width}:${size.height}:flags=lanczos`;
 }
 
 /** Apply authored pixel dimensions after director materialization, on the export copy only. */

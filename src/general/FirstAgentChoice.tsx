@@ -4,9 +4,10 @@ import {connectionReadyForFilm, type ConnectionId, type ConnectionView} from '..
 import {ConnectionEditor} from '@/studio/components/ConnectionSettings'
 import {connectionRequest} from '@/studio/connections'
 import {getAgentSettings} from '@/studio/api'
+import {UNIFIED_AGENTS} from './platform'
 import './first-agent-choice.css'
 
-const isMacOnboarding = () => typeof window !== 'undefined' && /Mac/i.test(window.navigator.platform)
+const isAgentOnboarding = () => typeof window !== 'undefined' && UNIFIED_AGENTS
 
 async function seenRequest(method = 'GET') {
   const response = await fetch('/api/editor/onboarding/general-choice', {method, cache: 'no-store'})
@@ -15,7 +16,7 @@ async function seenRequest(method = 'GET') {
   return body.result as {seenAt?: string}
 }
 export function useFirstAgentChoice() {
-  const enabled = isMacOnboarding()
+  const enabled = isAgentOnboarding()
   const [open, setOpen] = useState(false)
   const [label, setLabel] = useState('选择出片智能体')
   const [error, setError] = useState('')
@@ -37,7 +38,7 @@ export function useFirstAgentChoice() {
 }
 /** Same connection editor as Settings: a relay is advisory, never a second readiness gate. */
 export function FirstAgentChoice({onDone}: {onDone: () => void}) {
-  const enabled = isMacOnboarding()
+  const enabled = isAgentOnboarding()
   const [connections, setConnections] = useState<ConnectionView[]>([])
   const [selected, setSelected] = useState<ConnectionId>('codex')
   const [section, setSection] = useState<'cli' | 'api' | 'claude'>('cli')

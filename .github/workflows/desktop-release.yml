@@ -1,0 +1,161 @@
+name: Build desktop installers and prepare release draft
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: official-desktop-release
+  cancel-in-progress: false
+jobs:
+  source:
+    if: github.repository == 'saf1102/opentake-standard' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      commit: ${{ steps.identity.outputs.commit }}
+      tag: ${{ steps.identity.outputs.tag }}
+      version: ${{ steps.identity.outputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.18.0
+      - id: identity
+        name: Freeze current official main without moving existing version tags
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          import release from './desktop/release-contract.cjs';
+          const commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+          execFileSync('git',['merge-base','--is-ancestor',commit,'refs/remotes/origin/main']);
+          const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+          const metadata=JSON.parse(fs.readFileSync('desktop/windows-version.json','utf8'));
+          if(metadata.repository!==release.REPOSITORY||metadata.upstreamVersion!==pkg.version)throw Error('Release identity differs');
+          const tag=release.desktopTag(pkg.version,metadata.windowsBuild);
+          const existing=execFileSync('git',['tag','--list',tag],{encoding:'utf8'}).trim();
+          if(existing)throw Error('Release tag already exists; increment the build instead of replacing it');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,`commit=${commit}\ntag=${tag}\nversion=${pkg.version}\n`);
+          NODE
+      - run: npm run test:release
+      - name: Refuse an existing published release or draft before building
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          node --input-type=module <<'NODE'
+          import {findReleaseByTag} from './scripts/publish-source-release.mjs';
+          if(findReleaseByTag(process.env.GITHUB_REPOSITORY,process.env.RELEASE_TAG))throw Error('Release/draft already exists; preserve it and inspect it before retrying');
+          NODE
+      - name: Prepare source archive with the same desktop release tag
+        env:
+          SOURCE_SHA: ${{ steps.identity.outputs.commit }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+        run: node scripts/prepare-source-release.mjs --ref "$SOURCE_SHA" --tag "$RELEASE_TAG" --out release/source
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-source
+          path: release/source/*
+          if-no-files-found: error
+          retention-days: 14
+  installers:
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin-arm64
+            installer: release/*.dmg
+            receipt: release/*.dmg.build.json
+          - os: windows-2025
+            platform: win32-x64
+            installer: release/windows/*.exe
+            receipt: release/windows/*.exe.build.json
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            vendor/openscreen/package-lock.json
+      - run: npm ci
+      - run: npm --prefix vendor/openscreen ci --ignore-scripts
+      - name: Prepare the locked Electron binary
+        run: node node_modules/electron/install.js
+      - run: npx --no-install playwright-core install chromium
+      - name: Install macOS media test tools
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: Prepare locked Windows media test tools
+        if: runner.os == 'Windows'
+        run: node scripts/prepare-ci-media.mjs
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-source
+          path: release/source
+      - name: Use the verified official source receipt on macOS
+        if: runner.os == 'macOS'
+        run: unzip -p release/source/OpenTake-Standard-source.zip opentake-standard/release-source.json > release-source.json
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:release
+      - name: Compile native components and create the local-signing-only installer
+        run: npm run build:installer
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: |
+            ${{ matrix.installer }}
+            ${{ matrix.receipt }}
+          if-no-files-found: error
+          retention-days: 14
+  draft:
+    needs: [source, installers]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.18.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release/incoming
+      - run: node scripts/prepare-desktop-release.mjs --source release/incoming --artifacts release/incoming --out release/bundle
+      - name: Create a draft for maintainer installation checks and final publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.source.outputs.tag }}
+          SOURCE_SHA: ${{ needs.source.outputs.commit }}
+          APP_VERSION: ${{ needs.source.outputs.version }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {findReleaseByTag} from './scripts/publish-source-release.mjs';
+          if(findReleaseByTag(process.env.GITHUB_REPOSITORY,process.env.RELEASE_TAG))throw Error('Release/draft already exists; refusing replacement');
+          NODE
+          gh release create "$RELEASE_TAG" release/bundle/* --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --title "OpenTake Standard $APP_VERSION macOS and Windows" --notes-file release/bundle/release-notes.md --draft
+          echo 'Draft created. Complete the handoff acceptance checks before publishing it as Latest.' >> "$GITHUB_STEP_SUMMARY"

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {filmAgentArgs,filmAgentId,applyClaudeEvent,startFilmAgent,filmAgentRedactor} from './general/agent-adapter.ts';
+import {claudeTurnArgs,filmAgentArgs,filmAgentId,applyClaudeEvent,startFilmAgent,filmAgentRedactor} from './general/agent-adapter.ts';
 import {filmTurnArgs} from './general/codex.ts';
 import {initialSteps} from './general/events.ts';
 import {saveAgentConnection} from './agent-connections.ts';
@@ -20,7 +20,8 @@ test('任务17：Codex 原参数不变；API 地址仅作为本轮参数传入',
  assert.equal(filmAgentId({agent:'kimi'}),'kimi','任务24扩围；Codex/Claude原行为断言保留');
 });
 test('任务17：Claude 使用无头流式、临时配置和强制沙盒，API不使用订阅凭据',()=>{
- const args=filmAgentArgs({agent:'claude',executable:'/fixture/agent',model:'default',effort:'medium',method:'api'},{...turn,model:'default'});
+ const args=claudeTurnArgs({...turn,model:'default',method:'api'});
+ if(process.platform==='win32')assert.throws(()=>filmAgentArgs({agent:'claude',executable:'/fixture/agent',model:'default',effort:'medium'},turn),/Windows.*暂未适配/);
  assert.ok(args.includes('--bare'));assert.ok(args.includes('stream-json'));assert.ok(args.includes('--resume'));
  assert.ok(!args.includes('--model'));assert.ok(!args.includes('--dangerously-skip-permissions'));
  const settings=JSON.parse(args[args.indexOf('--settings')+1]);
@@ -49,6 +50,7 @@ test('任务17：假进程流式完成、密钥脱敏、关开关立即取消；
  fs.writeFileSync(fixture,`console.log(JSON.stringify({type:'system',subtype:'init',session_id:'fixture-thread'}));if(process.env.FIXTURE_WAIT){setInterval(()=>{},100)}else{console.error(process.env.ANTHROPIC_API_KEY);console.log(JSON.stringify({type:'result',subtype:'success',result:'fixture '+process.env.ANTHROPIC_API_KEY}))}`);
  try {
   writeGate();const last=path.join(dir,'last.txt'),events=path.join(dir,'events.jsonl');const seen:Record<string,unknown>[]=[];
+  if(process.platform==='win32'){assert.throws(()=>startFilmAgent({agent:'claude',executable:process.execPath,model:'default',effort:'medium'},[fixture],{cwd:dir,env:{},prompt:'fixture',onEvent(){}}),/Windows.*暂未适配/);assert.equal(fs.existsSync(events),false);assert.equal(filmAgentRedactor({ANTHROPIC_API_KEY:'abc'})('xabcx'),'x[已隐藏密钥]x');return;}
   const proc=startFilmAgent({agent:'claude',executable:process.execPath,model:'default',effort:'medium'},[fixture],{cwd:dir,env:{PATH:process.env.PATH,ANTHROPIC_API_KEY:'fake-secret-task17'},prompt:'fixture',eventLog:events,lastMessage:last,onEvent:event=>seen.push(event)});
   const done=await proc.done;assert.equal(done.code,0);assert.equal(seen.length,2);
   assert.equal(fs.readFileSync(last,'utf8'),'fixture [已隐藏密钥]');assert.doesNotMatch(fs.readFileSync(events,'utf8')+done.stderr,/fake-secret-task17/);

@@ -2,12 +2,13 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {spawnSync}=require('node:child_process');
+const platform=require('./platform.cjs');
 const versions=new Map();
 let shellCache;
 function sanitizeAgentEnv(input=process.env,connection){
  const clean=Object.fromEntries(Object.entries(input).filter(([k,v])=>v!==undefined&&!/^(CLAUDECODE|CLAUDE_CODE_.*|ANTHROPIC_BASE_URL|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY)$/.test(k)));
  // Existing Windows behavior stays unchanged. API credentials are explicit per-launch additions on macOS.
- if(process.platform==='darwin'&&connection){
+ if(connection){
   const keys=connection.agent==='claude'?['ANTHROPIC_BASE_URL','ANTHROPIC_API_KEY']:connection.agent==='codex'?['OPENTAKE_CODEX_API_KEY']:[];
   for(const key of keys)if(typeof connection.variables?.[key]==='string')clean[key]=connection.variables[key];
  }
@@ -16,7 +17,7 @@ function sanitizeAgentEnv(input=process.env,connection){
 function loginEnvironment(base=process.env,refresh=false){
  const env=sanitizeAgentEnv(base), now=Date.now();
  if(!refresh&&shellCache&&shellCache.key===`${env.HOME}:${env.SHELL}`&&now-shellCache.at<15000)return {...env,...shellCache.values};
- if(process.platform==='win32')return env;
+ if(process.platform==='win32')return platform.environmentWithPath(env,platform.environmentPath(env));
  const shell=path.isAbsolute(env.SHELL||'')?env.SHELL:'/bin/zsh';
  const marker='__CW_LOGIN_ENV_7B31__';
  const result=spawnSync(shell,['-ilc',`printf '${marker}\\0'; /usr/bin/env -0`],{env,encoding:'utf8',timeout:2000,maxBuffer:1024*1024});
@@ -85,7 +86,7 @@ function detectAgent(kind,options={}){
  if(configured)add(configured,'manual');
  else{
   add(env[kind==='codex'?'LINKREADER_CODEX_EXECUTABLE':'LINKREADER_CLAUDE_EXECUTABLE'],'environment');
-  for(const dir of [...(env.PATH||'').split(path.delimiter),path.join(home,'.local/bin'),path.join(home,'.npm-global/bin'),'/opt/homebrew/bin','/usr/local/bin'].filter(d=>path.isAbsolute(d)))add(path.join(dir,process.platform==='win32'?kind+'.exe':kind),'PATH');
+  for(const dir of [...platform.environmentPath(env).split(path.delimiter),path.join(home,'.local/bin'),path.join(home,'.npm-global/bin'),'/opt/homebrew/bin','/usr/local/bin'].filter(d=>path.isAbsolute(d)))add(path.join(dir,process.platform==='win32'?kind+'.exe':kind),'PATH');
   for(const apps of options.applicationDirs||[path.join(home,'Applications'),'/Applications'])if(kind==='codex')for(const app of ['Codex.app','ChatGPT.app'])for(const relative of ['Contents/Resources/codex','Contents/Resources/codex-cli/bin/codex','Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex'])add(path.join(apps,app,relative),'app');
   if(process.platform==='win32'&&kind==='codex'){
    const npm=env.APPDATA&&path.join(env.APPDATA,'npm','node_modules','@openai','codex');

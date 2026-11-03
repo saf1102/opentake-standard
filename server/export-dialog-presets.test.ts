@@ -7,8 +7,36 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {exportSettingsForPreset} from '../src/studio/export-settings.ts';
 import type {ExportSettings} from '../src/types/editor.ts';
+import {videoExportCapabilities} from '../shared/export-video.ts';
 
 const require=createRequire(import.meta.url);
+
+test('Windows export dialog disables HEVC, explains odd-size padding and recovers saved HEVC preferences',async()=>{
+ const output=await build({entryPoints:['src/studio/components/ExportDialog.tsx'],bundle:true,write:false,platform:'node',format:'cjs',packages:'external',jsx:'automatic',loader:{'.css':'empty'}});
+ const mod={exports:{} as typeof import('../src/studio/components/ExportDialog.tsx')};
+ new Function('require','module','exports',output.outputFiles[0].text)(require,mod,mod.exports);
+ for(const mode of ['general','screen'] as const){
+  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
+  const savedGlobals=new Map<string,PropertyDescriptor|undefined>();const submissions:ExportSettings[]=[];
+  const preference={...exportSettingsForPreset('quick'),video:{...exportSettingsForPreset('quick').video,codec:'h265'}};
+  const values={window:dom.window,document:dom.window.document,HTMLElement:dom.window.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true,fetch:async()=>({ok:true,json:async()=>({ok:true,result:preference})})};
+  for(const [key,value]of Object.entries(values)){savedGlobals.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true});}
+  const root=createRoot(dom.window.document.getElementById('root')!);
+  try{
+   await act(async()=>root.render(React.createElement(mod.exports.ExportDialog,{mode,projectId:'fixture',projectName:'奇数画幅',starting:false,history:React.createElement('div'),canvas:{width:1281,height:721,fps:30},capabilities:{video:videoExportCapabilities('win32'),defaultDestination:'/tmp/exports',jianying:{available:false}},onClose:()=>{},onChooseDestination:async()=>'',onStart:async s=>{submissions.push(s)},onRetry:async()=>{},onStop:async()=>{},onRestart:async()=>{},onReveal:()=>{}})));
+   const codecs=[...dom.window.document.querySelectorAll<HTMLButtonElement>('[aria-label="编码"] button')];
+   const hevc=codecs.find(b=>b.textContent?.startsWith('HEVC'))!,h264=codecs.find(b=>b.textContent?.startsWith('H.264'))!;
+   const submit=dom.window.document.querySelector<HTMLButtonElement>('.export-footer .export-primary')!;
+   assert.equal(hevc.disabled,true);assert.match(hevc.textContent!,/Windows HEVC 暂不可用/);assert.equal(submit.disabled,true);
+   assert.match(dom.window.document.body.textContent!,/1282 × 722/);
+   await act(async()=>h264.click());assert.equal(submit.disabled,false);
+   await act(async()=>submit.click());assert.equal(submissions[0].video.codec,'h264');
+  }finally{
+   await act(async()=>root.unmount());dom.window.close();
+   for(const [key,descriptor]of savedGlobals){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);}
+  }
+ }
+});
 
 test('真实共享弹窗：口播、通用剪辑与录屏的剪映提交隔离成片选择，切回和重开仍保留',async()=>{
  const output=await build({entryPoints:['src/studio/components/ExportDialog.tsx'],bundle:true,write:false,
@@ -54,7 +82,7 @@ test('真实共享弹窗：口播、通用剪辑与录屏的剪映提交隔离�
    await click('.export-presets button',mode==='koubo'?'剪映工程':'剪映草稿');
    for(const button of dom.window.document.querySelectorAll<HTMLButtonElement>('.export-resolution button'))assert.equal(button.disabled,true);
    await click('.export-footer button.export-primary','导出');
-   assert.deepEqual(submissions[0],exportSettingsForPreset('jianying',film));
+   assert.deepEqual(submissions[0],{...exportSettingsForPreset('jianying',film),importToJianying:false},'portable draft export must not promise unavailable automatic import');
    assert.equal(Object.hasOwn(submissions[0],'fps'),false);
    assert.deepEqual(writes.at(-1),film,'保存的只有成片偏好');
    await click('.export-presets button',mode==='koubo'?'快速成片':'成片');

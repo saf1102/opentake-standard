@@ -1,17 +1,26 @@
 import localSignature from './sign-local-app.cjs';
 import platform from './platform.cjs';
+import releaseContract from './release-contract.cjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {spawnSync} from 'node:child_process';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const target=platform.buildTarget();
+if(target!=='mac'){
+ const {writeWindowsSourceReceipt}=await import('./windows-source.cjs');
+ writeWindowsSourceReceipt(root);
+}
 const receiptFile=path.join(root,'release-source.json');
-if(!fs.existsSync(receiptFile)&&fs.existsSync(path.join(root,'.git'))){
+if(target==='mac'&&!fs.existsSync(receiptFile)&&fs.existsSync(path.join(root,'.git'))){
  const git=args=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8'});if(r.status!==0)throw Error('源码身份未确认，请交给智能体更新');return r.stdout.trim()};
  const origin=git(['remote','get-url','origin']),version=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version;
- if(!['https://github.com/saf1102/opentake-standard.git','https://github.com/saf1102/opentake-standard','git@github.com:saf1102/opentake-standard.git'].includes(origin)||git(['status','--porcelain'])||git(['describe','--tags','--exact-match','HEAD'])!=='v'+version)throw Error('请在干净的官方版本标签上构建，或交给智能体保留你的源码改动');
+ const metadata=JSON.parse(fs.readFileSync(path.join(root,'desktop/windows-version.json'),'utf8'));
+ const tags=git(['tag','--points-at','HEAD']).split(/\r?\n/);
+ const officialTag=tags.includes('v'+version)||tags.includes(releaseContract.desktopTag(version,metadata.windowsBuild));
+ if(!['https://github.com/saf1102/opentake-standard.git','https://github.com/saf1102/opentake-standard','git@github.com:saf1102/opentake-standard.git'].includes(origin)||git(['status','--porcelain'])||!officialTag)throw Error('请在干净的官方版本标签上构建，或交给智能体保留你的源码改动');
  const entries=git(['ls-tree','-rz','HEAD']).split('\0').filter(Boolean).map(line=>{const m=/^(100644|100755) blob ([a-f0-9]+)\t([\s\S]+)$/.exec(line);if(!m)throw Error('不支持的源码项');return [m[3],m[2]]});
  fs.writeFileSync(receiptFile,JSON.stringify({repository:'saf1102/opentake-standard',version,commit:git(['rev-parse','HEAD']),files:Object.fromEntries(entries)}));
 }
-if(fs.existsSync(receiptFile)){
+if(target==='mac'&&fs.existsSync(receiptFile)){
  const receipt=JSON.parse(fs.readFileSync(receiptFile));
  if(receipt.repository!=='saf1102/opentake-standard'||!receipt.files)throw Error('源码来源记录无效，请交给智能体更新');
  for(const [rel,expected] of Object.entries(receipt.files)){
@@ -21,7 +30,6 @@ if(fs.existsSync(receiptFile)){
  }
  if(fs.existsSync(path.join(root,'.git'))){const result=spawnSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'});if(result.status!==0||result.stdout.trim())throw Error('源码工作区不干净，请交给智能体更新');}
 }
-const target=platform.buildTarget();
 const run=(command,args)=>{const r=spawnSync(command,args,{cwd:root,stdio:'inherit',env:{...process.env,CSC_IDENTITY_AUTO_DISCOVERY:'false'}});if(r.error)throw r.error;if(r.status!==0)throw Error(command+' 失败')};
 if(target==='mac'){
 const icons=path.join(root,'release','OpenTake.iconset');fs.mkdirSync(icons,{recursive:true});

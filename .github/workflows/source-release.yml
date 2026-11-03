@@ -41,7 +41,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          options=()
+          # Keep the combined desktop release and its Windows feed at Latest.
+          options=(--preserve-latest)
           if [ "$RESUME_DRAFT" = "true" ]; then
             options+=(--resume-draft)
           fi

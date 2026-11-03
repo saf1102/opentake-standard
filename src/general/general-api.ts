@@ -13,7 +13,7 @@ export type GeneralCreateInput = { styleId: string; settings: GeneralSettings; i
 export type GeneralPatch = { name?: string; settings?: GeneralSettings; inputs?: { text?: string; note?: string }; agent?: GeneralAgentChoice | null; network?: boolean }
 
 export type GeneralClient = {
-  list(): Promise<GeneralProjectSummary[]>
+  list(includeDeleted?: boolean): Promise<GeneralProjectSummary[]>
   get(id: string): Promise<GeneralProject>
   create(input: GeneralCreateInput): Promise<GeneralProject>
   patch(id: string, patch: GeneralPatch): Promise<GeneralProject>
@@ -71,7 +71,7 @@ const post = <T>(path: string, body?: unknown) => call<T>(path, {
 const projectPath = (id: string) => `/projects/${encodeURIComponent(id)}`
 
 const httpClient: GeneralClient = {
-  list: () => call<GeneralProjectSummary[]>('/projects').then(list => (Array.isArray(list) ? list : [])),
+  list: (includeDeleted=false) => call<GeneralProjectSummary[]>('/projects'+(includeDeleted?'?includeDeleted=1':'')).then(list => (Array.isArray(list) ? list : [])),
   get: id => call<GeneralProject>(projectPath(id)),
   create: input => post<GeneralProject>('/projects', input),
   patch: (id, patch) => call<GeneralProject>(projectPath(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }),
@@ -133,7 +133,9 @@ const httpClient: GeneralClient = {
 function client(){return editionClient(httpClient)}
 
 export const generalApi = {
-  list: () => client().then(c => c.list()),
+  list: (includeDeleted=false) => client().then(c => c.list(includeDeleted)),
+  restore: (id:string) => post<GeneralProject>(`${projectPath(id)}/restore`),
+  purge: (id:string) => post<void>(`${projectPath(id)}/purge`,{confirmProjectId:id}),
   get: (id: string) => client().then(c => c.get(id)),
   create: (input: GeneralCreateInput) => client().then(c => c.create(input)),
   patch: (id: string, patch: GeneralPatch) => client().then(c => c.patch(id, patch)),

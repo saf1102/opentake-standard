@@ -25,12 +25,12 @@ export function recentProjects<T extends ListedProject>(projects: readonly T[], 
 }
 
 /** A general project as a library row: the same shape as its summary, with times in milliseconds like 口播 projects. */
-export type GeneralLibraryProject = Omit<GeneralProjectSummary, 'updatedAt' | 'createdAt'> & { updatedAt: number; createdAt: number }
+export type GeneralLibraryProject = Omit<GeneralProjectSummary, 'updatedAt' | 'createdAt' | 'deletedAt'> & { updatedAt: number; createdAt: number; deletedAt?: number }
 
 const milliseconds = (iso: string) => { const value = Date.parse(iso); return Number.isFinite(value) ? value : 0 }
 
 export function generalLibraryProject(summary: GeneralProjectSummary): GeneralLibraryProject {
-  return { ...summary, kind: 'general', updatedAt: milliseconds(summary.updatedAt), createdAt: milliseconds(summary.createdAt) }
+  return { ...summary, deletedAt:summary.deletedAt?milliseconds(summary.deletedAt):undefined, kind: 'general', updatedAt: milliseconds(summary.updatedAt), createdAt: milliseconds(summary.createdAt) }
 }
 
 export const isGeneralProject = (project: object): project is GeneralLibraryProject => projectKind(project) === 'general'

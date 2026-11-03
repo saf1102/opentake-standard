@@ -1,9 +1,12 @@
+import {autoBackup} from '../editor/project-backups.ts';
+import {removeWithRetrySync} from '../file-ops.ts';
 /**
  * A layered film (film.json version 2) becomes a version's tracks: a snapshot of the agent's work folder in
  * versions/vN/work (the next turn rewrites work/) and versions/vN/layers.json, the 口播 editor's timeline shape that
  * the general page edits. Plain films (version 1) keep only their video.
  */
 import fs from 'node:fs';
+import {atomicJsonSync} from '../file-ops.ts';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -134,7 +137,7 @@ export async function snapshotLayers(dir: string, n: number, media: GeneralMedia
   const film = hf ? undefined : await normalize(work, path.join(dir, 'media'));
   if (!film && !hf) return undefined;
   const folder = path.join(dir, 'versions', `v${n}`), snap = path.join(folder, 'work');
-  fs.rmSync(folder, { recursive: true, force: true });
+  removeWithRetrySync(folder, { recursive: true, force: true });
   fs.mkdirSync(snap, { recursive: true });
   for (const name of fs.readdirSync(work)) if (!NOT_FILM.has(name)) fs.cpSync(path.join(work, name), path.join(snap, name), { recursive: true });
   const base = path.relative(dir, snap).split(path.sep).join('/');
@@ -183,6 +186,17 @@ export async function stylePresets(style: string): Promise<{ presets: Record<str
 }
 
 /** Write the person's edits of version n (versions/vN/edited.json). The agent's layers.json is never changed. */
+export function readGeneralLayers(id: string, n: number): { layers: GeneralLayers; edited: boolean } {
+  const { dir, project } = findGeneral(id);
+  if (!Number.isSafeInteger(n) || !project.versions.some(version => version.n === n && version.layersUrl))
+    throw Object.assign(new Error('这一版不存在或没有分轨'), { status: 404 });
+  const folder = path.join(dir, 'versions', `v${n}`);
+  const edited = fs.existsSync(path.join(folder, 'edited.json'));
+  const layers = JSON.parse(fs.readFileSync(path.join(folder, edited ? 'edited.json' : 'layers.json'), 'utf8')) as GeneralLayers;
+  return { layers, edited };
+}
+
+/** Write edits separately from the immutable version. */
 export function saveEdited(id: string, n: number, body: unknown) {
   const { dir, project } = findGeneral(id);
   const version = project.versions.find(v => v.n === n);
@@ -192,9 +206,9 @@ export function saveEdited(id: string, n: number, body: unknown) {
   const timeline = TimelineSchema.parse(layers.timeline);
   const original = JSON.parse(fs.readFileSync(path.join(dir, 'versions', `v${n}`, 'layers.json'), 'utf8')) as GeneralLayers;
   const next: GeneralLayers = { ...original, segments: Array.isArray(layers.segments) ? layers.segments : original.segments, duration: timeline.duration, ending: layers.ending ?? original.ending, finish: layers.finish ?? original.finish, timeline };
-  const file = path.join(dir, 'versions', `v${n}`, 'edited.json'), tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(next, null, 1));
-  fs.renameSync(tmp, file);
+  const file = path.join(dir, 'versions', `v${n}`, 'edited.json');
+  autoBackup(dir,'general');
+  atomicJsonSync(file, next, {indent:1});
   return { saved: true, at: new Date().toISOString() };
 }
 

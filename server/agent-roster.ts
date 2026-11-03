@@ -67,7 +67,7 @@ export function rosterExecutableCandidates(agent:RosterAgent,options:RosterOptio
  const home=options.home??os.homedir(),apps=options.applicationDirs??['/Applications',path.join(home,'Applications')];
  const env=options.env??tools.loginEnvironment();
  const dirs=[...new Set([...String(env.PATH||'').split(path.delimiter),path.join(home,'.local','bin'),path.join(home,'.npm-global','bin'),'/opt/homebrew/bin','/usr/local/bin',...(agent.dirs?.(home,apps)??[])].filter(dir=>path.isAbsolute(dir)))];
- return dirs.flatMap(dir=>agent.names.map(name=>path.join(dir,name)));
+ return dirs.flatMap(dir=>agent.names.map(name=>path.join(dir,process.platform==='win32'?name+'.exe':name))); 
 }
 /** One agent: its program on the login shell's PATH, in the folders installers use, or inside its maker's app. */
 export async function rosterAgentStatus(agent:RosterAgent,options:RosterOptions={}):Promise<RosterStatus>{

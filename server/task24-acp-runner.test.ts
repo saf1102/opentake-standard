@@ -1,3 +1,4 @@
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 /** Real runner/store/prepareWork + a fake ACP process; no model call, browser or rendering. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,8 +23,8 @@ test('任务24：实际runner走ACP预检、共享工具、模型记录、失败
  try{
   const id=fresh();active=id;startFirst(id);await wait(id,()=>findGeneral(id).project.run?.state==='failed');
   const {project,dir}=findGeneral(id);assert.match(project.run!.error||'',/当前订阅不包含/);assert.equal(project.run!.agent,'kimi');assert.equal(project.run!.transport,'acp');assert.equal(project.run!.model,'real-default');assert.equal(project.run!.modelSelection,'default');
-  assert.equal(fs.existsSync(path.join(dir,'work','.opentake','bin','film')),true);
-  const prompt=fs.readFileSync(path.join(dir,'work','prompt.txt'),'utf8');assert.match(prompt,/同题15秒模拟/);assert.match(prompt,/\.opentake\/guide-/);
+  assert.equal(fs.existsSync(path.join(dir,'work','.opentake','bin',process.platform==='win32'?'film.cmd':'film')),true);
+  const prompt=fs.readFileSync(path.join(dir,'work','prompt.txt'),'utf8');assert.match(prompt,/同题15秒模拟/);assert.match(prompt,/\.opentake[\\/]guide-/);
   const calls=fs.readFileSync(path.join(dir,'work','calls.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));assert.equal(calls.find(c=>c.method==='session/new').params.cwd,path.join(dir,'work'));assert.equal(calls.some(c=>c.method==='session/set_model'),false);
   assert.match(readSession(dir).turns[0].error||'',/订阅/);
   const records=fs.readdirSync(path.join(root,'settings','agent-runs')).filter(f=>f.endsWith('.json')).map(f=>JSON.parse(fs.readFileSync(path.join(root,'settings','agent-runs',f),'utf8')));assert.equal(records.some(r=>r.agent==='kimi'&&r.transport==='acp'&&r.model==='real-default'&&r.status==='failed'),true);
@@ -52,8 +53,9 @@ if(process.env.BUSY_AGENT==='codex'){
  const rl=require('node:readline').createInterface({input:process.stdin});rl.on('line',line=>{const m=JSON.parse(line);const reply=v=>out({jsonrpc:'2.0',id:m.id,...v});if(m.method==='initialize')reply({result:{protocolVersion:1}});else if(m.method==='session/new')reply({result:{sessionId:'fake-session',models:{currentModelId:'busy-model',availableModels:[{modelId:'busy-model',name:'Busy model'}]}}});else if(m.method==='session/set_model'){fs.writeFileSync('selected.txt',m.params.modelId);reply({result:{}})}else if(m.method==='session/prompt'){record(m.params.prompt[0].text);if(busy())reply({error:{code:503,message:'model overloaded'}});else{success();out({jsonrpc:'2.0',method:'session/update',params:{sessionId:'fake-session',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'需要联网检查素材'}}}});reply({result:{stopReason:'end_turn'}})}}});
 }
 `,{mode:0o755});
+ const codexFixture=fakeNodeCli(path.join(root,'codex-fixture'),fs.readFileSync(fake,'utf8'));
  let mode='always',agent:'kimi'|'codex'='kimi',resolved=0;
- setGeneralRuntime({busyRetryDelayMs:150,creationTools:async()=>undefined,resolveCodex:async()=>{resolved++;return {agent,...(agent==='kimi'?{transport:'acp' as const,args:[fake],executable:process.execPath}:{executable:fake}),method:'cli',model:'default',effort:'medium'}},baseEnv:()=>({PATH:process.env.PATH,BUSY_MODE:mode,BUSY_AGENT:agent}),agentReview:false,render:async()=>{throw Error('不应渲染')}});
+ setGeneralRuntime({busyRetryDelayMs:150,creationTools:async()=>undefined,resolveCodex:async()=>{resolved++;return {agent,...(agent==='kimi'?{transport:'acp' as const,args:[fake],executable:process.execPath}:{executable:codexFixture}),method:'cli',model:'default',effort:'medium'}},baseEnv:()=>({PATH:process.env.PATH,BUSY_MODE:mode,BUSY_AGENT:agent}),agentReview:false,render:async()=>{throw Error('不应渲染')}});
  const wait=async(id:string,condition:()=>boolean)=>{for(let i=0;i<300;i++){if(condition())return;await new Promise(r=>setTimeout(r,20))}throw Error(`等待超时：${findGeneral(id).project.run?.state}`)};
  const fresh=()=>createGeneral({styleId:'whiteboard',settings:{length:15,aspect:'16:9'},inputs:{kind:'topic',text:'模型繁忙模拟'},agent:{agent,model:'default',effort:'medium'}},'测试').project.id;
  let active:string|undefined;

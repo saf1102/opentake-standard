@@ -2,10 +2,14 @@ import { openScreenProjectProfile } from "./openscreen-profile.ts";
 export { openScreenProjectProfile } from "./openscreen-profile.ts";
 import { openScreenAppDataRoot, legacyWindowsHud } from "./openscreen-platform.ts";
 import { compatibleOpenScreenDocument } from "../../shared/openscreen-compat.ts";
+import platform from '../platform.ts';
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import {promisify} from 'node:util';
+import {ffprobePath} from '../general/kit-env.ts';
+import {recordingDocument} from '../../shared/openscreen-recording.ts';
 import type {
   EditProject,
   MediaAsset,
@@ -16,7 +20,11 @@ import {
   OpenScreenHostCandidateSchema,
   OpenScreenHostSessionSchema,
 } from "../../src/types/editor.ts";
-import { findOpenScreenExecutable, appBundleForExecutable, openScreenProfileArgs } from "./openscreen.ts";
+import { findOpenScreenExecutable, appBundleForExecutable, openScreenProfile, openScreenProfileArgs, listOpenScreenSources } from "./openscreen.ts";
+import { NativeRecordingController, type NativeRecordingState } from './native-recording.ts';
+import { correctNativeRecordingTime } from './native-recording-clock.ts';
+import { windowsRecordingHelper } from './native-recording-helper.ts';
+import { z } from 'zod';
 import { processMedia } from "./media.ts";
 import { createOpenScreenDocument } from "./openscreen-documents.ts";
 import { atomicJson, findProject, save } from "./store.ts";
@@ -43,6 +51,97 @@ function sessionFile(projectId: string, sessionId: string) {
 function persist(session: OpenScreenHostSession) {
   session.updatedAt = Date.now();
   atomicJson(sessionFile(session.projectId, session.id), session);
+  return session;
+}
+const unsavedHostSessions=new Map<string,OpenScreenHostSession>();
+function persistFromCallback(session:OpenScreenHostSession){
+  try{persist(session);unsavedHostSessions.delete(session.id)}catch(error){
+    session.status='failed';session.error=`保存录制会话失败：${error instanceof Error?error.message:String(error)}`;
+    unsavedHostSessions.set(session.id,session);
+    if(unsavedHostSessions.size>200)unsavedHostSessions.delete(unsavedHostSessions.keys().next().value!);
+  }
+}
+
+function sendRecordingState(state:NativeRecordingState) {
+  try{if(process.connected)process.send?.({recordingControl:state},undefined,undefined,()=>{})}catch{/* disconnected desktop */}
+}
+const nativeRecorder = new NativeRecordingController({onStateError:sendRecordingState,async finalize(input){
+  const raw=JSON.parse(fs.readFileSync(input.projectFile,'utf8'));
+  const video=raw.media?.screenVideoPath??raw.assets?.[0]?.originalPath;
+  if(typeof video!=='string'||!path.isAbsolute(video))throw Error('录制工程缺少本机视频路径；原始文件已保留。');
+  const timed=correctNativeRecordingTime(video);
+  const candidateRaw=structuredClone(raw);
+  if(candidateRaw.media)candidateRaw.media.screenVideoPath=timed.video;
+  else if(candidateRaw.assets?.[0])candidateRaw.assets[0].originalPath=timed.video;
+  const probe=JSON.parse((await promisify(execFile)(ffprobePath(),['-v','error','-show_format','-show_streams','-of','json',timed.video],{windowsHide:true,timeout:30_000})).stdout);
+  const stream=probe.streams?.find((s:any)=>s.codec_type==='video');
+  const [numerator,denominator]=String(stream?.r_frame_rate||'0/1').split('/').map(Number);
+  const document=recordingDocument(candidateRaw,{duration:Number(probe.format?.duration||stream?.duration),width:Number(stream?.width),height:Number(stream?.height),fps:numerator/denominator},
+    {id:`proj_${input.id}`,title:`录制 ${input.sourceName}`,createdAt:new Date().toISOString()});
+  atomicJson(managedCandidateFile({projectId:input.projectId,id:input.id}),document);
+},onState(state) {
+  const file = sessionFile(state.projectId, state.id);
+  if (!fs.existsSync(file)) throw Error('录制会话文件不存在；原始录制文件保留。');
+  const session = OpenScreenHostSessionSchema.parse(JSON.parse(fs.readFileSync(file, 'utf8')));
+  if(session.projectId!==state.projectId||session.id!==state.id)throw Error('录制会话与当前工程不匹配，未改写其他工程。');
+  session.recordingStartedAt = state.startedAt;
+  session.status = ({starting:'launching', recording:'recording', stopping:'stopping', saved:'selecting', failed:'failed'} as const)[state.phase];
+  session.error = state.error;
+  if (state.phase === 'saved') {
+    const candidate = candidateDocument(managedCandidateFile(session));
+    if (candidate) {session.candidates=[candidateMetadata(managedCandidateFile(session), candidate)];session.candidateFiles=session.candidates.map(c=>c.file);}
+    else {session.status='failed';session.error='录制已结束，但 OpenScreen 未生成可读取的工程；原始文件已保留。';}
+  }
+  persist(session);
+  sendRecordingState({...state,phase:session.status === 'failed' ? 'failed' : state.phase,error:session.error});
+}});
+
+function managedProjectFile(session: Pick<OpenScreenHostSession,'projectId'|'id'>) {
+  return path.join(sessionDir(session.projectId), `${session.id}.openscreen`);
+}
+function managedCandidateFile(session: Pick<OpenScreenHostSession,'projectId'|'id'>) {
+  return path.join(sessionDir(session.projectId), `${session.id}.import.openscreen`);
+}
+export const nativeRecordingStatus = () => ({supported:process.platform === 'win32', active:nativeRecorder.state});
+export const nativeRecordingBusy = () => nativeRecorder.busy;
+export const stopNativeRecording = (projectId:string, id:string) => nativeRecorder.stop(projectId,id);
+if (typeof process.send === 'function') process.on('message', message => {
+  const request = (message as {recordingStop?:{projectId?:string;id?:string}})?.recordingStop;
+  if (!request || typeof request.projectId !== 'string' || typeof request.id !== 'string') return;
+  try {nativeRecorder.stop(request.projectId,request.id)} catch { /* stale tray command must never stop another take */ }
+});
+
+const NativeRecordingRequest = z.object({
+  sourceId:z.string().min(1), sourceType:z.enum(['window','display']),
+  systemAudio:z.boolean().default(false), microphone:z.boolean().default(false),
+  durationSeconds:z.number().int().min(0).max(3600).default(0),
+});
+export async function startNativeRecording(projectId:string, input:unknown) {
+  if(process.platform !== 'win32') throw Error('此录制控制入口仅用于 Windows；请使用本机 OpenScreen 录制入口。');
+  if(nativeRecorder.busy) throw Error('已有录制正在启动、录制或保存，请先停止并保存。');
+  findProject(projectId,true);
+  const executable=findOpenScreenExecutable();
+  if(!executable) throw Error('未检测到用户安装的 OpenScreen，请安装后重试；现有工程已保留。');
+  const captureHelper=windowsRecordingHelper();
+  const request=NativeRecordingRequest.parse(input);
+  const sources=await listOpenScreenSources();
+  const source=sources.find(source=>source.id===request.sourceId && source.type===request.sourceType);
+  if(!source) throw Error('选择的窗口或屏幕已不可用，请刷新来源后重新选择。');
+  if(source.type==='window' && sources.filter(s=>s.type==='window' && s.name.toLowerCase().includes(source.name.toLowerCase())).length!==1)
+    throw Error('存在同名或标题包含关系的窗口，无法唯一确定录制对象；请先区分窗口标题。');
+  if(nativeRecorder.busy) throw Error('已有录制正在启动、录制或保存，请先停止并保存。');
+  const now=Date.now();
+  const session=OpenScreenHostSessionSchema.parse({id:crypto.randomUUID(),projectId,status:'launching',mode:'cli',
+    createdAt:now,updatedAt:now,sourceName:source.name,durationSeconds:request.durationSeconds||undefined});
+  persist(session);
+  const args=[...openScreenProfileArgs(), 'record', '--json', '--cursor','editable-overlay', '--project', managedProjectFile(session),
+    source.type==='window'?'--window':'--display',source.captureValue];
+  if(request.durationSeconds) args.push('--duration',String(request.durationSeconds));
+  if(request.systemAudio) args.push('--system-audio');
+  if(request.microphone) args.push('--mic');
+  nativeRecorder.start({projectId,id:session.id,sourceName:source.name,executable,args,env:{...process.env,OPENSCREEN_WGC_CAPTURE_EXE:captureHelper},
+    projectFile:managedProjectFile(session),durationSeconds:session.durationSeconds,
+    diagnosticFile:path.join(sessionDir(projectId),`${session.id}.diagnostic.json`)});
   return session;
 }
 
@@ -210,7 +309,7 @@ export function launchOpenScreenHud(projectId: string): OpenScreenHostSession {
   });
   persist(session);
   const profile = openScreenProjectProfile(projectId);
-  if (profile && process.platform !== "win32") fs.mkdirSync(profile, { recursive: true });
+  if (profile) fs.mkdirSync(profile, { recursive: true });
   const app = process.platform === "darwin" ? appBundleForExecutable(executable) : undefined;
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   const profileArgs = openScreenProfileArgs({ ...env, OPENSCREEN_USER_DATA_DIR: profile });
@@ -226,9 +325,7 @@ export function launchOpenScreenHud(projectId: string): OpenScreenHostSession {
     } catch { return false; }
   };
   child.once("close", (code, signal) => {
-    const failed = process.platform === "win32"
-      ? !oldWindows && code && !["completed", "cancelled"].includes(session.status)
-      : (code || signal) && !terminal();
+    const failed = (code || signal) && !terminal();
     if (failed) {
       session.status = "failed";
       session.error = `OpenScreen 启动失败（${signal || code}），请检查本机安装。`;
@@ -236,24 +333,37 @@ export function launchOpenScreenHud(projectId: string): OpenScreenHostSession {
     }
   });
   child.once("error", (error) => {
-    if (process.platform !== "win32" && terminal()) return;
+    if (terminal()) return;
     session.status = "failed";
     session.error = error.message;
-    persist(session);
+    persistFromCallback(session);
   });
   child.once("spawn", () => {
     child.unref();
-    if (process.platform !== "win32" && terminal()) return;
+    if (terminal()) return;
     session.status = "waiting";
-    persist(session);
+    persistFromCallback(session);
+    child.unref();
   });
   return session;
 }
 
 export function readOpenScreenHostSession(projectId: string, sessionId: string) {
   const file = sessionFile(projectId, sessionId);
+  const failed=unsavedHostSessions.get(sessionId);if(failed?.projectId===projectId)return {...failed};
   if (!fs.existsSync(file)) throw new Error("原生录制会话不存在");
   const session = OpenScreenHostSessionSchema.parse(JSON.parse(fs.readFileSync(file, "utf8")));
+  if(session.projectId!==projectId||session.id!==sessionId)throw Error('录制会话不属于当前工程，未操作其他工程。');
+  if(session.mode==='cli') {
+    if(['launching','recording','stopping','processing'].includes(session.status)
+      && (!nativeRecorder.busy || nativeRecorder.state?.id!==session.id)) {
+      const document=candidateDocument(managedCandidateFile(session));
+      if(document){session.candidates=[candidateMetadata(managedCandidateFile(session),document)];session.candidateFiles=session.candidates.map(c=>c.file);session.status='selecting';}
+      else{session.status='failed';session.error='录制控制服务已重启；原始录制文件保留，请检查后重新录制。';}
+      persist(session);
+    }
+    return session;
+  }
   if (["waiting", "recording", "processing", "selecting"].includes(session.status)) {
     session.candidates = sessionCandidates(session);
     session.candidateFiles = session.candidates.map((candidate) => candidate.file);
@@ -278,6 +388,8 @@ export function listOpenScreenHostSessions(projectId: string) {
 
 export function cancelOpenScreenHostSession(projectId: string, sessionId: string) {
   const session = readOpenScreenHostSession(projectId, sessionId);
+  if(session.mode==='cli' && ['launching','recording','stopping'].includes(session.status))
+    throw Error('录制仍在进行，请先停止并保存，不能只停止接收。');
   if (!["completed", "failed"].includes(session.status)) session.status = "cancelled";
   return persist(session);
 }
@@ -446,7 +558,7 @@ export async function importOpenScreenHostCandidate(
   } catch (error) {
     session.status = "failed";
     session.error = error instanceof Error ? error.message : String(error);
-    persist(session);
+    persistFromCallback(session);
     throw error;
   }
 }

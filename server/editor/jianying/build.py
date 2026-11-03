@@ -1,4 +1,4 @@
-"""Build a native Mac Jianying draft from the isolated export manifest.
+"""Build a native Jianying draft from the isolated export manifest.
 Requires the managed pyJianYingDraft==0.3.0 runtime. Never modifies user drafts.
 Schema reference: https://github.com/Vincentwei1021/video-shotcraft/blob/main/jianying-export/mac_draft.py
 """
@@ -10,6 +10,11 @@ import time
 import uuid
 import math
 import struct
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+if len(sys.argv) > 2 and sys.argv[2]:
+    sys.path.insert(0, str(Path(sys.argv[2]).resolve()))
+# Embedded Python ignores PYTHONPATH; use explicit package/script paths and UTF-8.
 import pyJianYingDraft as jy
 from native_masks import make_mask, mask_geometry, make_stroke, stroke_safe_framing
 from timing import placed_source_duration, normalize_frame_boundaries, bounded_source_duration, precise_audio_duration, jianying_draft_fps, non_overlapping_lanes
@@ -601,7 +606,7 @@ content.update(id=draft_id,name=m['name'],duration=m['duration'],create_time=now
 # Do not copy device identifiers from unrelated user drafts. Verify this minimal
 # platform record in the installed application before treating it as compatible.
 for key in ['platform','last_modified_platform']:
-    content[key].update(os='mac',app_source='lv')
+    content[key].update(os='windows' if sys.platform == 'win32' else 'mac',app_source='lv')
 records=[]
 for kind,typ in [('videos','video'),('audios','music')]:
     for v in content['materials'][kind]:

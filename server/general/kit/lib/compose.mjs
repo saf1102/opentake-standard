@@ -1,3 +1,4 @@
+import {removeWithRetrySync} from '../../../../desktop/file-ops.cjs';
 // Node side of the layered film (version 2): prepares the compositor page's inputs, captures frames through it,
 // applies segment transitions and the opening / ending fades on the encoded picture, and mixes the sound tracks.
 import fs from 'node:fs';
@@ -55,7 +56,7 @@ async function footageFrames(film) {
     const key = crypto.createHash('sha1').update(JSON.stringify([clip.media, stat.size, stat.mtimeMs, clip.in, clip.speed, clip.reverse, n, film.fps, size])).digest('hex').slice(0, 16);
     const dir = path.join(CACHE(), 'footage', `${clip.id}-${key}`);
     if (!fs.existsSync(path.join(dir, 'done'))) {
-      fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
+      removeWithRetrySync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
       const span = (clip.end - clip.start) * clip.speed + 2 / film.fps;
       const vf = [clip.reverse ? 'reverse' : '', `setpts=(PTS-STARTPTS)/${clip.speed}`, `fps=${film.fps}`, size, 'setsar=1'].filter(Boolean).join(',');
       await ffmpeg(['-ss', String(clip.in), '-t', String(span), '-i', file, '-an', '-vf', vf, '-frames:v', String(n), '-q:v', '3', path.join(dir, '%05d.jpg')]);

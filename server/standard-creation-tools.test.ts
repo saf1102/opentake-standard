@@ -1,3 +1,4 @@
+import {fakeNodeCli,runToolWrapper} from './test-support/fake-cli.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import http from 'node:http';import type {AddressInfo} from 'node:net';import {createRequire} from 'node:module';import {execFileSync} from 'node:child_process';
@@ -37,10 +38,10 @@ test('generate API rejects missing tools before run or work mutation; repaired r
 test('verified wrappers and kit use exact paths even after discovery environment changes',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),"pin tools ' 中文-"));
  try{
-  const file=path.join(root,"chosen ' tool");fs.writeFileSync(file,'#!/bin/sh\nprintf verified\n',{mode:0o755});
+  const file=fakeNodeCli(path.join(root,"chosen ' tool"),"process.stdout.write('verified')");
   const tools={python:file,ffmpeg:file,ffprobe:file,chromium:file,codex:file};
   const env=prepareWork(root,{PATH:'/missing',LINKREADER_PYTHON:'/missing',CW_HFX_CHROME:'/missing'},false,tools);
-  for(const name of ['python3','python','ffmpeg','ffprobe','chromium'])assert.equal(execFileSync(path.join(root,'work/.opentake/bin',name),[],{env,encoding:'utf8'}),'verified');
+  for(const name of ['python3','python','ffmpeg','ffprobe','chromium'])assert.equal(runToolWrapper(path.join(root,'work/.opentake/bin',name),env),'verified');
   assert.equal(env.CW_HFX_CHROME,file);assert.equal(env.CW_CHROME,file);assert.equal(env.CW_FFMPEG,file);assert.equal(env.CW_PYTHON,file);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'work/.opentake/tools.json'),'utf8')),tools);
  }finally{fs.rmSync(root,{recursive:true,force:true})}

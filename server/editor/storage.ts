@@ -5,6 +5,7 @@ import {allProjectCacheRoots} from './cache-location.ts';
 import {projectRoots,legacyProjectsRoot,settingsFile,projectPathOverridden} from '../system-settings.ts';
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import os from 'node:os';
 import {execFileAsync} from '../proc.ts';
 import {rootDir, atomicJson, findProject, save, readLock} from './store.ts';
@@ -32,7 +33,7 @@ async function walk(root:string, options:{skip?:Set<string>;accept?:(file:string
  const visit=async(dir:string)=>{
   let entries:fs.Dirent[];try{entries=await fs.promises.readdir(dir,{withFileTypes:true})}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return;throw e}
   for(const entry of entries){if(entry.isSymbolicLink())continue;const file=path.join(dir,entry.name);if(entry.isDirectory()){if(dir!==root||!options.skip?.has(entry.name))await visit(file)}else if(entry.isFile()&&(!options.accept||options.accept(file))){
-   let s:fs.Stats;try{s=await fs.promises.lstat(file)}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')continue;throw e}if(!s.isFile())continue;result.push({file,size:s.size,allocated:s.blocks*512,mtime:s.mtimeMs,ino:s.ino,dev:s.dev,nlink:s.nlink});
+   let s:fs.Stats;try{s=await fs.promises.lstat(file)}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')continue;throw e}if(!s.isFile())continue;result.push({file,size:s.size,allocated:Number.isFinite(s.blocks)?s.blocks*512:s.size,mtime:s.mtimeMs,ino:s.ino,dev:s.dev,nlink:s.nlink});
   }}
  };if(fs.existsSync(root)&&!fs.lstatSync(root).isSymbolicLink())await visit(root);return result;
 }
@@ -53,7 +54,7 @@ async function references(dirs:string[],targets:string[]){
  const add=(value:unknown,base:string,key='',skipDerived=false)=>{
   if(typeof value==='string'&&!(skipDerived&&derived.has(key))){
    if(value.length>4096||value.includes('\0')||/^(?:https?:|data:|blob:)/i.test(value))return;
-   let text=value;try{if(text.startsWith('file://'))text=decodeURIComponent(new URL(text).pathname)}catch{/* Keep the original reference when a file URL cannot be decoded. */}
+   let text=value;try{if(text.startsWith('file://'))text=fileURLToPath(text)}catch{/* Keep the original reference when a file URL cannot be decoded. */}
    if(path.isAbsolute(text))protectedFiles.add(resolve(text));
    else if(/^(?:\.{1,2}\/|media\/|cache\/|analysis\/|exports\/|assets\/|resources\/)/.test(text))protectedFiles.add(resolve(path.resolve(base,text)));
   }else if(Array.isArray(value))for(const v of value)add(v,base,key,skipDerived);
@@ -105,14 +106,14 @@ export async function storageOverview(projectId?:string){
 export async function cleanStorage(options:{projectId?:string;mode:'all'|'policy';archive?:boolean;dryRun?:boolean;reviewedFiles?:{path:string;mtime:number;ino:number}[];assertIdle:()=>void}){
  rootMemo=new Map();
  if(storageBusy)throw Error('正在管理缓存，请稍后重试');options.assertIdle();
- if(process.platform==='darwin'&&(projectRoots().some(root=>!fs.existsSync(root))||Object.values(placements()).some(p=>!p.removed&&!fs.existsSync(p.dir))))throw Error('有工程库离线，无法核对全部引用，请连接后清理');
+ if(projectRoots().some(root=>!fs.existsSync(root))||Object.values(placements()).some(p=>!p.removed&&!fs.existsSync(p.dir)))throw Error('有工程库离线，无法核对全部引用，请连接后清理');
  storageBusy=true;
  const gates:(()=>void)[]=[];
  const leases:Awaited<ReturnType<typeof acquireExportCacheLease>>[]=[];
  try{
   const dirs=projectDirs();const requested=options.projectId?dirs.filter(dir=>rawProject(dir).id===options.projectId):dirs;
-  if(options.mode==='all'&&requested.some(dir=>readLock(dir)||(process.platform==='darwin'&&readScreenLock(dir))))throw Error('请先关闭正在编辑的工程，再清理或归档');
-  const targets=options.mode==='policy'?requested.filter(dir=>!readLock(dir)&&(process.platform!=='darwin'||!readScreenLock(dir))):requested;
+  if(options.mode==='all'&&requested.some(dir=>readLock(dir)||readScreenLock(dir)))throw Error('请先关闭正在编辑的工程，再清理或归档');
+  const targets=options.mode==='policy'?requested.filter(dir=>!readLock(dir)&&!readScreenLock(dir)):requested;
   if(options.projectId&&!requested.length)throw Error('工程不存在');
   for(const dir of targets){const lease=await acquireExportCacheLease(dir);leases.push(lease);if(lease.otherReaders())throw Error('工程仍有导出进程正在使用缓存');gates.push(lease.beginMaintenance())}
   if(options.archive)for(const dir of targets)for(const asset of rawProject(dir).media||[]){if(asset.originalFile&&!fs.existsSync(path.resolve(dir,asset.originalFile)))throw Error('素材缺失，请先补齐再归档：'+asset.name)}

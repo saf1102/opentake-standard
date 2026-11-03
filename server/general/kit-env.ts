@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 import type {CreationTools} from '../../shared/creation-tools.ts';
 import {standardEdition} from './edition.ts';
 import {supportBin,ffmpegPath,ffprobePath,chromePath,pythonPath,fontDirs} from './runtime-tools.ts';
@@ -52,11 +53,11 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   if(standardEdition && process.platform==='win32'){
     // Batch paths are quoted and percent expansion escaped; never turn an arbitrary path into a shell command.
     const quote=(value:string)=>{if(/["\r\n]/.test(value))throw Error('工具路径含不支持的字符');return '"'+value.replaceAll('%','%%')+'"';};
-    const command=(exe:string,args:string[]=[])=>'@echo off\r\nsetlocal DisableDelayedExpansion\r\n'+(electron?'set "ELECTRON_RUN_AS_NODE=1"\r\n':'')+[exe,...args].map(quote).join(' ')+' %*\r\n';
-    Object.assign(wrappers,{node:command(node),film:command(node,[path.join(KIT_DIR,'film.mjs')]),hfx:command(node,[path.join(KIT_DIR,'hfx.mjs')]),python3:command(pythonPath()),ffmpeg:command(ffmpegPath()),ffprobe:command(ffprobePath())});
+    const command=(exe:string,args:string[]=[])=>'@echo off\r\n'+quote(path.join(process.env.SystemRoot||'C:\\Windows','System32','chcp.com'))+' 65001 >nul\r\nsetlocal DisableDelayedExpansion\r\n'+(electron?'set "ELECTRON_RUN_AS_NODE=1"\r\n':'')+[exe,...args].map(quote).join(' ')+' %*\r\n';
+    Object.assign(wrappers,{node:command(node),film:command(node,[path.join(KIT_DIR,'film.mjs')]),hfx:command(node,[path.join(KIT_DIR,'hfx.mjs')]),python3:command(python),ffmpeg:command(ffmpeg),ffprobe:command(ffprobe),chromium:command(chrome)});
   }
   if(verified?.chromium) {
-    wrappers.chromium = `#!/bin/sh\nexec ${shellQuote(chrome)} "$@"\n`;
+    if(process.platform!=='win32')wrappers.chromium = `#!/bin/sh\nexec ${shellQuote(chrome)} "$@"\n`;
     fs.writeFileSync(path.join(work,'.opentake','tools.json'),JSON.stringify(verified,null,2));
   }
   wrappers.python = wrappers.python3;
@@ -77,7 +78,7 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   const env: NodeJS.ProcessEnv = {
     ...base,
     ...(standardEdition && process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{ZDOTDIR:zdot}),
-    PATH: `${bin}${path.delimiter}${base.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'}`,
+    
     TMPDIR: tmp, TMPPREFIX: path.join(tmp, 'zsh', 'zsh'),
     CW_WORK: work, CW_MEDIA: path.join(projectDir, 'media'), CW_KIT: KIT_DIR, CW_BIN: bin,
     CW_FFMPEG: ffmpeg, CW_FFPROBE: ffprobe, CW_CHROME: chrome, ...(verified?.chromium?{CW_HFX_CHROME:chrome,PLAYWRIGHT_CHROMIUM_EXECUTABLE:chrome}:{}), CW_PYTHON: python, CW_NODE_MODULES: nodeModulesPath(),
@@ -90,5 +91,6 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
     ...(styleOf(projectDir) ? { CW_STYLE: styleOf(projectDir) } : {}),
   };
   delete env.CODEX_THREAD_ID;
-  return env;
+  const inheritedPath = platform.environmentPath(base) || (process.platform === 'win32' ? '' : '/usr/bin:/bin:/usr/sbin:/sbin');
+  return platform.environmentWithPath(env, `${bin}${path.delimiter}${inheritedPath}`);
 }

@@ -20,20 +20,11 @@ for (const platform of ['MacIntel','Win32']) test(`任务17：${platform} 工程
    return Response.json({ok:true,result});}) as typeof fetch;
   app=h.createRoot(document.getElementById('root'));await h.act(async()=>{app.render(h.picker((next:unknown)=>picked.push(next)));await new Promise(r=>setTimeout(r,5))});
   await h.act(async()=>{(document.querySelector('button') as HTMLButtonElement).click();await new Promise(r=>setTimeout(r,5))});
-  if(platform==='Win32'){
-   assert.equal(connectionRequests,0,'Windows must not call its unavailable connections endpoint');
-   assert.doesNotMatch(document.body.textContent||'',/已接通的智能体|Claude Code|Kimi|接入读取失败/);
-   const model=[...document.querySelectorAll('button')].find(b=>b.textContent==='模型M');assert.ok(model);assert.equal(model.disabled,false);
-   await h.act(async()=>model.click());assert.deepEqual(picked.at(-1),{model:'m',effort:'medium'},'legacy project choice has no new Agent field');
-   const standard=[...document.querySelectorAll('button')].find(b=>b.textContent?.startsWith('系统默认')&&b.className==='ge-model-opt');assert.ok(standard);assert.equal(standard.disabled,false);
-   await h.act(async()=>standard.click());assert.equal(picked.at(-1),undefined);
-  }else{
   assert.match(document.body.textContent||'',/Claude Code/);assert.doesNotMatch(document.body.textContent||'',/DeepSeek/);
   const kimi=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Kimi'));assert.equal(kimi,undefined,'任务24只列可出片接法；这个Kimi仅API且未安装');
   const claude=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Claude Code'));assert.ok(claude);await h.act(async()=>claude.click());assert.deepEqual(picked.at(-1),{agent:'claude',model:'default',effort:'medium'});
   claudeEnabled=false;await h.act(async()=>{window.dispatchEvent(new dom.window.Event('opentake-connections-changed'));await new Promise(r=>setTimeout(r,5))});assert.doesNotMatch(document.body.textContent||'',/Claude Code/);
   assert.ok(connectionRequests>0);
-  }
   await h.act(async()=>app.unmount());app=null;
  }finally{if(app)app.unmount();globalThis.fetch=oldFetch;dom.window.close();for(const [key,value] of saved){if(value)Object.defineProperty(globalThis,key,value);else delete (globalThis as any)[key]}fs.rmSync(temp,{recursive:true,force:true});}
 });

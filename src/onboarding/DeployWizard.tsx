@@ -3,7 +3,7 @@ import {useEffect,useRef,useState,type CSSProperties} from 'react';
 import {createPortal} from 'react-dom';
 import {useNavigate} from 'react-router';
 import {AgentMark} from '@/studio/components/AgentMark';
-import {IS_MAC} from '@/general/platform';
+import {UNIFIED_AGENTS} from '@/general/platform';
 import {refreshConnections,useConnections} from '@/studio/connection-store';
 import {ConnectionActions} from '@/studio/components/ConnectionActions';
 import {connectionDefinition,type ConnectionId,type ConnectionMode} from '@/studio/connections';
@@ -25,8 +25,8 @@ function Ring({ok,total}:{ok:number;total:number}){
 export function DeployButton(){
  useAccountAndFirstRun();
  const connections=useConnections();
- useEffect(()=>{if(IS_MAC)syncDeployConnections(connections.connections)},[connections.connections]);
- useEffect(()=>{if(IS_MAC)void refreshConnections()},[]);
+ useEffect(()=>{if(UNIFIED_AGENTS)syncDeployConnections(connections.connections)},[connections.connections]);
+ useEffect(()=>{if(UNIFIED_AGENTS)void refreshConnections()},[]);
  const s=summary(useDeploy());
  if(s.ready)return <button className="ot-deploy-nav is-ready" onClick={()=>setDeployOpen(true)} title="这台电脑已准备好，点开可以重新检查"><span className="ot-deploy-tick" aria-hidden="true">✓</span>已就绪</button>;
  return <button className="ot-deploy-nav" onClick={()=>setDeployOpen(true)} aria-label={`一键部署，必须项已就绪 ${s.okRequired} / ${s.required}`}>
@@ -47,11 +47,11 @@ export function DeployStrip(){
 export function DeployWizard(){
  const open=useDeployOpen(),snap=useDeploy(),s=summary(snap),navigate=useNavigate();
  const connections=useConnections();
- useEffect(()=>{if(IS_MAC)syncDeployConnections(connections.connections)},[connections.connections]);
+ useEffect(()=>{if(UNIFIED_AGENTS)syncDeployConnections(connections.connections)},[connections.connections]);
  const dialog=useRef<HTMLDivElement>(null);
  const [watching,setWatching]=useState<DeployItemId|null>(null);
  // every opening is a fresh check of this Mac
- useEffect(()=>{if(open){void runAll();if(IS_MAC)void refreshConnections()}},[open]);
+ useEffect(()=>{if(open){void runAll();if(UNIFIED_AGENTS)void refreshConnections()}},[open]);
  useEffect(()=>{if(!open)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setDeployOpen(false)};window.addEventListener('keydown',key);requestAnimationFrame(()=>dialog.current?.focus());return()=>window.removeEventListener('keydown',key)},[open]);
  // after a fix that happens elsewhere (Terminal, a browser, settings), check that row again until it is done
  useEffect(()=>{
@@ -66,7 +66,7 @@ export function DeployWizard(){
   else if(action.kind==='link'){window.open(action.target,'_blank','noreferrer');setWatching(id)}
   else if(action.kind==='system'){await fetch(`/api/editor/onboarding/system/${encodeURIComponent(action.target||'')}`,{method:'POST'})}
   else if(action.kind==='route'){setDeployOpen(false);navigate(action.target||'/')}
-  else{setDeployOpen(false);openSettings(action.target||'agents')}
+  else{setDeployOpen(false);openSettings(action.target||'agents',undefined,true)}
  };
  const manage=(agentId?:ConnectionId,mode?:ConnectionMode)=>{setDeployOpen(false);openSettings('agents',agentId,true,mode)};
  const prominent=(item:ConnectionView)=>item.cliInstalled||item.connected||item.hasKey||!!connections.waiting[item.id];
@@ -94,12 +94,12 @@ export function DeployWizard(){
      return [head,<div key={item.id} className="ot-deploy-item" data-s={state} style={{'--i':n++} as CSSProperties}>
       <span className="ot-deploy-st">{SYMBOL[state]}</span>
       <div><b>{item.title}</b><small>{msg}</small></div>
-      <span className="ot-deploy-slot">{item.id==='agent'&&IS_MAC?<span className="ot-deploy-agent-manage"><button type="button" disabled={connections.loading} onClick={()=>{void refreshConnections();void recheck('agent')}}>重新查找</button><button type="button" onClick={()=>manage()}>在设置里管理 →</button></span>:done&&result?.action&&(state==='act'||state==='opt'||(state==='ok'&&result.action.kind==='system'))?<button className="ot-deploy-act" onClick={()=>void act(item.id,result.action!)}>{watching===item.id?'等待完成…':result.action.label}</button>:optional&&state==='ok'?<span className="ot-deploy-tag">可选</span>:null}</span>
+      <span className="ot-deploy-slot">{item.id==='agent'&&UNIFIED_AGENTS?<span className="ot-deploy-agent-manage"><button type="button" disabled={connections.loading} onClick={()=>{void refreshConnections();void recheck('agent')}}>重新查找</button><button type="button" onClick={()=>manage()}>在设置里管理 →</button></span>:done&&result?.action&&(state==='act'||state==='opt'||(state==='ok'&&result.action.kind==='system'))?<button className="ot-deploy-act" onClick={()=>void act(item.id,result.action!)}>{watching===item.id?'等待完成…':result.action.label}</button>:optional&&state==='ok'?<span className="ot-deploy-tag">可选</span>:null}</span>
       {item.id==='perf'&&<div className={`ot-deploy-chips${done?'':' is-pending'}`}>{(result?.chips||['CPU','GPU','内存','系统','系统盘','硬件编码']).map(chip=><span key={chip}>{chip}</span>)}</div>}
-      {item.id==='agent'&&IS_MAC&&connections.error&&<p role="alert" className="ot-deploy-connection-error">{connections.error}</p>}
-      {item.id==='agent'&&IS_MAC&&connections.connections.length>0&&<><div className="ot-deploy-agents ot-deploy-auto-agents">{connections.connections.filter(item=>item.kind==='agent'&&prominent(item)).map(renderAgent)}</div>{connections.connections.some(item=>item.kind==='agent'&&!prominent(item))&&<details className="ot-deploy-agent-more"><summary>更多智能体 · {connections.connections.filter(item=>item.kind==='agent'&&!prominent(item)).length} 个未安装</summary><div className="ot-deploy-agents ot-deploy-auto-agents">{connections.connections.filter(item=>item.kind==='agent'&&!prominent(item)).map(renderAgent)}</div></details>}</>}
+      {item.id==='agent'&&UNIFIED_AGENTS&&connections.error&&<p role="alert" className="ot-deploy-connection-error">{connections.error}</p>}
+      {item.id==='agent'&&UNIFIED_AGENTS&&connections.connections.length>0&&<><div className="ot-deploy-agents ot-deploy-auto-agents">{connections.connections.filter(item=>item.kind==='agent'&&prominent(item)).map(renderAgent)}</div>{connections.connections.some(item=>item.kind==='agent'&&!prominent(item))&&<details className="ot-deploy-agent-more"><summary>更多智能体 · {connections.connections.filter(item=>item.kind==='agent'&&!prominent(item)).length} 个未安装</summary><div className="ot-deploy-agents ot-deploy-auto-agents">{connections.connections.filter(item=>item.kind==='agent'&&!prominent(item)).map(renderAgent)}</div></details>}</>}
 
-      {item.id==='agent'&&(!IS_MAC||!connections.connections.length)&&<div className="ot-deploy-agents">{(result?.agents||pendingAgents.map(id=>({id,name:{codex:'Codex',claude:'Claude Code',kimi:'Kimi',deepseek:'DeepSeek',minimax:'MiniMax Code',codebuddy:'CodeBuddy',copilot:'GitHub Copilot',cursor:'Cursor',opencode:'OpenCode',qwen:'Qwen Code'}[id],line:'',state:'off' as const,status:''}))).map(tile=>
+      {item.id==='agent'&&(!UNIFIED_AGENTS||!connections.connections.length)&&<div className="ot-deploy-agents">{(result?.agents||pendingAgents.map(id=>({id,name:{codex:'Codex',claude:'Claude Code',kimi:'Kimi',deepseek:'DeepSeek',minimax:'MiniMax Code',codebuddy:'CodeBuddy',copilot:'GitHub Copilot',cursor:'Cursor',opencode:'OpenCode',qwen:'Qwen Code'}[id],line:'',state:'off' as const,status:''}))).map(tile=>
        <div key={tile.id} className={`ot-deploy-agent${!result?' is-pending':tile.state==='on'?' is-on':tile.state==='off'?' is-off':''}`}>
         <span className="ot-deploy-logo"><AgentMark id={tile.id as AgentId} size={24}/></span>
         <b><i/>{tile.name}</b><small>{result?tile.line:' '}</small><span>{result?tile.status:state==='checking'?'检查中…':'等待检查'}</span>

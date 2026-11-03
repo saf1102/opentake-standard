@@ -6,8 +6,12 @@ dist/
 ._*
 release/
 .venv/
+__pycache__/
+*.py[cod]
 
 # Generated source provenance; never commit local receipts.
 /release-source.json
 
 /.setup-state.json
+.build/
+native/windows/

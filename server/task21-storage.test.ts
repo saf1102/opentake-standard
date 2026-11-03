@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {setPlacement,relocatedReferences} from './editor/migration-state.ts';
 import {findProject,save,scan} from './editor/store.ts';
 import {listBackups,restoreBackup} from './editor/project-backups.ts';
 import {cleanStorage,storageOverview} from './editor/storage.ts';
@@ -35,4 +37,30 @@ test('S06 自动备份关闭生效，彻底删除只接受回收站实体目录'
 
 test('S06 活跃录屏窗口锁阻止清理，备份录屏文件校验失败不恢复',async()=>{
  const f=fixture();try{fs.writeFileSync(path.join(f.dir,'analysis/openscreen/editor-lock.json'),JSON.stringify({clientId:'active',expiresAt:Date.now()+30000}));await assert.rejects(cleanStorage({projectId:f.id,mode:'all',assertIdle(){}}),/关闭正在编辑/);const p=findProject(f.id).project;save(f.dir,p);const [b]=listBackups();const file=path.join(b.root,'snapshots',b.projectId,b.id+'.json'),snapshot=JSON.parse(fs.readFileSync(file,'utf8'));snapshot.recordingFiles[0].text='tampered';fs.writeFileSync(file,JSON.stringify(snapshot));assert.equal(listBackups().length,0);await assert.rejects(restoreBackup(b.id),/校验失败/);}finally{f.cleanup();}
+});
+
+test('Windows/Posix file URL 保留缓存引用，并正确迁移中文与空格路径',async()=>{
+ const f=fixture();try{
+  const cache=path.join(f.dir,'cache/thumbnails');fs.mkdirSync(cache,{recursive:true});
+  const keep=path.join(cache,'保留 画面.jpg'),unused=path.join(cache,'unused.jpg');
+  fs.writeFileSync(keep,'referenced');fs.writeFileSync(unused,'unused');
+  fs.writeFileSync(path.join(f.dir,'analysis/references.json'),JSON.stringify({sourceFile:pathToFileURL(keep).href}));
+  await cleanStorage({projectId:f.id,mode:'all',assertIdle(){}});
+  assert.equal(fs.readFileSync(keep,'utf8'),'referenced');assert.equal(fs.existsSync(unused),false);
+  const moved=path.join(f.root,'新 位置.jpg');
+  setPlacement({id:f.id,dir:f.dir,previous:[],aliases:{[keep]:moved},project:findProject(f.id).project as unknown as Record<string,unknown>});
+  assert.deepEqual(relocatedReferences({file:pathToFileURL(keep).href},f.id,f.dir),{file:moved});
+ }finally{f.cleanup();}
+});
+
+test('录屏备份拒绝反斜杠路径穿越，恢复不写入备份目录外',async()=>{
+ const f=fixture();try{
+  save(f.dir,findProject(f.id).project);const [backup]=listBackups();
+  const file=path.join(backup.root,'snapshots',backup.projectId,backup.id+'.json');
+  const snapshot=JSON.parse(fs.readFileSync(file,'utf8'));
+  snapshot.recordingFiles[0].path='analysis/openscreen/..\\..\\outside.txt';
+  fs.writeFileSync(file,JSON.stringify(snapshot));
+  assert.equal(listBackups().length,0);await assert.rejects(restoreBackup(backup.id),/校验失败/);
+  assert.equal(fs.existsSync(path.join(f.root,'outside.txt')),false);
+ }finally{f.cleanup();}
 });

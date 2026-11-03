@@ -66,6 +66,7 @@ export const applyFilmAgentEvent=(id:FilmAgentId,steps:GeneralStep[],event:Recor
 
 /** Reuse the existing process-group transport, including descendant cancellation and event log handling. */
 export function startFilmAgent(agent:ResolvedFilmAgent,args:string[],options:Parameters<typeof startCodex>[2] & {lastMessage?:string;images?:string[];projectRoot?:string}):CodexProcess {
+  assertAgentWorkAllowed(agent.agent||'codex');
   const id=filmAgentId(agent);
   // Kept immediately before transport start; even stale jobs must re-read the current switch.
   assertAgentWorkAllowed(id);

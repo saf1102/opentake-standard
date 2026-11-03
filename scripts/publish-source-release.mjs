@@ -30,7 +30,7 @@ export function findReleaseByTag(repo,tag,run=gh){
  if(matches.length>1)throw new Error('Ambiguous release tag; refusing publication');
  return matches[0]??null;
 }
-export function publishSourceRelease({folder,repo=process.env.GITHUB_REPOSITORY,resumeDraft=false,run=gh}){
+export function publishSourceRelease({folder,repo=process.env.GITHUB_REPOSITORY,resumeDraft=false,makeLatest=true,run=gh}){
  if(!folder||repo!==PUBLIC_REPOSITORY)throw new Error('Only the official Standard repository can publish this source snapshot');
  const manifest=JSON.parse(fs.readFileSync(path.join(folder,'source-release.json'),'utf8'));
  if(manifest.localCandidate)throw new Error('Local acceptance candidates cannot be published');
@@ -83,7 +83,7 @@ export function publishSourceRelease({folder,repo=process.env.GITHUB_REPOSITORY,
   if(ref.object?.type!=='commit'||ref.object.sha!==manifest.commit)throw new Error('Existing tag does not identify the selected commit; draft kept unpublished');
  }
  // Publishing by numeric release ID works before the draft's tag exists.
- run(['api',`${api}/releases/${id}`,'--method','PATCH','-F','draft=false','-f','make_latest=true']);
+ run(['api',`${api}/releases/${id}`,'--method','PATCH','-F','draft=false','-f',`make_latest=${makeLatest}`]);
  const published=JSON.parse(String(run(['api',`${api}/releases/${id}`])));
  if(published.id!==id||published.draft!==false||published.tag_name!==manifest.tag)throw new Error('Publication state not confirmed; inspect the existing release, do not replace it');
  return {releaseId:id,tag:manifest.tag,url:`https://github.com/${repo}/releases/tag/${manifest.tag}`,resumed:resumeDraft};
@@ -91,8 +91,8 @@ export function publishSourceRelease({folder,repo=process.env.GITHUB_REPOSITORY,
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{
   const args=process.argv.slice(2);
-  if(args[0]!=='--bundle'||!args[1]||args.length>3||(args[2]&&args[2]!=='--resume-draft'))throw new Error('Usage: --bundle prepared-folder [--resume-draft]');
-  const result=publishSourceRelease({folder:args[1],resumeDraft:args[2]==='--resume-draft'});
+  if(args[0]!=='--bundle'||!args[1]||args.slice(2).some(arg=>!['--resume-draft','--preserve-latest'].includes(arg))||new Set(args.slice(2)).size!==args.slice(2).length)throw new Error('Usage: --bundle prepared-folder [--resume-draft] [--preserve-latest]');
+  const result=publishSourceRelease({folder:args[1],resumeDraft:args.includes('--resume-draft'),makeLatest:!args.includes('--preserve-latest')});
   console.log(`Published ${result.url}`);
  }catch(error){console.error(error instanceof SyntaxError?'Invalid release metadata; refusing publication.':error.message);process.exitCode=1;}
 }

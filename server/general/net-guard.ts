@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from '../file-ops.ts';
 import {resolvePython} from './python-runtime.ts';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -70,7 +71,7 @@ export function quarantineSoftware(work: string, dest: string, allowed: string[]
   const move = (rel: string) => {
     const target = path.join(dest, rel);
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.renameSync(path.join(work, rel), fs.existsSync(target) ? `${target}.${Date.now()}` : target);
+    renameWithRetrySync(path.join(work, rel), fs.existsSync(target) ? `${target}.${Date.now()}` : target);
     moved.push(rel);
   };
   const walk = (dir: string) => {

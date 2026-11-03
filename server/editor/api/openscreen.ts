@@ -15,6 +15,8 @@ import {
   launchOpenScreenHud,
   listOpenScreenHostSessions,
   readOpenScreenHostSession,
+  startNativeRecording,
+  stopNativeRecording,
 } from "../openscreen-host.ts";
 import {
   compactOpenScreenCodexSession,
@@ -44,7 +46,7 @@ export type ScreenRouteContext={req:IncomingMessage;res:ServerResponse;parts:str
 export async function handleOpenScreenApi(ctx: ScreenRouteContext): Promise<boolean> {
   if(await handleScreenEditionApi(ctx))return true;
   const { req, res, parts, id, dir } = ctx;
-  if(process.platform==='darwin'&&parts[2]==='openscreen'&&parts[3]==='lock'&&parts.length===4&&req.method==='POST')
+  if(parts[2]==='openscreen'&&parts[3]==='lock'&&parts.length===4&&req.method==='POST')
     return handled(sendJson(res,200,{ok:true,result:acquireScreenLock(dir,await bodyJson(req))}));
   if (parts[2] === "openscreen" && parts[3] === "documents" && parts.length === 4) {
     if (req.method === "GET")
@@ -97,14 +99,14 @@ export async function handleOpenScreenApi(ctx: ScreenRouteContext): Promise<bool
         return handled(sendJson(res, 423, { ok: false, error: "工程正由其他设备编辑", lock }));
       return handled(sendJson(res, 200, {
         ok: true,
-        result: cancelOpenScreenExport(id, documentId, parts[6]),
+        result: await cancelOpenScreenExport(id, documentId, parts[6]),
       }));
     }
     if (parts[5] === "reveal" && req.method === "POST") {
       const body = await bodyJson(req);
       return handled(sendJson(res, 200, {
         ok: true,
-        result: revealOpenScreenExport(id, body.path),
+        result: await revealOpenScreenExport(id, body.path),
       }));
     }
     if (parts[5] === "captions" && parts[6] === "translate" && req.method === "POST") {
@@ -233,12 +235,21 @@ export async function handleOpenScreenApi(ctx: ScreenRouteContext): Promise<bool
       const lock = readLock(dir);
       if (lock && lock.clientId !== String(body.clientId || ""))
         return handled(sendJson(res, 423, { ok: false, error: "工程正由其他设备编辑", lock }));
+      if (body.mode === 'cli') return handled(sendJson(res, 201, {ok:true,result:await startNativeRecording(id,body)}));
+      if (process.platform === 'win32') throw Error('请在 Standard 的录制面板中选择窗口或屏幕，然后开始录制。');
       return handled(sendJson(res, 201, { ok: true, result: launchOpenScreenHud(id) }));
     }
   }
   if (parts[2] === "openscreen" && parts[3] === "host-sessions" && parts[4]) {
     if (parts.length === 5 && req.method === "GET")
       return handled(sendJson(res, 200, { ok: true, result: readOpenScreenHostSession(id, parts[4]) }));
+    if(parts[5] === 'stop' && req.method === 'POST') {
+      const body=await bodyJson(req),lock=readLock(dir);
+      if(lock && lock.clientId !== String(body.clientId||''))
+        return handled(sendJson(res,423,{ok:false,error:'工程正由其他设备编辑',lock}));
+      stopNativeRecording(id,parts[4]);
+      return handled(sendJson(res,200,{ok:true,result:readOpenScreenHostSession(id,parts[4])}));
+    }
     if (parts[5] === "cancel" && req.method === "POST") {
       const body = await bodyJson(req);
       const lock = readLock(dir);

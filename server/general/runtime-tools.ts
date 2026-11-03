@@ -11,6 +11,7 @@ export function chromePath(){
  const file=process.env.CW_CHROME || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
  if(file && executable(file))return file;
  const resolved=chromium.executablePath(); if(executable(resolved))return resolved;
+ const headless=chromium.executablePath().replace(/chromium-(\d+)[\\/]chrome-win64[\\/]chrome.exe$/,'chromium_headless_shell-$1/chrome-headless-shell-win64/chrome-headless-shell.exe');if(process.platform==='win32'&&executable(headless))return headless;
  throw new Error('请准备 Playwright Chromium，或设置 PLAYWRIGHT_CHROMIUM_EXECUTABLE。');
 }
 export const pythonPath=resolvePython;

@@ -1,3 +1,4 @@
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -58,6 +59,7 @@ test('P11 实际检测路径、工程隔离 profile、启动失败落盘与取�
     // Only process launch and project discovery are faked; session persistence,
     // failure transitions and profile selection execute the production module.
     const built=await build({entryPoints:['server/editor/openscreen-host.ts'],bundle:true,write:false,format:'cjs',platform:'node',packages:'external',plugins:[{name:'host-boundaries',setup(b){
+      b.onResolve({filter:/(?:platform|file-ops|media-tools|agent-installation|agent-settings|openscreen|kit-env|static-assets|native-recording-helper)\.ts$/},a=>({path:path.resolve(path.dirname(a.importer),a.path),external:true}));
       // Standard's platform adapter uses import.meta.url to locate its real CJS
       // implementation. Keep that module native; bundling it as CJS erases the URL.
       b.onResolve({filter:/^\.\.\/platform\.ts$/},args=>({path:path.resolve(path.dirname(args.importer),args.path),external:true}));
@@ -66,14 +68,14 @@ test('P11 实际检测路径、工程隔离 profile、启动失败落盘与取�
       b.onResolve({filter:/^\.\/media\.ts$/},()=>({path:'media',namespace:'fixture'}));
       b.onResolve({filter:/^\.\/openscreen-documents\.ts$/},()=>({path:'documents',namespace:'fixture'}));
       b.onResolve({filter:/^\.\/openscreen-capture\.ts$/},()=>({path:'capture',namespace:'fixture'}));
-      b.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path==='spawn' ? `import {EventEmitter} from 'node:events'; export let calls=[]; export let child; export function spawn(command,args,options){child=new EventEmitter();child.unref=()=>{};calls.push({command,args,options,child});return child;} export const spawnSync=()=>({status:0,stdout:'2.1.2'});` : args.path==='store' ? `import fs from 'node:fs';import path from 'node:path'; export const findProject=(id)=>({dir:path.join(${JSON.stringify(root)},id),project:{}}); export const atomicJson=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(value));}; export const save=()=>{};` : args.path==='media' ? 'export const processMedia=async()=>{};' : args.path==='documents' ? 'export const createOpenScreenDocument=()=>{};' : 'export const activeCaptureJobs=()=>0;'}));
+      b.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path==='spawn' ? `import {EventEmitter} from 'node:events'; export let calls=[]; export let child; export function spawn(command,args,options){child=new EventEmitter();child.unref=()=>{};calls.push({command,args,options,child});return child;} export const execFile=()=>{throw Error('unexpected recording process')}; export const spawnSync=()=>({status:0,stdout:'2.1.2'});` : args.path==='store' ? `import fs from 'node:fs';import path from 'node:path'; export const findProject=(id)=>({dir:path.join(${JSON.stringify(root)},id),project:{}}); export const atomicJson=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(value));}; export const save=()=>{};` : args.path==='media' ? 'export const processMedia=async()=>{};' : args.path==='documents' ? 'export const createOpenScreenDocument=()=>{};' : 'export const activeCaptureJobs=()=>0;'}));
     }}],stdin:undefined});
     // Expose the injected process boundary alongside the actual host exports.
     const source=built.outputFiles[0].text.replace(/var calls = \[\];/, 'var calls = []; globalThis.__task20Calls = calls;');
     const mod={exports:{} as any}; new Function('require','module','exports',source)(createRequire(import.meta.url),mod,mod.exports);
     const api=mod.exports;
-    const executable=path.join(root,'Detected OpenScreen.app','Contents','MacOS','Openscreen');
-    fs.mkdirSync(path.dirname(executable),{recursive:true});fs.writeFileSync(executable,'#!/bin/sh\nexit 0\n');fs.chmodSync(executable,0o755);
+    let executable=path.join(root,'Detected OpenScreen.app','Contents','MacOS','Openscreen');
+    fs.mkdirSync(path.dirname(executable),{recursive:true});executable=fakeNodeCli(executable,"console.log('2.1.2')");
     const oldBin=process.env.OPENSCREEN_BIN,oldNode=process.env.ELECTRON_RUN_AS_NODE;
     process.env.OPENSCREEN_BIN=executable;process.env.ELECTRON_RUN_AS_NODE='1';
     try {
@@ -105,6 +107,7 @@ test('P09 文档保存往返：保留 v8 原件、写入 v7、revision 备份和
   try {
     const project={id:'p',revision:0,sourceTranscripts:[],media:[{id:'a'}],timeline:{tracks:[]},openScreenDocuments:[]};
     const built=await build({entryPoints:['server/editor/openscreen-documents.ts'],bundle:true,write:false,format:'cjs',platform:'node',packages:'external',plugins:[{name:'document-project-boundary',setup(b){
+      b.onResolve({filter:/(?:platform|file-ops|media-tools|agent-installation|agent-settings|openscreen|kit-env|static-assets|native-recording-helper)\.ts$/},a=>({path:path.resolve(path.dirname(a.importer),a.path),external:true}));
       b.onResolve({filter:/^\.\/store\.ts$/},()=>({path:'store',namespace:'fixture'}));
       b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`import fs from 'node:fs'; import path from 'node:path'; const project=${JSON.stringify(project)}; export const findProject=()=>({dir:${JSON.stringify(root)},project}); export const atomicJson=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(value));}; export const save=()=>{};`}));
     }}]});

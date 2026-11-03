@@ -16,6 +16,7 @@ import { LoginBackdrop } from '@/desktop/LoginBackdrop'
 import '@/workspace/workspace-home.css'
 import { DeployStrip } from '@/onboarding/DeployWizard'
 import {homeHasKoubo, loadHomeEditorProjects} from '@/workspace/home-edition'
+import {openUpgrade} from '@/standard/Upgrade'
 
 /** Entrance loops. Until real clips are placed here the slots stay a neutral dark frame; a missing file only hides the video. */
 const HOME_LOOPS: Record<'koubo' | 'general' | 'publish', { src: string; poster?: string }> = {
@@ -353,7 +354,7 @@ export default function WorkspaceHome() {
             <h2 id="home-entry-koubo">口播剪辑{!homeHasKoubo && <span className="home-only standard-pro-badge">Pro</span>}</h2>
             <p className="home-entry__line">导入口播原片，粗剪、动效、配乐，每一步都能精细调整。</p>
             <div className="home-entry__actions">
-              {homeHasKoubo ? <button ref={kouboButton} type="button" className="home-entry__button" aria-haspopup="dialog" aria-expanded={intakeOpen} aria-controls="home-intake" onClick={() => setIntakeOpen(true)}>新建口播工程<ChevronRight size={16} aria-hidden="true" /></button> : <Link className="home-entry__button" to="/pro/koubo">升级到 Pro<ChevronRight size={16} aria-hidden="true" /></Link>}
+              {homeHasKoubo ? <button ref={kouboButton} type="button" className="home-entry__button" aria-haspopup="dialog" aria-expanded={intakeOpen} aria-controls="home-intake" onClick={() => setIntakeOpen(true)}>新建口播工程<ChevronRight size={16} aria-hidden="true" /></button> : <button type="button" className="home-entry__button" aria-haspopup="dialog" onClick={openUpgrade}>升级到 Pro<ChevronRight size={16} aria-hidden="true" /></button>}
               {status && <span className="home-entry__status" role="status"><i className="home-dot" data-kind="koubo" aria-hidden="true" />{status}</span>}
             </div>
           </div>
@@ -376,7 +377,7 @@ export default function WorkspaceHome() {
             <h2 id="home-entry-publish">文案发布{!homeHasKoubo && <span className="home-only standard-pro-badge">Pro</span>}</h2>
             <p className="home-entry__line">写稿、审核、标题简介、封面，一键填进各平台发布页。</p>
             <div className="home-entry__actions">
-              <Link className="home-entry__button" to={homeHasKoubo ? "/publish" : "/pro/publish"}>{homeHasKoubo ? "新建稿子" : "升级到 Pro"}<ChevronRight size={16} aria-hidden="true" /></Link>
+              {homeHasKoubo ? <Link className="home-entry__button" to="/publish">新建稿子<ChevronRight size={16} aria-hidden="true" /></Link> : <button type="button" className="home-entry__button" aria-haspopup="dialog" onClick={openUpgrade}>升级到 Pro<ChevronRight size={16} aria-hidden="true" /></button>}
             </div>
           </div>
           <HomeLoop source={HOME_LOOPS.publish} />

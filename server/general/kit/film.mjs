@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {renameWithRetrySync,removeWithRetrySync,cleanupPathSync} from '../../../desktop/file-ops.cjs';
 // OpenTake film kit: `film <command>` (the wrapper in .opentake/bin runs this file). Run it in the film folder.
 // Commands are listed by `film help` and in MANUAL.md. Nothing here touches the network.
 import fs from 'node:fs';
@@ -67,7 +68,7 @@ const commands = {
     const target = argv[0];
     const dir = path.join(WORK, 'look');
     fs.mkdirSync(dir, { recursive: true });
-    for (const f of fs.readdirSync(dir)) if (/^(t_|sheet).*\.jpg$/.test(f)) fs.rmSync(path.join(dir, f));
+    for (const f of fs.readdirSync(dir)) if (/^(t_|sheet).*\.jpg$/.test(f)) removeWithRetrySync(path.join(dir, f));
     if (target && !/^[\d.]+(-[\d.]+)?$/.test(target)) return lookVideo(path.resolve(WORK, target), dir, every ? Number(every) : undefined);
     const film = readFilm();
     let [a, b] = target ? target.split('-').map(Number) : [0, film.duration];
@@ -96,7 +97,7 @@ const commands = {
     if (film.version === 2) return renderV2(film);
     const workers = Math.max(1, Math.min(6, Number(opt('--workers', String(Math.min(3, Math.max(1, Math.floor(os.cpus().length / 4))))))));
     const work = path.join(WORK, 'out', '.render');
-    fs.rmSync(work, { recursive: true, force: true });
+    removeWithRetrySync(work, { recursive: true, force: true });
     fs.mkdirSync(work, { recursive: true });
     const totalFrames = film.shots.reduce((n, s) => n + frames(s.dur, film.fps), 0);
     let done = 0, last = 0;
@@ -118,13 +119,13 @@ const commands = {
     for (const shot of film.shots) {
       const parts = tasks.filter(t => t.shot === shot).map(t => t.file);
       const file = path.join(work, `shot${shot.index}.mp4`);
-      if (parts.length === 1) fs.renameSync(parts[0], file);
+      if (parts.length === 1) renameWithRetrySync(parts[0], file);
       else { fs.writeFileSync(path.join(work, `list${shot.index}.txt`), parts.map(p => `file '${path.basename(p)}'`).join('\n')); await ffmpeg(['-f', 'concat', '-safe', '0', '-i', `list${shot.index}.txt`, '-c', 'copy', path.basename(file)], { cwd: work }); }
       shotFiles.push(file);
     }
     const out = path.join(WORK, 'out', 'video.mp4');
     await joinShots(film, shotFiles, out);
-    fs.rmSync(work, { recursive: true, force: true });
+    removeWithRetrySync(work, { recursive: true, force: true });
     writeProgress({ step: 'render', detail: '画面渲染完成', progress: { done: round(totalFrames / film.fps), total: round(totalFrames / film.fps) } });
     say(`完成：${rel(out)}，${totalFrames} 帧，用时 ${((Date.now() - t0) / 1000).toFixed(0)} 秒`);
   },
@@ -152,7 +153,7 @@ const commands = {
       ...(audio ? ['-filter_complex', `${chain}[a]`, '-map', '0:v', '-map', '[a]'] : ['-map', '0:v', '-map', '1:a']),
       '-t', String(vdur), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', tmp];
     await ffmpeg(args);
-    fs.renameSync(tmp, out);
+    renameWithRetrySync(tmp, out);
     const after = audio ? await integrated(out) : undefined;
     say(`完成：${rel(out)}，${vdur.toFixed(2)} 秒，${loud}${after ? `，成片实测 ${after}` : ''}`);
   },
@@ -337,7 +338,7 @@ async function deterministicV2(film, times) {
 async function renderV2(film) {
   const workers = Math.max(1, Math.min(6, Number(opt('--workers', String(Math.min(3, Math.max(1, Math.floor(os.cpus().length / 4))))))));
   const work = path.join(WORK, 'out', '.render');
-  fs.rmSync(work, { recursive: true, force: true }); fs.mkdirSync(work, { recursive: true });
+  removeWithRetrySync(work, { recursive: true, force: true }); fs.mkdirSync(work, { recursive: true });
   const total = frames(film.duration, film.fps), t0 = Date.now();
   let done = 0, last = 0;
   const tick = () => { done++; if (done - last >= 30 || done === total) { last = done; writeProgress({ step: 'render', detail: '逐帧渲染', progress: { done: round(done / film.fps), total: round(total / film.fps) } }); } };
@@ -368,8 +369,8 @@ async function renderV2(film) {
   await ffmpeg(['-f', 'concat', '-safe', '0', '-i', 'list.txt', '-c', 'copy', 'raw.mp4'], { cwd: work });
   const out = path.join(WORK, 'out', 'video.mp4'), tmp = `${out}.${process.pid}.tmp.mp4`;
   await finishPicture(film, raw, tmp, await ENCODE(film.fps));
-  fs.renameSync(tmp, out);
-  fs.rmSync(work, { recursive: true, force: true });
+  renameWithRetrySync(tmp, out);
+  removeWithRetrySync(work, { recursive: true, force: true });
   writeProgress({ step: 'render', detail: '画面渲染完成', progress: { done: round(total / film.fps), total: round(total / film.fps) } });
   say(`完成：${rel === undefined ? '' : 'out/video.mp4'}，${total} 帧（分轨合成${film.segments.some(s => s.transition !== 'cut') || film.ending === 'fade' ? '，含转场和淡入淡出' : ''}），用时 ${((Date.now() - t0) / 1000).toFixed(0)} 秒`);
 }
@@ -440,7 +441,7 @@ async function contactSheet(files, out, step, start) {
   fs.writeFileSync(list, files.map(f => `file '${f.replace(/'/g, "'\\''")}'\nduration ${step}`).join('\n') + `\nfile '${files.at(-1).replace(/'/g, "'\\''")}'`);
   // The bundled ffmpeg has no drawtext, so frames carry no time label: they run left to right, top to bottom, `step` seconds apart.
   try { await ffmpeg(['-f', 'concat', '-safe', '0', '-i', path.basename(list), '-vf', `scale=480:-2,tile=${cols}x${rows}:padding=6:margin=6:color=0x1b1b1b`, '-frames:v', '1', '-q:v', '3', path.basename(out)], { cwd: path.dirname(out) }); }
-  finally { fs.rmSync(list, { force: true }); }
+  finally { cleanupPathSync(list); }
   void start;
   return out;
 }
@@ -497,7 +498,7 @@ async function joinShots(film, files, out) {
     });
     await ffmpeg([...files.flatMap(f => ['-i', f]), '-filter_complex', parts.join(';'), '-map', `[${acc}]`, ...(await videoEncoder(film.fps)), '-movflags', '+faststart', tmp]);
   }
-  fs.renameSync(tmp, out);
+  renameWithRetrySync(tmp, out);
 }
 
 async function measureLoudness(file) {
@@ -518,5 +519,5 @@ async function measuredFps(file) {
   return ((ts.length - 1) / (ts.at(-1) - ts[0])).toFixed(2);
 }
 
-if (!cmd || !commands[cmd]) { say(HELP); process.exit(cmd ? 2 : 0); }
-commands[cmd]().then(() => process.exit(0), error => { console.error(`film ${cmd}：${error.message || error}`); process.exit(1); });
+if (!cmd || !commands[cmd]) { say(HELP); process.exitCode=cmd ? 2 : 0; }
+else commands[cmd]().catch(error => { console.error(`film ${cmd}：${error.stack || error}`); process.exitCode=1; });

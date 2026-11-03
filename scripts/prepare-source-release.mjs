@@ -20,7 +20,7 @@ export function releaseNotes(version){
 统一智能体命令行与 API 密钥接入，可测试连接；首次打开通用剪辑引导选择智能体，录屏页增加引导卡，模型不可用时回退默认。
 npm run setup 一条命令安装；修复本机 App 签名失效导致的「已损坏」提示，构建后自动清理隔离标记并严格验签。已知项：API 密钥连通未实测（没有密钥）。`;
 }
-export function prepareSourceRelease({cwd=process.cwd(),ref='main',out,localCandidate=false,frozenManifest}){
+export function prepareSourceRelease({cwd=process.cwd(),ref='main',out,localCandidate=false,frozenManifest,tag}){
  if(frozenManifest)return prepareFrozenSourceRelease({cwd,out,localCandidate,frozenManifest});
  if(!out || (ref!=='main'&&!/^[a-f0-9]{40}$/i.test(ref)))throw new Error('Select main or a full 40-character main commit SHA');
  const git=(args)=>{const r=spawnSync('git',args,{cwd,encoding:'utf8',maxBuffer:10_000_000});if(r.error||r.status!==0)throw new Error('Source Git verification failed');return r.stdout;};
@@ -47,14 +47,17 @@ export function prepareSourceRelease({cwd=process.cwd(),ref='main',out,localCand
  const filename='OpenTake-Standard-source.zip',archive=path.join(folder,filename);
  for(const name of [filename,filename+'.sha256','source-release.json','release-notes.md','upgrade.json'])if(fs.existsSync(path.join(folder,name)))throw new Error('Refusing to overwrite a prepared source bundle');
  const pkg=JSON.parse(git(['show',sha+':package.json']));if(pkg.name!=='opentake-standard'||!/^\d+\.\d+\.\d+$/.test(pkg.version))throw Error('Invalid Standard version');
+ const versionTag='v'+pkg.version;
+ if(tag!==undefined&&tag!==versionTag&&!(tag.startsWith('desktop-v'+pkg.version+'-')&&/^[1-9]\d*$/.test(tag.slice(('desktop-v'+pkg.version+'-').length))))throw Error('Invalid source release tag');
+ const releaseTag=tag||versionTag;
  const receipt=JSON.stringify({repository:PUBLIC_REPOSITORY,commit:sha,version:pkg.version,...(localCandidate?{localCandidate:true}:{}),files:Object.fromEntries(entries.map(e=>[e.path,e.blob]))});
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'standard-source-'));
  try{const receiptFile=path.join(temporary,'release-source.json');fs.writeFileSync(receiptFile,receipt);git(['archive','--format=zip','--prefix=opentake-standard/',`--add-file=${receiptFile}`,`--output=${archive}`,sha]);}finally{fs.rmSync(temporary,{recursive:true,force:true})}
  const checksum=crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
  fs.writeFileSync(archive+'.sha256',`${checksum}  ${filename}\n`);
- const manifest={...(localCandidate?{localCandidate:true}:{}),schemaVersion:1,repository:PUBLIC_REPOSITORY,commit:sha,tag:`v${pkg.version}`,version:pkg.version,filename,sha256:checksum,bytes:fs.statSync(archive).size,trackedFiles:entries.length};
+ const manifest={...(localCandidate?{localCandidate:true}:{}),schemaVersion:1,repository:PUBLIC_REPOSITORY,commit:sha,tag:releaseTag,version:pkg.version,filename,sha256:checksum,bytes:fs.statSync(archive).size,trackedFiles:entries.length};
  fs.writeFileSync(path.join(folder,'source-release.json'),JSON.stringify(manifest,null,2)+'\n');
- const standard={version:pkg.version,notes:releaseNotes(pkg.version),url:`https://github.com/${PUBLIC_REPOSITORY}/releases/download/v${pkg.version}/${filename}`,sha256:checksum,publishedAt:new Date().toISOString()};
+ const standard={version:pkg.version,notes:releaseNotes(pkg.version),url:`https://github.com/${PUBLIC_REPOSITORY}/releases/download/${releaseTag}/${filename}`,sha256:checksum,publishedAt:new Date().toISOString()};
  fs.writeFileSync(path.join(folder,'upgrade.json'),JSON.stringify({... (names.has('upgrade.json')?JSON.parse(git(['show',sha+':upgrade.json'])):{mode:'beta',notice:''}),standard},null,2)+'\n');
  fs.writeFileSync(path.join(folder,'release-notes.md'),`# OpenTake Standard ${pkg.version}\n\n${releaseNotes(pkg.version)}\n\n公开 main 提交：${sha}\n\n请下载附件 **${filename}**，解压后按 README 安装；这不是预编译安装包。\n\nSHA-256：\`${checksum}\`（另附 .sha256 文件）。\n\n由 git archive 从已跟踪源码生成，不包含本机未提交文件、依赖缓存或用户工程。此源码附件不覆盖；每个版本使用独立 v 版本标签。\n\nRelease 附件下载次数用于仓库聚合统计，不是人数或安装成功数。GitHub 自动 Source code ZIP 是另一个入口，无法提供相同计数。\n`);
  return manifest;
@@ -101,6 +104,6 @@ function prepareFrozenSourceRelease({cwd,out,localCandidate,frozenManifest}){
  return manifest;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- try{const args=process.argv.slice(2),options={};for(let i=0;i<args.length;i+=2){if(!['--ref','--out'].includes(args[i])||!args[i+1])throw new Error('Usage: --ref main|full-sha --out folder');options[args[i]]=args[i+1];}const manifest=prepareSourceRelease({ref:options['--ref'],out:options['--out']});console.log(`Prepared ${manifest.tag}: ${manifest.bytes} bytes, SHA-256 ${manifest.sha256}`);}
+ try{const args=process.argv.slice(2),options={};for(let i=0;i<args.length;i+=2){if(!['--ref','--out','--tag'].includes(args[i])||!args[i+1])throw new Error('Usage: --ref main|full-sha --out folder [--tag desktop-version-build]');options[args[i]]=args[i+1];}const manifest=prepareSourceRelease({ref:options['--ref'],out:options['--out'],tag:options['--tag']});console.log(`Prepared ${manifest.tag}: ${manifest.bytes} bytes, SHA-256 ${manifest.sha256}`);}
  catch(error){console.error(error.message);process.exitCode=1;}
 }

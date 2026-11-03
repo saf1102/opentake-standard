@@ -1,6 +1,7 @@
 // film.json: the cut. Each shot is one page (window.shot.frame(t)) or a stretch of footage; shots follow each other,
 // an optional transition overlaps a shot with the one before it.
 import fs from 'node:fs';
+import {atomicJsonSync} from '../../../../desktop/file-ops.cjs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { MEDIA, tool, WORK } from './env.mjs';
@@ -86,9 +87,7 @@ export function writeProgress(fields, dir = WORK) {
   let current = {};
   try { current = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* first write */ }
   const next = { ...current, ...fields, at: new Date().toISOString() };
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
-  fs.renameSync(tmp, file);
+  atomicJsonSync(file, next);
   return next;
 }
 

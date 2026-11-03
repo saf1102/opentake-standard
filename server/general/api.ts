@@ -1,8 +1,13 @@
+import {assertStorageIdle} from '../editor/api/storage.ts';
+import {jianyingCapabilities} from '../editor/jianying/runtime.ts';
+import {chooseExportDestination} from '../editor/settings-host.ts';
+import {videoExportCapabilities} from '../../shared/export-video.ts';
 import {readExportPreferences,writeExportPreferences} from '../export-preferences.ts';
 import {requireCreationTools} from '../creation-tools.ts';
-import {extraStyle,styleError,revealCommand} from './edition.ts';
+import {extraStyle,styleError,revealPath} from './edition.ts';
 /** /api/general：通用剪辑的接口，照 src/general/general-contract.ts 实现。回应沿用工作台的 {ok, result} / {ok:false, error}。 */
-import { startExport, exportRunning, reconcileExports, generalExportSource, generalExportHistory, readGeneralExport, cancelGeneralExport } from './export.ts';
+import { startExport, exportRunning, reconcileExports, generalExportSource, generalExportHistory, readGeneralExport, cancelGeneralExport, cancelExport } from './export.ts';
+import {renameWithRetrySync,removeWithRetrySync,cleanupPathSync} from '../file-ops.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -14,10 +19,10 @@ import { bodyJson, sendJson } from '../http.ts';
 import { assertFreeSpace } from '../system-settings.ts';
 import { serveProjectFile, serveResolvedFile } from './files.ts';
 import { pageHostPort } from './page-host.ts';
-import { saveEdited, sceneSpeedsOf, soundFilesOf, soundsOf, soundWaveform, stylePresets, upgradeVersion } from './layers.ts';
+import { readGeneralLayers, saveEdited, sceneSpeedsOf, soundFilesOf, soundsOf, soundWaveform, stylePresets, upgradeVersion } from './layers.ts';
 import { ffmpegPath, ffprobePath } from './kit-env.ts';
 import { switchRunAgent, answerNetwork, isLive, mediaFile, postMessage, reconcile, resumeRun, assertReady, startFirst, stopForDelete, stopRun, styleLibrary, readSession, writeSession } from './runner.ts';
-import { createGeneral, fileUrl, findGeneral, generalChanges, patchGeneral, scanGeneral, summarize, trashGeneral, updateGeneral } from './store.ts';
+import { createGeneral, fileUrl, findGeneral, generalChanges, patchGeneral, scanGeneral, summarize, trashGeneral, restoreGeneral, purgeGeneral, updateGeneral } from './store.ts';
 
 const exec = promisify(execFile);
 const MEDIA_TYPES = new Set(['.mp4', '.mov', '.m4v', '.webm', '.mkv', '.avi', '.mp3', '.wav', '.m4a', '.aac', '.flac', '.jpg', '.jpeg', '.png', '.webp']);
@@ -32,7 +37,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
     if (parts[0] === 'page-host' && method === 'GET') return ok(res, { port: await pageHostPort() });
     if (parts[0] !== 'projects') return sendJson(res, 404, { ok: false, error: '接口不存在' });
     if (parts.length === 1) {
-      if (method === 'GET') return ok(res, scanGeneral().map(l => summarize(reconcile(l))));
+      if (method === 'GET') return ok(res, scanGeneral(url.searchParams.get('includeDeleted')==='1').map(l => summarize(l.deletedAt ? l.project : reconcile(l), l.deletedAt)));
       if (method === 'POST') {
         const body = await bodyJson(req);
         const styleId = String(body.styleId || '');
@@ -60,12 +65,14 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
       }
       return sendJson(res, 405, { ok: false, error: '不支持的方法' });
     }
+    if(action==='restore'&&method==='POST'&&parts.length===3){assertStorageIdle();return ok(res,restoreGeneral(id));}
+    if(action==='purge'&&method==='POST'&&parts.length===3){const body=await bodyJson(req);if(body.confirmProjectId!==id)throw Object.assign(Error('请确认彻底删除的工程'),{status:400});assertStorageIdle();await purgeGeneral(id);return ok(res,null);}
     if(action==='agent-comparison'&&method==='GET'&&parts.length===3){const {compareProjectAgentRuns}=await import('../agent-comparison.ts');return ok(res,compareProjectAgentRuns(findGeneral(id).project.id));}
     if (action === 'events' && method === 'GET') return events(req, res, id);
     // 打开工程目录 in the editor's media column (S先生 10-31: it did nothing)
     if (action === 'reveal' && method === 'POST' && parts.length === 3) {
       const { dir } = findGeneral(id);
-      const cmd = revealCommand(dir); await exec(cmd.command, cmd.args);
+      await revealPath(dir);
       return ok(res, { revealed: true });
     }
     if (action === 'files' && (method === 'GET' || method === 'HEAD')) {
@@ -74,6 +81,8 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
       const version = /^versions\/v(\d+)\.mp4$/.exec(rel)?.[1];
       return serveProjectFile(req, res, dir, rel, version ? `${project.name} 第${version}版.mp4` : undefined);
     }
+    if(action==='versions'&&parts[4]==='layers'&&parts.length===5&&method==='GET')return ok(res,readGeneralLayers(id,Number(parts[3])));
+    if(action==='exports'&&parts[4]==='cancel'&&parts.length===5&&method==='POST')return ok(res,await cancelExport(id,parts[3]));
     if(action==='exports') {
       const {dir,project}=findGeneral(id);
       if(parts[3]==='preferences'&&parts.length===4) {
@@ -84,14 +93,13 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
         const source=await generalExportSource(id,Number(url.searchParams.get('version')));
         const destination=path.join(dir,'exports');fs.mkdirSync(destination,{recursive:true});
         const stats=fs.statfsSync(destination);
-        return ok(res,{defaultDestination:destination,freeBytes:stats.bavail*stats.bsize,jianying:{available:false,warning:'完成后可从导出文件夹导入剪映'},canvas:{width:source.media.width,height:source.media.height,fps:source.media.fps}});
+        return ok(res,{video:videoExportCapabilities(process.platform),defaultDestination:destination,freeBytes:stats.bavail*stats.bsize,jianying:await jianyingCapabilities(),canvas:{width:source.media.width,height:source.media.height,fps:source.media.fps}});
       }
       if(parts[3]==='destination'&&method==='POST') {
-        const {stdout}=await exec('/usr/bin/osascript',['-e','POSIX path of (choose folder with prompt "选择导出位置")']);
-        return ok(res,{path:stdout.trim().replace(/\/$/,'')});
+        return ok(res,{path:await chooseExportDestination('选择导出位置')});
       }
       if(parts[3]==='history'&&method==='GET')return ok(res,generalExportHistory(dir));
-      if(parts[3]==='cancel'&&method==='POST')return ok(res,cancelGeneralExport(id));
+      if(parts[3]==='cancel'&&method==='POST')return ok(res,await cancelGeneralExport(id));
       if(parts[4]==='file'&&(method==='GET'||method==='HEAD')) {
         const job=readGeneralExport(dir,parts[3]);
         if(job.state!=='done'||!job.outputDir||job.format!=='mp4')throw Error('成片尚未生成');
@@ -102,7 +110,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
         const body=await bodyJson(req);const task=body.id?readGeneralExport(dir,String(body.id)):project.exportTask;
         const target=task?.state==='done'?(task.folder||task.outputDir):undefined;
         if(!target||!fs.existsSync(target))throw Error('找不到导出文件夹');
-        const cmd=revealCommand(target);await exec(cmd.command,cmd.args);
+        await revealPath(target);
         return ok(res,{revealed:true});
       }
     }
@@ -132,7 +140,7 @@ export async function handleGeneralApi(req: IncomingMessage, res: ServerResponse
     if (action === 'media' && method === 'POST' && parts.length === 3) return ok(res, await addMedia(req, id), 201);
     if (action === 'media' && method === 'DELETE' && parts.length === 4) return ok(res, removeMedia(id, parts[3]));
     if (method !== 'POST' || parts.length !== 3) return sendJson(res, 404, { ok: false, error: '接口不存在' });
-    if (action === 'generate') { assertReady(findGeneral(id).project); return ok(res, startFirst(id, { request: true, ...(process.platform==='darwin'?{tools:await requireCreationTools(findGeneral(id).project.agent)}:{} ) })); }
+    if (action === 'generate') { assertReady(findGeneral(id).project); return ok(res, startFirst(id, { request: true, tools:await requireCreationTools(findGeneral(id).project.agent) })); }
     if (action === 'stop') return ok(res, stopRun(id));
     if(action==='switch-agent'){
       if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||''))return sendJson(res,403,{ok:false,error:'只允许在本机切换智能体'});
@@ -187,12 +195,12 @@ async function addMedia(req: IncomingMessage, id: string): Promise<GeneralMedia>
     const out = fs.createWriteStream(tmp);
     req.on('error', reject); out.on('error', reject); out.on('finish', () => resolve());
     req.pipe(out);
-  }).catch(error => { fs.rmSync(tmp, { force: true }); throw error; });
-  if (!fs.statSync(tmp).size) { fs.rmSync(tmp, { force: true }); throw Object.assign(new Error('上传的文件是空的'), { status: 400 }); }
-  fs.renameSync(tmp, file);
+  }).catch(error => { cleanupPathSync(tmp); throw error; });
+  if (!fs.statSync(tmp).size) { removeWithRetrySync(tmp, { force: true }); throw Object.assign(new Error('上传的文件是空的'), { status: 400 }); }
+  renameWithRetrySync(tmp, file);
   let info: { duration: number; width: number; height: number };
   try { info = await probe(file); }
-  catch (error) { fs.rmSync(file, { force: true }); throw Object.assign(new Error(`读不出这个文件：${error instanceof Error ? error.message : error}`), { status: 415 }); }
+  catch (error) { cleanupPathSync(file); throw Object.assign(new Error(`读不出这个文件：${error instanceof Error ? error.message : error}`), { status: 415 }); }
   const posterFile = path.join(folder, `${mediaId}.poster.jpg`);
   let poster: string | undefined;
   if (info.width > 0) {
@@ -217,7 +225,7 @@ function removeMedia(id: string, mediaId: string): GeneralProject {
   if (project.run && ['running', 'stopping', 'needs-network'].includes(project.run.state) && isLive(id)) throw Object.assign(new Error('出片时不能改素材，请先停止'), { status: 409 });
   if (!project.inputs.media.some(m => m.id === mediaId)) throw Object.assign(new Error('素材不存在'), { status: 404 });
   const file = mediaFile(dir, mediaId);
-  if (file) fs.rmSync(file, { force: true });
-  fs.rmSync(path.join(dir, 'media', `${mediaId}.poster.jpg`), { force: true });
+  if (file) removeWithRetrySync(file, { force: true });
+  removeWithRetrySync(path.join(dir, 'media', `${mediaId}.poster.jpg`), { force: true });
   return updateGeneral(id, p => { p.inputs.media = p.inputs.media.filter(m => m.id !== mediaId); });
 }

@@ -1,3 +1,4 @@
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -40,7 +41,7 @@ test('修复一：Codex原生出片和轻活的凭据拒绝也清连接，普通
    if(event.type==='turn.failed')immediate=!!config.authRejectedAt;
   }});
   await proc.done;assert.equal(ordinary,true);assert.equal(immediate,true,'退出码0的失败事件也立即清缓存');
-  save();const cli=path.join(dir,'codex-fake');fs.writeFileSync(cli,`#!${process.execPath}\nconsole.error('not logged in');process.exit(1);`,{mode:0o755});
+  save();const cli=fakeNodeCli(path.join(dir,'codex-fake'),"console.error('not logged in');process.exit(1);");
   await assert.rejects(runAgent({module:'captionTranslation',agent:'codex',method:'cli',executable:cli,model:'default',effort:'medium',cliVersion:'fake'},['exec','fixture']),/缺少有效登录凭据/);
   assert.ok(JSON.parse(fs.readFileSync(process.env.LINKREADER_CONNECTION_SETTINGS_FILE!,'utf8')).codex.authRejectedAt);
  }finally{

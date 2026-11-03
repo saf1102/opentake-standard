@@ -17,7 +17,7 @@ function fixture(){
  const assets=[{id:61,name:filename,size:zip.length,state:'uploaded',digest:`sha256:${hash(zip)}`},{id:62,name:filename+'.sha256',size:checksum.length,state:'uploaded',digest:`sha256:${hash(checksum)}`}];
  return {folder,release,assets,zip,checksum,cleanup:()=>fs.rmSync(folder,{recursive:true,force:true})};
 }
-function runner(f,{existing=false,missingDigest=false}={}){
+function runner(f,{existing=false,missingDigest=false,expectedLatest=true}={}){
  let created=existing,published=false;const calls=[];
  const run=(args,options)=>{
   calls.push({args,options});const endpoint=args[1];
@@ -30,7 +30,7 @@ function runner(f,{existing=false,missingDigest=false}={}){
   if(endpoint.endsWith('/releases/assets/61'))return f.zip;
   if(endpoint.endsWith('/releases/assets/62'))return f.checksum;
   if(endpoint.endsWith('/releases/51')){
-   if(args.includes('PATCH')){assert.ok(args.includes('draft=false'));assert.ok(args.includes('make_latest=true'));published=true;}
+   if(args.includes('PATCH')){assert.ok(args.includes('draft=false'));assert.ok(args.includes(`make_latest=${expectedLatest}`));published=true;}
    return JSON.stringify({...f.release,draft:published?false:f.release.draft});
   }
   throw new Error(`Unexpected mocked endpoint ${endpoint}`);
@@ -39,6 +39,10 @@ function runner(f,{existing=false,missingDigest=false}={}){
 }
 test('new draft found via list and published through numeric ID, not tag',()=>{
  const f=fixture();try{const r=runner(f);const result=publishSourceRelease({folder:f.folder,repo,run:r.run});assert.equal(result.releaseId,51);assert.equal(result.resumed,false);assert.equal(r.calls.filter(c=>c.args[0]==='release').length,1);assert.equal(r.calls.filter(c=>c.args.includes('PATCH')).length,1);}finally{f.cleanup();}
+});
+
+test('source-only publication can preserve Latest for the complete desktop release',()=>{
+ const f=fixture();try{const r=runner(f,{expectedLatest:false});publishSourceRelease({folder:f.folder,repo,makeLatest:false,run:r.run});assert.ok(r.calls.some(c=>c.args.includes('make_latest=false')));}finally{f.cleanup();}
 });
 test('explicit resume verifies same commit and both assets, without reupload/deletion',()=>{
  const f=fixture();try{const r=runner(f,{existing:true,missingDigest:true});const result=publishSourceRelease({folder:f.folder,repo,resumeDraft:true,run:r.run});assert.equal(result.resumed,true);assert.equal(r.calls.some(c=>c.args[0]==='release'),false);assert.equal(r.calls.filter(c=>c.args.includes('Accept: application/octet-stream')).length,2);}finally{f.cleanup();}

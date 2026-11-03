@@ -19,12 +19,13 @@ test('S07：共享 Codex 安装组件可选择程序并验证保存，模型页�
    if(url.endsWith('/choose-cli'))result={path:'/fixture/selected-codex'};
    else if(url.endsWith('/installation/codex')){if(init.method==='PUT')cliPath=body.cliPath;result={host:'test',mode:'manual',state:'ready',executable:cliPath,version:'test',candidates:[]}}
    else if(url.endsWith('/catalog'))result=catalog();
+   else if(url.endsWith('/agent-connections'))result={connections:[]};
    else if(url.endsWith('/test'))result={...body,ok:false,durationMs:4,checkedAt:new Date().toISOString(),error:'测试连接失败示例'};
    else if(url.endsWith('/agent-settings'))result={settings:{...settings,cliPath},catalog:catalog(),runs:[]};else throw Error('意外请求 '+url);
    return Response.json({ok:true,result});}) as typeof fetch;
   app=h.createRoot(document.getElementById('root'));const click=async(label:string)=>{const el=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()===label);assert.ok(el,label);await h.act(async()=>{el.click();await new Promise(r=>setTimeout(r,5))})};
   await h.act(async()=>{app.render(h.installation);await new Promise(r=>setTimeout(r,5))});await click('手动指定…');await click('选择程序');assert.equal((document.querySelector('input') as HTMLInputElement).value,'/fixture/selected-codex');await click('验证并保存路径');assert.ok(calls.some(c=>c.url.endsWith('/installation/codex')&&c.body?.cliPath==='/fixture/selected-codex'));
-  await h.act(async()=>{app.render(h.models);await new Promise(r=>setTimeout(r,5))});await click('连通测试');const tested=calls.filter(c=>c.url.endsWith('/test'));assert.ok(tested.some(c=>c.body.model==='model-current'));assert.equal(tested.some(c=>c.body.model==='model-other'),h.testAllCatalogModels);assert.match(document.body.textContent||'',/测试连接失败示例/);assert.equal(calls.some(c=>c.url.includes('/agent-connections')),false,'Windows模型页保留旧API，不请求Mac统一接入');
+  await h.act(async()=>{app.render(h.models);await new Promise(r=>setTimeout(r,5))});await click('连通测试');const tested=calls.filter(c=>c.url.endsWith('/test'));assert.ok(tested.some(c=>c.body.model==='model-current'));assert.equal(tested.some(c=>c.body.model==='model-other'),h.testAllCatalogModels);assert.match(document.body.textContent||'',/测试连接失败示例/);assert.equal(calls.some(c=>c.url.includes('/agent-connections')),true,'Windows模型页也读取统一接入状态');
   await h.act(async()=>app.unmount());app=null;
  }finally{if(app)app.unmount();globalThis.fetch=oldFetch;dom.window.close();for(const [key,value] of saved){if(value)Object.defineProperty(globalThis,key,value);else delete (globalThis as any)[key]}fs.rmSync(temp,{recursive:true,force:true})}
 });

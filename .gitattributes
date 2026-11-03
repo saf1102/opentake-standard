@@ -1,0 +1,2 @@
+vendor/openscreen-compositor/*.patch text eol=lf whitespace=-blank-at-eol
+vendor/openscreen-compositor/upstream.json text eol=lf

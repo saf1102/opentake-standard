@@ -1,5 +1,5 @@
 import {connectionDefinition} from '../connections'
-import {IS_MAC} from '../../general/platform'
+import {UNIFIED_AGENTS} from '../../general/platform'
 import {refreshConnections,useConnections} from '../connection-store'
 import {AgentPicker,VoiceSettings,modelsDescription,testAllCatalogModels} from './agent-settings-edition';
 import { useEffect, useState, useRef } from 'react'
@@ -21,7 +21,7 @@ export function AgentSettingsDialog({embedded=false,onDirtyChange,onBusyChange}:
   const [testedConfig, setTestedConfig] = useState('')
   const [error, setError] = useState('')
   const {connections}=useConnections()
-  useEffect(()=>{if(open&&IS_MAC)void refreshConnections()},[open])
+  useEffect(()=>{if(open&&UNIFIED_AGENTS)void refreshConnections()},[open])
   useEffect(() => {
     if (!open) return
     let active = true
@@ -42,7 +42,7 @@ export function AgentSettingsDialog({embedded=false,onDirtyChange,onBusyChange}:
   useEffect(()=>()=>onDirtyChange?.(false),[onDirtyChange]);
   const catalog = view?.catalog
   const catalogMatchesPath = !!catalog && (!draft?.cliPath || draft.cliPath === catalog.executable)
-  const invalid = draft && catalog ? AGENT_MODULES.filter(({ id }) => { if(IS_MAC&&draft.modules[id].agent&&draft.modules[id].agent!=='codex')return false; const m = catalog.models.find(x => x.id === draft.modules[id].model); return !!m && !m.efforts.includes(draft.modules[id].effort) }) : []
+  const invalid = draft && catalog ? AGENT_MODULES.filter(({ id }) => { if(UNIFIED_AGENTS&&draft.modules[id].agent&&draft.modules[id].agent!=='codex')return false; const m = catalog.models.find(x => x.id === draft.modules[id].model); return !!m && !m.efforts.includes(draft.modules[id].effort) }) : []
   const defaultModel = catalog?.models.find(m => m.isDefault) || catalog?.models[0]
   // 合成一行的几项（智能粗剪 + 章节、半卡 + 全卡）一起改
   const update = (id: AgentModule, model: string, effort: string, also: AgentModule[] = []) => setDraft(d => d && ({ ...d, modules: { ...d.modules, ...Object.fromEntries([id, ...also].map(m => [m, { ...d.modules[m], model, effort }])) } }))
@@ -58,7 +58,7 @@ export function AgentSettingsDialog({embedded=false,onDirtyChange,onBusyChange}:
             <button className="agent-test-button" title={testAllCatalogModels?"测试全部模型及模块所选推理强度":"测试当前工作模块所选模型与推理强度"} disabled={!!busy || !catalogMatchesPath || invalid.length > 0} onClick={() => void act('test', async () => {
               if (!catalog) return
               setTests([]); setTestedConfig(JSON.stringify(draft))
-              const choices = [...(testAllCatalogModels?catalog.models.map(m => ({model:m.id,effort:m.efforts.includes('medium') ? 'medium' : m.defaultEffort})):[]), ...Object.values(draft.modules).filter(c=>!IS_MAC||!c.agent||c.agent==='codex').map(c => { const e = effectiveChoice(c, catalog.models); return { model: e.model, effort: e.effort } })]
+              const choices = [...(testAllCatalogModels?catalog.models.map(m => ({model:m.id,effort:m.efforts.includes('medium') ? 'medium' : m.defaultEffort})):[]), ...Object.values(draft.modules).filter(c=>!UNIFIED_AGENTS||!c.agent||c.agent==='codex').map(c => { const e = effectiveChoice(c, catalog.models); return { model: e.model, effort: e.effort } })]
               const unique = [...new Map(choices.map(c => [`${c.model}/${c.effort}`,c])).values()]
               try {
                 for (const [index, choice] of unique.entries()) {
@@ -82,7 +82,7 @@ export function AgentSettingsDialog({embedded=false,onDirtyChange,onBusyChange}:
           <div className="agent-module-table"><div className="agent-module-head"><span>工作</span><span>Agent</span><span>模型</span><span>推理强度</span></div>
             {/* 按模块分组（S先生 10-27）；选题研究和选题库「研究设置」是同一个设置，两边都能改 */}
             {AGENT_ROWS.map(({ group, id, also = [], name, description }, index) => {
-              const choice = draft.modules[id], connection=connections.find(c=>c.id===(choice.agent||'codex')), isCodex=!IS_MAC||!choice.agent||choice.agent==='codex', effective = isCodex&&catalog ? effectiveChoice(choice, catalog.models) : undefined, model = catalog?.models.find(m => m.id === effective?.model)
+              const choice = draft.modules[id], connection=connections.find(c=>c.id===(choice.agent||'codex')), isCodex=!UNIFIED_AGENTS||!choice.agent||choice.agent==='codex', effective = isCodex&&catalog ? effectiveChoice(choice, catalog.models) : undefined, model = catalog?.models.find(m => m.id === effective?.model)
               const missing = isCodex && !!catalog && choice.model !== FOLLOW_DEFAULT && !catalog.models.some(m => m.id === choice.model)
               const mixed = also.some(a => draft.modules[a].model !== choice.model || draft.modules[a].effort !== choice.effort)
               const head = index === 0 || AGENT_ROWS[index - 1].group !== group ? <div className="agent-module-group" key={`g-${group}`}>{group}</div> : null

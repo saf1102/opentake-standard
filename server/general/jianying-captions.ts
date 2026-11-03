@@ -54,6 +54,12 @@ export async function generalJianyingCaptions(film: Film2, resources: string, st
   };
   let systemFonts: string[] | undefined;
   const systemFont = (family: string) => {
+    if(process.platform==='win32'){
+      const names:Record<string,string[]>={'Kaiti SC':['simkai.ttf'],'Songti SC':['simsun.ttc'],'PingFang SC':['msyh.ttc','msyh.ttf'],'Noto Sans SC':['msyh.ttc','msyh.ttf']};
+      const dirs=[path.join(process.env.SystemRoot||'C:\\Windows','Fonts'),...fontDirs()];
+      for(const name of names[family]||[])for(const dir of dirs){const file=path.join(dir,name);if(fs.existsSync(file))return file;}
+      return undefined;
+    }
     const filenames: Record<string, string[]> = { 'Kaiti SC': ['Kaiti.ttc', 'STKaiti.ttf'], 'Songti SC': ['Songti.ttc'], 'PingFang SC': ['PingFang.ttc'] };
     const names = filenames[family] ?? [];
     for (const name of names) {

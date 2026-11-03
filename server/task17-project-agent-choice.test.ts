@@ -51,7 +51,7 @@ test('任务17：工程选择真实落盘、隔离口播/录屏、复制保留�
  }finally{delete(globalThis as any).__task17ProjectChoice;fs.rmSync(temp,{recursive:true,force:true})}
 });
 
-test('任务17：两版Mac实际dispatch包工程scope，Windows保留原dispatch',()=>{
+test('任务17：两版桌面实际dispatch包工程scope',()=>{
  const proFile=path.join(root,'server/editor-api.ts');if(fs.existsSync(proFile)){const pro=fs.readFileSync(proFile,'utf8');assert.match(pro,/withProjectAgentChoices\(dir,\['openscreen','capture-jobs'\]/);assert.match(pro,/processOwner\.run\(quickEditOwner\(id,token\),scopedDispatch\)/);}
- const standardFile=path.join(root,'server/standard/openscreen-api.ts'),standard=fs.readFileSync(fs.existsSync(standardFile)?standardFile:path.join(root,'scripts/standard/overlays/server/standard/openscreen-api.ts'),'utf8');assert.match(standard,/process\.platform==='darwin'.*withProjectAgentChoices\(dir,'screen',screenDispatch\):screenDispatch\(\)/);
+ const standardFile=path.join(root,'server/standard/openscreen-api.ts'),standard=fs.readFileSync(fs.existsSync(standardFile)?standardFile:path.join(root,'scripts/standard/overlays/server/standard/openscreen-api.ts'),'utf8');assert.match(standard,/withProjectAgentChoices\(dir,'screen',screenDispatch\)/);
 });

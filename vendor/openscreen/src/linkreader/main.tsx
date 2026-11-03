@@ -25,6 +25,12 @@ async function boot() {
 	installUuidCompatibility();
 	installBrowserShims();
 	await installLinkReaderBridge();
+	// Use the installed compositor's bundled, licensed fonts on this local origin.
+	// Without OpenScreen, its stylesheet is empty and the system font remains usable.
+	const fonts = document.createElement('link');
+	fonts.rel = 'stylesheet';
+	fonts.href = '/api/editor/openscreen/fonts.css';
+	document.head.append(fonts);
 	// App itself calls installBrowserShims at module scope. Import it only after
 	// the LinkReader overrides are installed; the second shim call is then a no-op.
 	const { default: App } = await import("../App.tsx");

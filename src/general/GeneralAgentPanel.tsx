@@ -7,7 +7,7 @@ import { AgentControls } from './AgentPicker'
 import { GeneralFailoverCard } from './GeneralFailoverCard'
 import { connectionDefinition } from '@/studio/connections'
 import { AgentMark } from '@/studio/components/AgentMark'
-import { IS_MAC } from './platform'
+import { UNIFIED_AGENTS } from './platform'
 import {
   clockTime, elapsedLabel, feedItems, networkCopy, revisionNote, runActive, runStatus, secondsLabel, stepRows, stepsSummary, versionCardTime, versionName,
   type FeedItem, type StepRow,
@@ -81,6 +81,7 @@ function StepList({ run, project }: { run: GeneralRun; project: GeneralProject }
 
 function RunBlock({ run, project, busy, actions }: { run: GeneralRun; project: GeneralProject; busy: string; actions: AgentActions }) {
   const finished = run.state === 'done'
+  const pageFailed = run.failure?.kind === 'generated-page' || /Maximum call stack size exceeded|too much recursion|生成页面执行失败/i.test(run.error || '')
   const [open, setOpen] = useState(!finished)
   // A run that starts again unfolds its steps (reset while rendering, not in an effect).
   const [wasFinished, setWasFinished] = useState(finished)
@@ -98,7 +99,7 @@ function RunBlock({ run, project, busy, actions }: { run: GeneralRun; project: G
       <p>已停止。方案和样张都留着，可以接着做。</p>
       <button type="button" className="ge-soft" data-solid disabled={!!busy} onClick={actions.resume}>{busy === 'resume' ? '正在接着做…' : '接着做'}</button>
     </div>}
-    {run.state === 'failed' && (IS_MAC
+    {run.state === 'failed' && (UNIFIED_AGENTS
       ? <GeneralFailoverCard run={run} busy={busy} onSwitch={actions.switchAgent} onResume={actions.resume} />
       : <div className="ge-runnote" data-tone="failed" role="alert"><p>没做完{run.error ? `：${run.error}` : '。'}</p><button type="button" className="ge-soft" disabled={!!busy} onClick={actions.resume}>{busy === 'resume' ? '正在接着做…' : '接着做'}</button></div>)}
   </div>
@@ -161,13 +162,13 @@ export function GeneralAgentPanel({ project, brief, shown, canQuote, onPickVersi
   const run = project.run
   const active = runActive(run)
   const [selectedDefault, setSelectedDefault] = useState<GeneralAgentChoice['agent']>()
-  const agentId = IS_MAC ? (active ? run?.agent : project.agent?.agent || selectedDefault) : 'codex'
+  const agentId = UNIFIED_AGENTS ? (active ? run?.agent : project.agent?.agent || selectedDefault) : 'codex'
   const agentName = agentId ? connectionDefinition(agentId).name : '读取智能体…'
   const now = useNow(active)
   const baseStatus = runStatus(project, now)
-  const status = IS_MAC && !active && run?.state === 'failed' && agentId && run.agent !== agentId
+  const status = UNIFIED_AGENTS && !active && run?.state === 'failed' && agentId && run.agent !== agentId
     ? { ...baseStatus, text: `上一轮（${connectionDefinition(run.agent).name}）没做完` }
-    : IS_MAC && run?.state === 'failed' && run.errorKind === 'no-response' ? { ...baseStatus, text: '没有回应' } : baseStatus
+    : UNIFIED_AGENTS && run?.state === 'failed' && run.errorKind === 'no-response' ? { ...baseStatus, text: '没有回应' } : baseStatus
   const asking = run?.state === 'needs-network' && run.networkRequest ? run.networkRequest : undefined
   const items = feedItems(project, brief)
   const body = useRef<HTMLDivElement>(null)
@@ -196,10 +197,10 @@ export function GeneralAgentPanel({ project, brief, shown, canQuote, onPickVersi
     ? (canQuote ? `想怎么改，直接说；按住 ${QUOTE_KEY} 拖动画面可以框选` : '想怎么改，直接说') : '有什么要求，直接说'
   const note = !active ? revisionNote(project.versions, shown) : undefined
 
-  return <aside className="ge-agent" data-failover={IS_MAC ? '' : undefined} data-asking={asking ? '' : undefined} aria-label={`${agentName} 对话`}>
+  return <aside className="ge-agent" data-failover={UNIFIED_AGENTS ? '' : undefined} data-asking={asking ? '' : undefined} aria-label={`${agentName} 对话`}>
     {resizer}
     <header className="ge-ahead">
-      <>{IS_MAC ? agentId ? <AgentMark id={agentId} size={22} /> : <Spinner size={22} /> : <CodexMark />}</>
+      <>{UNIFIED_AGENTS ? agentId ? <AgentMark id={agentId} size={22} /> : <Spinner size={22} /> : <CodexMark />}</>
       <span className="name">{agentName}</span>
       <span className="st" data-tone={status.tone} role="status"><i data-tone={status.tone} aria-hidden="true" /><span>{status.text}</span></span>
       {active && <button type="button" className="ge-stop" disabled={run?.state === 'stopping' || busy === 'stop'} onClick={actions.stop}>

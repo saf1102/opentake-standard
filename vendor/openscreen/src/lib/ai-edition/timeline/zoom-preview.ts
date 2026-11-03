@@ -12,12 +12,18 @@
 
 import type {
 	CursorTelemetryPoint,
+	CropRegion,
+	ZoomFocus,
 	ZoomRegion as LegacyZoomRegion,
 } from "@/components/video-editor/types";
 import { getZoomScale } from "@/components/video-editor/types";
 import type { AxcutZoomRegion } from "@/lib/ai-edition/schema";
 import { findDominantRegion } from "@/lib/zoomMath/zoomRegionUtils";
 import { computeZoomTransform } from "@/lib/zoomMath/zoomTransform";
+import { clampFocusToScale } from "@/lib/zoomMath/focusUtils";
+import { locateVirtualPosition } from "./virtual-preview";
+import type { AxcutClip } from "@/lib/ai-edition/schema";
+import type { BrowserCameraTrack } from "@/lib/cursor/browserCameraFollow";
 
 export interface ZoomPreviewTransform {
 	scale: number;
@@ -88,4 +94,61 @@ export function computeZoomPreviewTransform(
 		translateXPercent: transform.x * 100,
 		translateYPercent: transform.y * 100,
 	};
+}
+
+/** The recording clock belongs to the active asset, including after trims or reordering. */
+export function browserCursorFocusAt(
+	clips: AxcutClip[], assetId: string | undefined, timeMs: number,
+	path: { sampleAt(timeMs: number): ZoomFocus | null } | null,
+): ZoomFocus | null {
+	const position = locateVirtualPosition(clips, timeMs / 1000);
+	if (!position || position.clip.assetId !== assetId || !path) return null;
+	return path.sampleAt(position.sourceTimeSec * 1000);
+}
+
+/** Native Auto-Focus follows the pointer in the cropped screen, then maps that focus
+ * into the padded canvas. Manual focus is already authored in canvas coordinates. */
+export function computeBrowserZoomPreviewTransform(
+	regions: AxcutZoomRegion[], timeMs: number,
+	options: {
+		autoFocusAll: boolean;
+		cursorFocus: ZoomFocus | null;
+		cameraTrack?: BrowserCameraTrack | null;
+		sourceOffsetMs?: number;
+		crop: CropRegion;
+		screen: { x: number; y: number; width: number; height: number };
+		canvas: { width: number; height: number };
+		sourceSize: { width: number; height: number };
+		reference?: { screen: { width: number; height: number }; canvas: { width: number; height: number } };
+	},
+	playbackRate = 1,
+): ZoomPreviewTransform {
+	const { cursorFocus, crop, screen, canvas, sourceSize } = options;
+	// OpenScreen 2.1.2 caps total source magnification at 2x, measured at a
+	// 1080-pixel short side. Preview size and export quality must not change this cap.
+	const sourceWidth = Math.max(1, Math.round(sourceSize.width * crop.width));
+	const sourceHeight = Math.max(1, Math.round(sourceSize.height * crop.height));
+	const reference = options.reference ?? { screen, canvas };
+	const baseMagnification = 1080 / Math.max(1, Math.min(reference.canvas.width, reference.canvas.height)) *
+		Math.max(reference.screen.width / sourceWidth, reference.screen.height / sourceHeight);
+	const maxScale = baseMagnification > 0 ? Math.max(1, Math.min(5,
+		Math.floor(2 / baseMagnification * 100) / 100)) : 5;
+	const resolved = regions.map(region => {
+		const bounded = { ...region, customScale: Math.min(getZoomScale(region), maxScale) };
+		if (!(options.autoFocusAll || region.focusMode === "auto")) return bounded;
+		const window = (600 + 550 * Math.log(getZoomScale(bounded))) * Math.max(0.001, playbackRate);
+		const offset = options.sourceOffsetMs ?? 0;
+		const followed = options.cameraTrack?.focusAt(region.startMs - window + offset,
+			timeMs + offset, region.endMs + window + offset, getZoomScale(bounded)) ?? cursorFocus;
+		if (!followed) return bounded;
+		const focus = clampFocusToScale({
+			cx: (followed.cx - crop.x) / Math.max(0.0001, crop.width),
+			cy: (followed.cy - crop.y) / Math.max(0.0001, crop.height),
+		}, getZoomScale(bounded));
+		return { ...bounded, focusMode: "manual" as const, focus: {
+			cx: (screen.x + focus.cx * screen.width) / Math.max(1, canvas.width),
+			cy: (screen.y + focus.cy * screen.height) / Math.max(1, canvas.height),
+		} };
+	});
+	return computeZoomPreviewTransform(resolved, timeMs, undefined, playbackRate);
 }

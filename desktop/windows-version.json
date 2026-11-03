@@ -1,0 +1,11 @@
+{
+  "repository": "saf1102/opentake-standard",
+  "upstreamRepository": "saf1102/opentake-standard",
+  "upstreamVersion": "1.1.0",
+  "upstreamCommit": "786d2264db0fb29385c354a9890e96e961e2d57d",
+  "previousWindowsTree": "9c66a205740c5f9120d61a2f031815091b404b92",
+  "previousWindowsCommit": "a70d2aec243b1c216fbd172e6971814f9ce52cb8",
+  "windowsRevision": "official-cross-platform-signing-20261103",
+  "windowsBuild": 2026110306,
+  "nativeCompositorUpstream": "getopenscreen/openscreen@d8889c626f859e0be8f4f87fdffc7362629550bc"
+}

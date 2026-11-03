@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/getopenscreen/openscreen.git",
+  "tag": "v2.1.2",
+  "commit": "d8889c626f859e0be8f4f87fdffc7362629550bc",
+  "patchedFile": "crates/compositor/src/pipeline_windows.rs",
+  "patchedFileSha256": "ab795a78c6f5fb9dcea78b484c3eeb18f082f72de389eb1d594100db2b6e3f9c",
+  "sdkUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-31-14-10/ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1.zip",
+  "sdkSha256": "c222a490dde4e7059f45495deef6bfb98dbcacc2b43df5b607546252037aa95c",
+  "sdkDirectory": "ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1",
+  "license": "MIT"
+}

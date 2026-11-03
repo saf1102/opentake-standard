@@ -1,4 +1,6 @@
 import {killProcessGroup} from './edition.ts';
+import {removeWithRetrySync,cleanupPathSync} from '../file-ops.ts';
+import platform from '../platform.ts';
 /** General export jobs own a new directory and an immutable snapshot. No agent run or UI files are changed. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,8 +19,10 @@ import {HF_ENTRY,isHyperframesWork,readHyperframes} from './hf-project.ts';
 import {editedCaptionPage,editedCaptionPages,editedHyperframes} from './hf-timeline.ts';
 import {editedSpeedPages,withSpeedScripts} from './hf-speed.ts';
 import {validateDirectory} from '../system-settings.ts';
+import {assertVideoExportSupported} from '../../shared/export-video.ts';
+import {requireJianyingRuntime} from '../editor/jianying/runtime.ts';
+import {exportDiagnostic,decodeExportOutput,redactExportDiagnostic} from '../export-diagnostics.ts';
 
-const cancellers=new Map<string,()=>void>();
 export function readGeneralExport(dir:string,id:string):GeneralExport {
  if(!/^[0-9a-f-]{36}$/.test(id))throw Error('导出记录编号无效');
  return JSON.parse(fs.readFileSync(path.join(dir,'exports','.jobs',id+'.json'),'utf8'));
@@ -27,7 +31,6 @@ export function generalExportHistory(dir:string) {
  const folder=path.join(dir,'exports','.jobs');
  return fs.existsSync(folder)?fs.readdirSync(folder).filter(f=>/^[0-9a-f-]{36}\.json$/.test(f)).map(f=>readGeneralExport(dir,f.slice(0,-5))).sort((a,b)=>b.startedAt.localeCompare(a.startedAt)):[];
 }
-export function cancelGeneralExport(id:string) {cancellers.get(id)?.();return findGeneral(id).project.exportTask;}
 export async function generalExportSource(id:string,version:number) {
  const {dir,project}=findGeneral(id),v=project.versions.find(v=>v.n===version);
  if(!v)throw Object.assign(Error('这一版不存在'),{status:400});
@@ -41,41 +44,55 @@ export async function generalExportSource(id:string,version:number) {
 }
 
 
-const active = new Map<string, GeneralExport>();
+type ActiveExport = { task: GeneralExport; cancel: () => Promise<GeneralExport> };
+const active = new Map<string, ActiveExport>();
 export const activeGeneralExports = () => active.size;
+const running = (task?: GeneralExport) => task?.state === 'running' || task?.state === 'cancelling';
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const lockPath = (dir: string) => path.join(dir, 'exports', '.active');
-export function exportRunning(id: string): boolean { reconcileExports(id); return Boolean(findGeneral(id).project.exportTask?.state === 'running'); }
+export function exportRunning(id: string): boolean { reconcileExports(id); return running(findGeneral(id).project.exportTask); }
 export function reconcileExports(id: string) {
   const { dir, project } = findGeneral(id);
-  if (project.exportTask?.state !== 'running' || active.has(id)) return;
+  if (!running(project.exportTask) || active.has(id)) return;
   let owner: { pid?: number; worker?: number } = {};
   try { owner = JSON.parse(fs.readFileSync(path.join(lockPath(dir), 'owner.json'), 'utf8')); } catch { /* interrupted before worker start */ }
   if (owner.pid && alive(owner.pid)) return;
-  if (owner.worker) { try { killProcessGroup(owner.worker, 'SIGKILL'); } catch { /* exited */ } }
-  const job = project.exportTask;
-  if (/^[0-9a-f-]{36}$/.test(job.id)) {
-    const output=job.outputDir||path.join(dir,'exports',job.id);
-    if(path.basename(output)===job.id)fs.rmSync(output,{recursive:true,force:true});
-  }
-  fs.rmSync(lockPath(dir), { recursive: true, force: true });
-  const failed:GeneralExport={...job,state:'failed',endedAt:new Date().toISOString(),error:'导出因服务中断而停止，请重新导出'};
-  const jobs=path.join(dir,'exports','.jobs');fs.mkdirSync(jobs,{recursive:true});
-  fs.writeFileSync(path.join(jobs,job.id+'.json'),JSON.stringify(failed));
-  updateGeneral(id,p=>{p.exportTask=failed;});
+  if (owner.worker) { try { platform.killTree(owner.worker, 'SIGKILL'); } catch { /* exited */ } }
+  const job = project.exportTask!;
+  if (/^[0-9a-f-]{36}$/.test(job.id)) removeWithRetrySync(path.join(dir, 'exports', job.id), { recursive: true, force: true });
+  removeWithRetrySync(lockPath(dir), { recursive: true, force: true });
+  updateGeneral(id, p => { p.exportTask = { ...job, state: 'failed', endedAt: new Date().toISOString(), error: '导出因服务中断而停止，请重新导出' }; });
 }
 
+/** Bind cancellation to the displayed task, so a delayed click can never stop a newer retry. */
+export async function cancelExport(id: string, taskId: string): Promise<GeneralExport> {
+  reconcileExports(id);
+  const task = findGeneral(id).project.exportTask;
+  if (!task || task.id !== taskId) throw Object.assign(new Error('导出任务已变化，请刷新后重试'), { status: 409 });
+  if (!running(task)) return task;
+  const job = active.get(id);
+  if (!job || job.task.id !== taskId) throw Object.assign(new Error('导出由另一服务处理，请在原窗口取消'), { status: 409 });
+  return job.cancel();
+}
+
+export async function cancelGeneralExport(id:string){const task=findGeneral(id).project.exportTask;return task?cancelExport(id,task.id):undefined;}
 export async function startExport(id: string, version: number, format: unknown, value?:unknown): Promise<GeneralExport> {
   reconcileExports(id);
   const { dir, project } = findGeneral(id);
-  if (active.has(id) || project.exportTask?.state === 'running') return active.get(id) ?? project.exportTask!;
+  if (active.has(id) || running(project.exportTask)) return active.get(id)?.task ?? project.exportTask!;
   if (format !== 'mp4' && format !== 'jianying') throw Object.assign(new Error('导出格式只能是 mp4 或 jianying'), { status: 400 });
   if(!Number.isSafeInteger(version))throw Object.assign(Error('版本编号无效'),{status:400});
-  const {work,layers,kind,media}=await generalExportSource(id,version);
-  if(active.has(id))return active.get(id)!;
   const parsed=ExportSettingsSchema.safeParse(value ?? exportSettingsForPreset(format==='jianying'?'jianying':'quick'));
   if(!parsed.success)throw Object.assign(Error('导出参数无效'),{status:400});
   const settings=parsed.data;
+  if(format==='jianying'){
+    await requireJianyingRuntime();
+    // Standard exports portable drafts. Import is an explicit subsequent action.
+    settings.importToJianying=false;
+  }
+  if(format==='mp4')assertVideoExportSupported(settings.video,process.platform);
+  const {work,layers,kind,media}=await generalExportSource(id,version);
+  if(active.has(id))return active.get(id)!.task;
   if(kind==='video'&&typeof settings.fps==='number'&&settings.fps>media.fps&&format!=='jianying')
     throw Object.assign(Error('这一版只保留了成片，没有动效源码，无法按更高帧率重新渲染；请选跟工程或重新生成版本'),{status:400});
   const destination=settings.destinationDir.trim()?validateDirectory(settings.destinationDir):path.join(dir,'exports');
@@ -86,12 +103,65 @@ export async function startExport(id: string, version: number, format: unknown, 
   const output = path.join(destination, task.id);
   task.outputDir=output;
   const jobs=path.join(dir,'exports','.jobs');fs.mkdirSync(jobs,{recursive:true});
+  const diagnostics=path.join(jobs,task.id+'.diagnostics.jsonl');
+  const diagnostic=(event:Record<string,unknown>)=>exportDiagnostic({taskId:task.id,projectId:id,version,...event},diagnostics);
+  diagnostic({event:'start',format,node:process.version,electron:process.versions.electron});
   writeExportPreferences(dir,settings);
-  active.set(id, task);
-  const patch = (value: Partial<GeneralExport>) => { Object.assign(task, value); fs.writeFileSync(path.join(jobs,task.id+'.json'),JSON.stringify(task,null,2)); updateGeneral(id, p => { p.exportTask = { ...task }; }); };
+  const patch = (value: Partial<GeneralExport>) => { Object.assign(task, value); fs.writeFileSync(path.join(jobs,task.id+'.json'),JSON.stringify(task,null,2)); updateGeneral(id, p => { if (!p.exportTask || p.exportTask.id === task.id || !running(p.exportTask)) p.exportTask = { ...task }; }); };
   let child: ReturnType<typeof spawn> | undefined;
-  const cleanup = () => { active.delete(id); cancellers.delete(id); fs.rmSync(lockPath(dir), { recursive: true, force: true }); };
-  const fail = (error: unknown) => { fs.rmSync(output, { recursive: true, force: true }); patch({ state: 'failed', endedAt: new Date().toISOString(), error: `导出失败：${error instanceof Error ? error.message : error}` }); cleanup(); };
+  let settled = false, cancelRequested = false;
+  let resolveFinished!: () => void;
+  const finished = new Promise<void>(resolve => { resolveFinished = resolve; });
+  // Windows can retain Chromium profile handles briefly after taskkill returns.
+  // Yield during bounded sharing-violation retries, retaining this job's lock.
+  const remove = async (target: string) => {
+    try { await fs.promises.rm(target, { recursive: true, force: true, maxRetries: process.platform === 'win32' ? 10 : 0, retryDelay: 100 }); }
+    catch (error) { throw new Error(`清理文件失败（${(error as NodeJS.ErrnoException).code || 'UNKNOWN'}）：${target}`, { cause: error }); }
+  };
+  const stop = () => { if (child?.pid) try { platform.killTree(child.pid, 'SIGKILL'); } catch { /* already stopped */ } };
+  const done = async (error?: unknown) => {
+    if (settled) return;
+    settled = true;
+    process.off('exit', stop);
+    stop();
+    try {
+      if (cancelRequested) {
+        await remove(output);
+        patch({ state: 'cancelled', step: '导出已取消', endedAt: new Date().toISOString() });
+      } else if (error) {
+        diagnostic({event:'failed',step:task.step,error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined});
+        await remove(output);
+        patch({ state: 'failed', endedAt: new Date().toISOString(), error: `导出失败：${redactExportDiagnostic(String(error instanceof Error ? error.message : error)).slice(-8000)}；诊断记录：${diagnostics}` });
+      } else {
+        const result = format === 'mp4' ? `成片.${settings.video.codec==='prores422'?'mov':settings.video.container}` : '剪映工程';
+        if (!fs.existsSync(path.join(output, result))) throw new Error('没有生成导出文件');
+        for (const part of ['work', 'media']) await remove(path.join(output, part));
+        patch({ state: 'done', step: '导出完成', progress: 1, endedAt: new Date().toISOString(), ...(format === 'mp4' ? {downloadUrl:`/api/general/projects/${encodeURIComponent(id)}/exports/${task.id}/file`} : {folder:path.join(output,result)}) });
+        diagnostic({event:'complete'});
+      }
+    } catch (failure) {
+      diagnostic({event:'cleanup-failed',error:failure instanceof Error?failure.message:String(failure)});
+      const original=error?`导出失败：${redactExportDiagnostic(String(error instanceof Error?error.message:error)).slice(-8000)}；`:'';
+      const result:Partial<GeneralExport>={ state:'failed',endedAt:new Date().toISOString(),error:`${original}导出收尾失败：${failure instanceof Error?failure.message:failure}；诊断记录：${diagnostics}` };
+      try{patch(result)}catch(error){Object.assign(task,result);task.error+=`；状态保存失败：${error instanceof Error?error.message:String(error)}`;console.warn(task.error)}
+    } finally {
+      try { cleanupPathSync(lockPath(dir),{recursive:true}); }
+      finally { if (active.get(id)?.task === task) active.delete(id); resolveFinished(); }
+    }
+  };
+  active.set(id, { task, cancel: async () => {
+    if (!cancelRequested && !settled) {
+      cancelRequested = true;
+      patch({ state: 'cancelling', step: '正在终止导出并清理文件' });
+    }
+    if (!settled) { stop(); if (!child?.pid) done(); }
+    // Keep the lock and the busy state until close confirms the owned worker has stopped.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([finished, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error('正在等待导出进程退出，请稍后重试取消'), { status: 409 })), 10_000); })]);
+    } finally { clearTimeout(timer); }
+    return { ...task };
+  } });
   try {
     fs.writeFileSync(path.join(lockPath(dir), 'owner.json'), JSON.stringify({ pid: process.pid }));
     patch({});
@@ -124,37 +194,37 @@ export async function startExport(id: string, version: number, format: unknown, 
     }
     const env = prepareWork(output, { ...process.env, CW_NETWORK: '0', CW_STYLE: project.styleId, CW_EXPORT: '1' });
     const script = fileURLToPath(new URL('./export-worker.ts', import.meta.url));
-    child = spawn(process.execPath, ['--experimental-strip-types', script, output, format, project.name], { cwd: output, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const node=process.platform==='win32'?process.env.OPENTAKE_EXPORT_NODE||process.execPath:process.execPath;
+    if(process.platform==='win32'&&process.versions.electron&&(!process.env.OPENTAKE_EXPORT_NODE||!fs.existsSync(node)))throw Error('内置 Windows 导出运行库缺失，请重新安装完整包');
+    diagnostic({event:'worker-start',file:node,args:['--experimental-strip-types',script,output,format,'[project name]']});
+    child = spawn(node, ['--experimental-strip-types', script, output, format, project.name], { cwd: output, env: { ...env, ELECTRON_RUN_AS_NODE: '1',OPENTAKE_EXPORT_DIAGNOSTICS:diagnostics }, detached: true, windowsHide:true, stdio: ['ignore', 'pipe', 'pipe'] });
     fs.writeFileSync(path.join(lockPath(dir), 'owner.json'), JSON.stringify({ pid: process.pid, worker: child.pid }));
-    let tail = '', pending = '', settled = false;
-    const stop = () => { if (child?.pid) try { killProcessGroup(child.pid, 'SIGKILL'); } catch { /* already stopped */ } };
+    let tail = '', pending = '';const stderr:Buffer[]=[];let stderrBytes=0,truncated=false;
+    child.stdout?.setEncoding('utf8');
     process.once('exit', stop);
-    cancellers.set(id,()=>{patch({state:'cancelled',step:'已停止',endedAt:new Date().toISOString()});stop();});
     child.stdout?.on('data', data => {
       pending += data.toString();
       let newline;
       while ((newline = pending.indexOf('\n')) >= 0) {
         const line = pending.slice(0, newline); pending = pending.slice(newline + 1);
-        if (line.startsWith('EXPORT:')) { try { patch(JSON.parse(line.slice(7))); } catch { /* log line, not progress */ } }
+        if (line.startsWith('EXPORT:') && !settled && !cancelRequested) { try {
+          const value = JSON.parse(line.slice(7));
+          // Workers report progress only; late stdout must not resurrect a cancelled task.
+          if (typeof value.step === 'string' && Number.isFinite(value.progress)) patch({ step: value.step, progress: Math.max(0, Math.min(1, value.progress)) });
+        } catch { /* log line, not progress */ } }
         if (!line.startsWith('EXPORT:')) tail = (tail + line + '\n').slice(-8000);
       }
     });
-    child.stderr?.on('data', d => { tail = (tail + d).slice(-8000); });
-    const done = (error?: unknown) => {
-      if (settled) return; settled = true; process.off('exit', stop); stop();
-      if(task.state==='cancelled'){fs.rmSync(output,{recursive:true,force:true});cleanup();return;}
-      if (error) return fail(error);
-      // the film is downloaded; a 剪映 project is a folder (as from the 口播 export): shown in Finder, imported by its own
-      // 导入剪映-Mac.command / 导入剪映-Windows.cmd
-      const result = format === 'mp4' ? `成片.${settings.video.codec==='prores422'?'mov':settings.video.container}` : '剪映工程';
-      if (!fs.existsSync(path.join(output, result))) return fail('没有生成导出文件');
-      // the working snapshot served the render only; like the 口播 export, only the result (and the edit snapshot) stays
-      for (const part of ['work', 'media']) fs.rmSync(path.join(output, part), { recursive: true, force: true });
-      patch({ state: 'done', step: '导出完成', progress: 1, endedAt: new Date().toISOString(), ...(format === 'mp4' ? { downloadUrl: `/api/general/projects/${encodeURIComponent(id)}/exports/${task.id}/file` } : { folder: path.join(output, result) }) });
-      cleanup();
-    };
+    child.stderr?.on('data', d => {const bytes=Buffer.from(d);if(stderrBytes<(8<<20)){stderr.push(bytes.subarray(0,(8<<20)-stderrBytes));stderrBytes+=bytes.length}else truncated=true;});
     child.once('error', done);
-    child.once('close', code => done(code === 0 ? undefined : tail.trim() || `出片工具退出（${code}）`));
-  } catch (error) { fail(error); }
+    child.once('close', (code,signal) => {
+      const errorText=decodeExportOutput(Buffer.concat(stderr));
+      diagnostic({event:'worker-exit',code,signal,stderr:errorText,truncated,stdoutTail:tail+pending});
+      // close has reaped the process; never kill a PID after it might have been reused.
+      child=undefined;
+      done(code === 0 ? undefined : errorText.trim()||tail.trim()||`出片工具退出（${code}${signal?', '+signal:''}）`);
+    });
+    fs.writeFileSync(path.join(lockPath(dir), 'owner.json'), JSON.stringify({ pid: process.pid, worker: child.pid }));
+  } catch (error) { await done(error); }
   return { ...task };
 }

@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {renameWithRetrySync,removeWithRetrySync} from '../file-ops.ts';
 import {settingsFile,projectPathOverridden,legacyProjectsRoot} from '../system-settings.ts';
 export const migrationHome=()=>projectPathOverridden()?path.join(legacyProjectsRoot(),'.project-migrations'):path.join(path.dirname(settingsFile()),'project-migrations');
-export function durableJson(file:string,value:unknown){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+crypto.randomUUID()+'.tmp';const fd=fs.openSync(tmp,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify(value,null,2));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}fs.renameSync(tmp,file);}
+export function durableJson(file:string,value:unknown){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+crypto.randomUUID()+'.tmp';try{const fd=fs.openSync(tmp,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify(value,null,2));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}renameWithRetrySync(tmp,file);}finally{if(fs.existsSync(tmp))removeWithRetrySync(tmp,{force:true});}}
 export type Placement={id:string;dir:string;previous:string[];aliases?:Record<string,string>;project:Record<string,unknown>;removed?:boolean};
 let cached:{key:string;value:Record<string,Placement>}|undefined;
 export function placements():Record<string,Placement>{const file=path.join(migrationHome(),'locations.json');if(!fs.existsSync(file))return {};const st=fs.statSync(file),key=`${file}:${st.ino}:${st.mtimeMs}:${st.size}`;if(cached?.key===key)return cached.value;const value=JSON.parse(fs.readFileSync(file,'utf8'));cached={key,value};return value;}
@@ -22,6 +24,6 @@ export function relocatedReferences(value:unknown,id:string,sourceDir:string,key
  if(Array.isArray(value))return value.map(v=>relocatedReferences(v,id,sourceDir,key));
  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,relocatedReferences(v,id,sourceDir,k)]));
  if(typeof value!=='string'||!/(?:file|files|path|paths|src|url)$/i.test(key)||/^(?:https?:|data:|blob:)/i.test(value))return value;
- let file=value;try{if(file.startsWith('file://'))file=decodeURIComponent(new URL(file).pathname)}catch{return value}
+ let file=value;try{if(file.startsWith('file://'))file=fileURLToPath(file)}catch{return value}
  return aliases[path.resolve(sourceDir,file)]||value;
 }

@@ -1,9 +1,9 @@
-import { findActiveSpeedRegion } from "@/lib/ai-edition/timeline/speed";
-import { computeZoomPreviewTransform } from "@/lib/ai-edition/timeline/zoom-preview";
-import {
-	previewRadius,
-	screenPreviewRect,
-} from "../../../../../shared/openscreen-preview-geometry";
+import {screenPreviewRect, previewRadius} from '../../../../../shared/openscreen-preview-geometry';
+import {browserCursorFocusAt, computeBrowserZoomPreviewTransform} from '@/lib/ai-edition/timeline/zoom-preview';
+import {getSmoothedCursorPath} from '@/lib/cursor/cursorPathSmoothing';
+import {createBrowserCameraTrack} from '@/lib/cursor/browserCameraFollow';
+import {useCursorRecordingData} from '@/native/hooks/useCursorRecordingData';
+import {findActiveSpeedRegion} from '@/lib/ai-edition/timeline/speed';
 // Hosts the native D3D preview canvas (the sole pixel source) plus the
 // interactive-only DOM overlays (zoom gimbal, annotations, webcam drag) that
 // still need real hitboxes. The shared source of truth is `useEditorSettings`,
@@ -234,6 +234,15 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 		[props.clips, props.currentTimeSec],
 	);
 	const cropRegion: CropRegion = activeClip?.cropRegion ?? DEFAULT_CROP_REGION;
+	const activeSource = props.videoSources.find(source => source.id === activeClip?.assetId);
+	const { data: cursorRecording } = useCursorRecordingData(
+		isLinkReaderBrowser ? activeSource?.filePath ?? activeSource?.src ?? null : null,
+	);
+	const cursorPath = useMemo(() => cursorRecording
+		? getSmoothedCursorPath(cursorRecording, settings.cursor.smoothing) : null,
+		[cursorRecording, settings.cursor.smoothing]);
+	const cameraTrack = useMemo(() => createBrowserCameraTrack(cursorRecording, cursorPath, settings.cursor.smoothing),
+		[cursorRecording, cursorPath, settings.cursor.smoothing]);
 
 	// P4 — the layout preset is global (one panel for the whole timeline) but the camera
 	// is per clip, so the layout has to be resolved against the clip under the playhead.
@@ -243,7 +252,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 	);
 	const activeClipHasCamera = Boolean(activeCameraTrack?.visible && activeCameraTrack.sourcePath);
 
-	const layout = useMemo(() => {
+	const layouts = useMemo(() => {
 		// A clip with no camera lays out as "no-webcam", whatever the panel says. Hiding
 		// only the webcam slot is not enough: the block presets size the SCREEN off the
 		// block, so the screen stayed squeezed into its half with nothing beside it.
@@ -258,10 +267,6 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 		// camera reaches 40% of canvas; at padding=50 it falls to ~32%;
 		// at padding=100 the screen takes even more.
 		const paddingFit = clamp(1 - (clamp(settings.padding, 0, 100) / 100) * 0.4, 0.4, 1);
-		const maxContentSize = {
-			width: Math.round(frameSize.width * paddingFit),
-			height: Math.round(frameSize.height * paddingFit),
-		};
 		// The screen box must be fit to the CROPPED aspect ratio, not the full
 		// source frame's — otherwise VirtualPreview's crop math (which assumes
 		// its container is already correctly proportioned for the crop) would
@@ -271,9 +276,9 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 			width: Math.max(1, Math.round(fullScreenSize.width * cropRegion.width)),
 			height: Math.max(1, Math.round(fullScreenSize.height * cropRegion.height)),
 		};
-		return computeCompositeLayout({
-			canvasSize: frameSize,
-			maxContentSize,
+		const atSize = (canvasSize: { width: number; height: number }) => computeCompositeLayout({
+			canvasSize,
+			maxContentSize: { width: Math.round(canvasSize.width * paddingFit), height: Math.round(canvasSize.height * paddingFit) },
 			screenSize: croppedScreenSize,
 			webcamSize: preset === "no-webcam" ? null : WEBCAM_SOURCE_SIZE,
 			layoutPreset: preset,
@@ -285,8 +290,14 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 			webcamPosition: preset === "picture-in-picture" ? settings.webcamPosition : null,
 			webcamMaskShape: mask,
 		});
+		// Use the renderer's reference size for source-resolution limits. Rounding a
+		// small CSS preview must not change the zoom cap when the window is resized.
+		const referenceSize = document ? pickOutputDims(document, settings.aspectRatio) : SCREEN_SOURCE_SIZE;
+		return { preview: atSize(frameSize), reference: atSize(referenceSize), referenceSize };
 	}, [
 		frameSize,
+		document,
+		settings.aspectRatio,
 		screenNativeSize,
 		cropRegion,
 		activeClipHasCamera,
@@ -296,6 +307,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 		settings.webcamPosition,
 		settings.padding,
 	]);
+	const layout = layouts.preview;
 
 	// Full Camera: during a cameraFullscreen region the webcam takes the whole
 	// frame and eases back. Same `computeCameraFullscreenRect` call as both
@@ -323,70 +335,42 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 	const frameStyle = useMemo(() => buildFrameStyle(settings), [settings]);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const screenStyle = useMemo(() => {
-		if (!isLinkReaderBrowser || !layout?.screenRect)
-			return buildScreenStyle(layout, settings, frameSize, isLinkReaderBrowser, isPlaying);
-		const rate =
-			findActiveSpeedRegion(props.speedRegions ?? [], Math.round(props.currentTimeSec * 1000))
-				?.speed ?? 1;
-		const zoom = computeZoomPreviewTransform(
-			props.zoomRegions ?? [],
-			props.currentTimeSec * 1000,
-			undefined,
-			rate,
-		);
-		const transformed = {
-			...layout,
-			screenRect: screenPreviewRect(layout.screenRect, frameSize, zoom),
-		};
-		const style = buildScreenStyle(transformed, settings, frameSize, true, isPlaying);
-		const output = document ? pickOutputDims(document, settings.aspectRatio) : SCREEN_SOURCE_SIZE;
-		style.borderRadius = `${previewRadius(layout.screenBorderRadius ?? settings.borderRadius, frameSize, output)}px`;
+		if (!isLinkReaderBrowser || !layout?.screenRect) return buildScreenStyle(layout, settings, frameSize, isLinkReaderBrowser, isPlaying);
+		const rate=findActiveSpeedRegion(props.speedRegions ?? [], Math.round(props.currentTimeSec*1000))?.speed ?? 1;
+		const zoom=computeBrowserZoomPreviewTransform(props.zoomRegions ?? [], props.currentTimeSec*1000, {
+			autoFocusAll: settings.autoFocusAll,
+			cameraTrack, sourceOffsetMs: activeClip ? (activeClip.sourceStartSec - activeClip.timelineStartSec) * 1000 : 0,
+			cursorFocus: browserCursorFocusAt(props.clips, activeClip?.assetId, props.currentTimeSec*1000, cursorPath),
+			crop: cropRegion, screen: layout.screenRect, canvas: frameSize,
+			sourceSize: screenNativeSize ?? SCREEN_SOURCE_SIZE,
+			reference: { screen: layouts.reference.screenRect, canvas: layouts.referenceSize },
+		}, rate);
+		const transformed={...layout,screenRect:screenPreviewRect(layout.screenRect,frameSize,zoom)};
+		const style=buildScreenStyle(transformed,settings,frameSize,true,isPlaying);
+		const output=document ? pickOutputDims(document,settings.aspectRatio) : SCREEN_SOURCE_SIZE;
+		style.borderRadius=`${previewRadius(layout.screenBorderRadius ?? settings.borderRadius,frameSize,output)}px`;
 		return style;
-	}, [
-		layout,
-		settings,
-		frameSize,
-		isLinkReaderBrowser,
-		isPlaying,
-		props.speedRegions,
-		props.zoomRegions,
-		props.currentTimeSec,
-		document,
-	]);
+	}, [layout, layouts, settings, frameSize, screenNativeSize, isLinkReaderBrowser, isPlaying, props.speedRegions, props.zoomRegions, props.currentTimeSec, props.clips, activeClip, cropRegion, cursorPath, cameraTrack, document]);
 	// Motion-blur history must use the previous camera rectangle too; using
 	// today's zoom for every tap makes the pointer smear along a different path.
 	const cursorPreviousFrame = useMemo(() => {
 		if (!isLinkReaderBrowser || !layout?.screenRect) return undefined;
 		const now = props.currentTimeSec * 1000;
-		const previous = now - (Math.min(1, Math.max(0, settings.cursor.motionBlur)) / 60) * 1000;
-		const rectAt = (time: number) =>
-			screenPreviewRect(
-				layout.screenRect!,
-				frameSize,
-				computeZoomPreviewTransform(
-					props.zoomRegions ?? [],
-					time,
-					undefined,
-					findActiveSpeedRegion(props.speedRegions ?? [], Math.round(time))?.speed ?? 1,
-				),
-			);
-		const current = rectAt(now),
-			prior = rectAt(previous);
-		return {
-			x: (prior.x - current.x) / current.width,
-			y: (prior.y - current.y) / current.height,
-			width: prior.width / current.width,
-			height: prior.height / current.height,
-		};
-	}, [
-		isLinkReaderBrowser,
-		layout,
-		frameSize,
-		props.currentTimeSec,
-		props.zoomRegions,
-		props.speedRegions,
-		settings.cursor.motionBlur,
-	]);
+		const previous = now - Math.min(1, Math.max(0, settings.cursor.motionBlur)) / 60 * 1000;
+		const rectAt = (time: number) => screenPreviewRect(layout.screenRect!, frameSize,
+			computeBrowserZoomPreviewTransform(props.zoomRegions ?? [], time, {
+				autoFocusAll: settings.autoFocusAll,
+				cameraTrack, sourceOffsetMs: activeClip ? (activeClip.sourceStartSec - activeClip.timelineStartSec) * 1000 : 0,
+				cursorFocus: browserCursorFocusAt(props.clips, activeClip?.assetId, time, cursorPath),
+				crop: cropRegion, screen: layout.screenRect!, canvas: frameSize,
+				sourceSize: screenNativeSize ?? SCREEN_SOURCE_SIZE,
+				reference: { screen: layouts.reference.screenRect, canvas: layouts.referenceSize },
+			},
+				findActiveSpeedRegion(props.speedRegions ?? [], Math.round(time))?.speed ?? 1));
+		const current = rectAt(now), prior = rectAt(previous);
+		return {x:(prior.x-current.x)/current.width,y:(prior.y-current.y)/current.height,
+			width:prior.width/current.width,height:prior.height/current.height};
+	}, [isLinkReaderBrowser, layout, layouts, frameSize, screenNativeSize, props.currentTimeSec, props.zoomRegions, props.speedRegions, props.clips, activeClip, cropRegion, cursorPath, cameraTrack, settings.autoFocusAll, settings.cursor.motionBlur]);
 	const webcamStyle = useMemo(
 		() => buildWebcamStyle(effectiveLayout, settings, frameSize),
 		[effectiveLayout, settings, frameSize],

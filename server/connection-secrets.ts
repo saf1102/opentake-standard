@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import path from 'node:path';
+import {windowsConnectionSecretStore} from './windows-connection-secrets.ts';
 import {agentSettingsFile} from './agent-settings.ts';
 import {spawn} from 'node:child_process';
 import type {ConnectionId} from '../shared/agent-connections.ts';
@@ -12,6 +14,7 @@ const runSecurity:SecurityRun=(args,stdin)=>new Promise((resolve,reject)=>{
 });
 export function connectionSecretStore(run:SecurityRun=runSecurity,platform=process.platform):ConnectionSecretStore {
  const scope=crypto.createHash('sha256').update(process.env.LINKREADER_CONNECTION_SETTINGS_FILE||agentSettingsFile()).digest('hex').slice(0,16);
+ if(platform==='win32'&&run===runSecurity)return windowsConnectionSecretStore(path.join(path.dirname(process.env.LINKREADER_CONNECTION_SETTINGS_FILE||agentSettingsFile()),'connection-secrets',scope),scope);
  const service=(id:ConnectionId)=>`opentake.connection.${scope}.${id}`;
  const args=(action:string,id:ConnectionId)=>[action,'-a','opentake','-s',service(id)];
  const requireMac=()=>{if(platform!=='darwin')throw Error('当前系统尚未适配统一接入钥匙串；不会把密钥存入明文文件');};
