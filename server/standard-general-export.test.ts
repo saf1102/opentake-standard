@@ -59,6 +59,17 @@ test('cancel stops the owned worker tree, ignores late output and permits a fres
     await until(() => fs.existsSync(path.join(output, 'pids.json')) && findGeneral(project.id).project.exportTask?.progress === 0.2);
     const pids: number[] = JSON.parse(fs.readFileSync(path.join(output, 'pids.json'), 'utf8'));
     assert.equal(findGeneral(project.id).project.exportTask?.state, 'running', 'worker cannot overwrite task state');
+    if(process.platform==='win32'){
+      // A separate scanner can retain a handle beyond the renderer's lifetime.
+      // Exercise real Windows sharing violations longer than the old 545 ms retry.
+      const held=path.join(output,'transient-scan.tmp'),ready=path.join(root,'scanner-ready');
+      fs.writeFileSync(held,'synthetic scanner fixture');
+      const quote=(s:string)=>"'"+s.replaceAll("'","''")+"'";
+      const command=`$qaStream=[IO.File]::Open(${quote(held)},'Open','Read','None');try{[IO.File]::WriteAllText(${quote(ready)},'ready');Start-Sleep -Milliseconds 1800}finally{$qaStream.Dispose()}`;
+      const holder=spawn(path.join(process.env.SystemRoot!,'System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-Command',command],{windowsHide:true,stdio:'ignore'});
+      children.push(holder);
+      await until(()=>fs.existsSync(ready));
+    }
     const firstCancel = cancelExport(project.id, task.id);
     const secondCancel = cancelExport(project.id, task.id);
     assert.equal((await startExport(project.id, 1, 'mp4')).id, task.id, 'cleanup retains the project lock');

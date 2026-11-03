@@ -112,30 +112,37 @@ export async function startExport(id: string, version: number, format: unknown, 
   let settled = false, cancelRequested = false;
   let resolveFinished!: () => void;
   const finished = new Promise<void>(resolve => { resolveFinished = resolve; });
-  const remove = (target: string) => removeWithRetrySync(target, { recursive: true, force: true });
+  // Windows can retain Chromium profile handles briefly after taskkill returns.
+  // Yield during bounded sharing-violation retries, retaining this job's lock.
+  const remove = async (target: string) => {
+    try { await fs.promises.rm(target, { recursive: true, force: true, maxRetries: process.platform === 'win32' ? 10 : 0, retryDelay: 100 }); }
+    catch (error) { throw new Error(`清理文件失败（${(error as NodeJS.ErrnoException).code || 'UNKNOWN'}）：${target}`, { cause: error }); }
+  };
   const stop = () => { if (child?.pid) try { platform.killTree(child.pid, 'SIGKILL'); } catch { /* already stopped */ } };
-  const done = (error?: unknown) => {
+  const done = async (error?: unknown) => {
     if (settled) return;
     settled = true;
     process.off('exit', stop);
     stop();
     try {
       if (cancelRequested) {
-        remove(output);
+        await remove(output);
         patch({ state: 'cancelled', step: '导出已取消', endedAt: new Date().toISOString() });
       } else if (error) {
         diagnostic({event:'failed',step:task.step,error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined});
-        remove(output);
+        await remove(output);
         patch({ state: 'failed', endedAt: new Date().toISOString(), error: `导出失败：${redactExportDiagnostic(String(error instanceof Error ? error.message : error)).slice(-8000)}；诊断记录：${diagnostics}` });
       } else {
         const result = format === 'mp4' ? `成片.${settings.video.codec==='prores422'?'mov':settings.video.container}` : '剪映工程';
         if (!fs.existsSync(path.join(output, result))) throw new Error('没有生成导出文件');
-        for (const part of ['work', 'media']) remove(path.join(output, part));
+        for (const part of ['work', 'media']) await remove(path.join(output, part));
         patch({ state: 'done', step: '导出完成', progress: 1, endedAt: new Date().toISOString(), ...(format === 'mp4' ? {downloadUrl:`/api/general/projects/${encodeURIComponent(id)}/exports/${task.id}/file`} : {folder:path.join(output,result)}) });
         diagnostic({event:'complete'});
       }
     } catch (failure) {
-      const result:Partial<GeneralExport>={ state:'failed',endedAt:new Date().toISOString(),error:`导出收尾失败：${failure instanceof Error?failure.message:failure}` };
+      diagnostic({event:'cleanup-failed',error:failure instanceof Error?failure.message:String(failure)});
+      const original=error?`导出失败：${redactExportDiagnostic(String(error instanceof Error?error.message:error)).slice(-8000)}；`:'';
+      const result:Partial<GeneralExport>={ state:'failed',endedAt:new Date().toISOString(),error:`${original}导出收尾失败：${failure instanceof Error?failure.message:failure}；诊断记录：${diagnostics}` };
       try{patch(result)}catch(error){Object.assign(task,result);task.error+=`；状态保存失败：${error instanceof Error?error.message:String(error)}`;console.warn(task.error)}
     } finally {
       try { cleanupPathSync(lockPath(dir),{recursive:true}); }
@@ -218,6 +225,6 @@ export async function startExport(id: string, version: number, format: unknown, 
       done(code === 0 ? undefined : errorText.trim()||tail.trim()||`出片工具退出（${code}${signal?', '+signal:''}）`);
     });
     fs.writeFileSync(path.join(lockPath(dir), 'owner.json'), JSON.stringify({ pid: process.pid, worker: child.pid }));
-  } catch (error) { done(error); }
+  } catch (error) { await done(error); }
   return { ...task };
 }
