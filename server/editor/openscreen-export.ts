@@ -80,7 +80,7 @@ function persistFromProcess(job:OpenScreenExportJob) {
     unsaved.set(job.id,job);
     if(unsaved.size>200)unsaved.delete(unsaved.keys().next().value!);
     const worker=live.get(job.id)?.child;
-    try{if(worker?.pid&&worker.exitCode===null&&worker.signalCode===null)platform.killTree(worker.pid)}catch{}
+    try{if(worker?.pid&&worker.exitCode===null&&worker.signalCode===null)stopScreenExport(worker)}catch{}
     return false;
   }
 }

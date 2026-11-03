@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 
 if(process.platform!=='win32'){
-  console.log('Windows 采集组件：当前平台无需构建。');
+  fs.writeSync(1,'Windows 采集组件：当前平台无需构建。\n');
   process.exit(0);
 }
 if(process.arch!=='x64')throw Error('Windows 采集组件目前仅验收 x64。');

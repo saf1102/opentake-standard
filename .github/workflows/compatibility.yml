@@ -32,6 +32,12 @@ jobs:
       - run: npm ci
       - run: npm --prefix vendor/openscreen ci --ignore-scripts
       - run: npx --no-install playwright-core install chromium
+      - name: Install macOS media test tools
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: Prepare locked Windows media test tools
+        if: runner.os == 'Windows'
+        run: node scripts/prepare-ci-media.mjs
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:release

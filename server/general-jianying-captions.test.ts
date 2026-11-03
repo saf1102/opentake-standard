@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -6,6 +6,24 @@ import path from 'node:path';
 import { generalJianyingCaptions, splitJianyingText } from './general/jianying-captions.ts';
 import type { Film2 } from './general/layers.ts';
 import { fontDirs } from './general/runtime-tools.ts';
+
+// These cases verify mapping and copying, not glyph rendering. Use a synthetic
+// transferable font file so a fresh CI host needs no optional system CJK fonts.
+const fontFolder=fs.mkdtempSync(path.join(os.tmpdir(),'jianying-caption-fonts-'));
+const originalFontDirs=process.env.CW_FONT_DIRS;
+const originalGeneralFontDirs=process.env.LINKREADER_GENERAL_FONT_DIRS;
+before(()=>{
+  fs.writeFileSync(path.join(fontFolder,'NotoSansSCwght.ttf'),'caption-copy-fixture');
+  process.env.CW_FONT_DIRS=fontFolder;
+  process.env.LINKREADER_GENERAL_FONT_DIRS=fontFolder;
+});
+after(()=>{
+  if(originalFontDirs===undefined)delete process.env.CW_FONT_DIRS;else process.env.CW_FONT_DIRS=originalFontDirs;
+  if(originalGeneralFontDirs===undefined)delete process.env.LINKREADER_GENERAL_FONT_DIRS;else process.env.LINKREADER_GENERAL_FONT_DIRS=originalGeneralFontDirs;
+  assert.equal(path.dirname(path.resolve(fontFolder)),path.resolve(os.tmpdir()));
+  assert.ok(path.basename(fontFolder).startsWith('jianying-caption-fonts-'));
+  fs.rmSync(fontFolder,{recursive:true,force:true});
+});
 
 /** Standard ships no style fonts, so a missing family falls back with a warning; Pro must keep the exact one. */
 function hasFont(family: string) {
@@ -64,7 +82,8 @@ test('Swiss and ink actual presets keep their distinct alignment, family and ita
   assert.equal(swiss.fontSizePx, 56.7); assert.equal(swiss.rotate, 12);
   assert.deepEqual(swiss.layout, { anchorX: 1, anchorY: 0, x: 1844.4, y: 75.60000000000001, maxWidth: 1152, bar: false, paddingX: 0, paddingY: 0 });
   const inkResult = await convert(film('宣纸旁白'), 'ink-wash'), ink = inkResult.subtitles[0].generalStyle;
-  assertFamily(ink, 'Cormorant Garamond', inkResult.warnings); assert.equal(ink.fallbackFamily, 'Songti SC');
+  assertFamily(ink, 'Cormorant Garamond', inkResult.warnings);
+  if(ink.fallbackFamily!=='Songti SC')assert.ok(inkResult.warnings.some(line=>line.includes('Songti SC')),'an unavailable system fallback must be reported');
   assert.equal(ink.italic, true); assert.equal(ink.color, '#373A36'); assert.equal(ink.backgroundColor, 'transparent');
 });
 

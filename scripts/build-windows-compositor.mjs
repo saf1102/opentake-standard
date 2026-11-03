@@ -63,4 +63,4 @@ async function build(){
  fs.writeFileSync(path.join(out,'build.json'),JSON.stringify({kind:'opentake-compositor-software-video-v2',upstreamCommit:upstream.commit,sourceSha256,binarySha256:sha(fs.readFileSync(binary)),ffmpegSdkSha256:upstream.sdkSha256},null,2)+'\n');
  verifyWindowsCompositor();console.log('Windows 原生合成器已构建，支持视频硬件初始化失败后的软件解码及编码回退。');
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await build();
+if(process.argv[1]&&fs.realpathSync(process.argv[1])===fs.realpathSync(fileURLToPath(import.meta.url)))await build();

@@ -26,7 +26,7 @@ test('a macOS host skips Windows native compilation before looking up toolchains
   for(const name of ['build-windows-recording.mjs','build-windows-compositor.mjs']){
    const file=path.join(folder,name);fs.copyFileSync(fileURLToPath(new URL('../scripts/'+name,import.meta.url)),file);
    const result=execFileSync(process.execPath,['--require',shim,file],{encoding:'utf8',timeout:15000});
-   assert.match(result,/当前平台无需构建/);
+   assert.match(result,/当前平台无需构建/,name);
   }
   assert.equal(fs.existsSync(path.join(folder,'native')),false);assert.equal(fs.existsSync(path.join(folder,'.build')),false);
  }finally{fs.rmSync(folder,{recursive:true,force:true})}

@@ -117,6 +117,11 @@ test('closed switch: settings, connectivity and film launch never start Claude C
  proto.spawn=function(this:unknown,options){if(isClaude(options?.file,options?.args?.slice(1))){claudeStarts.push(`ChildProcess ${options?.file}`);throw blocked();}return lowSpawn.call(this,options)};
  syncBuiltinESMExports();
  try{
+  // Windows can answer every disabled-agent route without starting a login shell.
+  // Probe the watch itself so zero legitimate starts cannot masquerade as a broken watch.
+  const canary=path.join(home,'watch-canary');
+  assert.equal(cp.spawnSync(canary,[]).error?.code,'ENOENT');
+  assert.ok(started.some(line=>line.includes(canary)),'the process-start watch must record its synthetic probe');
   const isStandard=!fs.existsSync(path.join(root,'server/editor/api/root.ts'));
   const routeModule=isStandard?'./standard/settings-api.ts':'./editor/api/root.ts';
   const handlers=await import(routeModule);
@@ -156,7 +161,6 @@ test('closed switch: settings, connectivity and film launch never start Claude C
   assert.throws(()=>startFilmAgent({agent:'kimi',executable:onPath,model:'default',effort:'medium'},['acp'],{cwd:home,env:{PATH:bin},prompt:'不应执行',onEvent(){}}),/不能通过通用 ACP/);
   // The rest of Settings › AI 与 Agent and the system settings page, run the same way.
   for(const route of ['agent-settings/installation/codex','agent-settings/roster','agent-settings','system-settings'])await call('GET',route);
-  assert.ok(started.length>0,'the watch saw no program start at all');
   assert.deepEqual(claudeStarts,[]);
   assert.equal(fs.existsSync(ran),false,`Claude Code was started: ${fs.existsSync(ran)?fs.readFileSync(ran,'utf8'):''}`);
   assert.equal(fs.readFileSync(legacyConfig,'utf8'),legacyText,'the old enhanced-agent.json stays as it was');
