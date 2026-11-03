@@ -6,11 +6,11 @@
     "status": "unavailable",
     "lastSuccessAt": null,
     "history": null,
-    "attemptedAt": "2026-11-03T09:29:32.591Z"
+    "attemptedAt": "2026-11-03T17:49:30.878Z"
   },
   "sourceZip": {
     "status": "ok",
-    "lastSuccessAt": "2026-11-03T09:29:32.591Z",
+    "lastSuccessAt": "2026-11-03T17:49:30.878Z",
     "assets": [
       {
         "id": 681972658,
@@ -19,7 +19,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-10-27T15:18:36.452Z",
         "firstObservedCount": 0,
-        "lastObservedAt": "2026-11-03T09:29:32.591Z",
+        "lastObservedAt": "2026-11-03T17:49:30.878Z",
         "lastCount": 143,
         "active": true,
         "absentSince": null
@@ -31,7 +31,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-10-29T02:25:47.190Z",
         "firstObservedCount": 10,
-        "lastObservedAt": "2026-11-03T09:29:32.591Z",
+        "lastObservedAt": "2026-11-03T17:49:30.878Z",
         "lastCount": 92,
         "active": true,
         "absentSince": null
@@ -43,7 +43,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-10-30T08:36:20.445Z",
         "firstObservedCount": 21,
-        "lastObservedAt": "2026-11-03T09:29:32.591Z",
+        "lastObservedAt": "2026-11-03T17:49:30.878Z",
         "lastCount": 174,
         "active": true,
         "absentSince": null
@@ -55,8 +55,20 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-11-01T16:00:44.585Z",
         "firstObservedCount": 247,
-        "lastObservedAt": "2026-11-03T09:29:32.591Z",
-        "lastCount": 316,
+        "lastObservedAt": "2026-11-03T17:49:30.878Z",
+        "lastCount": 337,
+        "active": true,
+        "absentSince": null
+      },
+      {
+        "id": 705086773,
+        "releaseId": 432510771,
+        "tag": "desktop-v1.1.0-2026110306",
+        "name": "OpenTake-Standard-source.zip",
+        "firstObservedAt": "2026-11-03T17:49:30.878Z",
+        "firstObservedCount": 8,
+        "lastObservedAt": "2026-11-03T17:49:30.878Z",
+        "lastCount": 8,
         "active": true,
         "absentSince": null
       }
@@ -1028,11 +1040,62 @@
             "correction": 0
           }
         ]
+      },
+      {
+        "from": "2026-11-03T09:29:32.591Z",
+        "to": "2026-11-03T17:49:30.878Z",
+        "increase": 21,
+        "firstSeenBaseline": 8,
+        "correction": 0,
+        "kind": "within-utc-day",
+        "utcDate": "2026-11-03",
+        "changes": [
+          {
+            "assetId": 681972658,
+            "from": "2026-11-03T09:29:32.591Z",
+            "to": "2026-11-03T17:49:30.878Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 686727336,
+            "from": "2026-11-03T09:29:32.591Z",
+            "to": "2026-11-03T17:49:30.878Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 690996729,
+            "from": "2026-11-03T09:29:32.591Z",
+            "to": "2026-11-03T17:49:30.878Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 698130702,
+            "from": "2026-11-03T09:29:32.591Z",
+            "to": "2026-11-03T17:49:30.878Z",
+            "increase": 21,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 705086773,
+            "from": null,
+            "to": "2026-11-03T17:49:30.878Z",
+            "increase": 0,
+            "baseline": 8,
+            "correction": 0
+          }
+        ]
       }
     ],
-    "attemptedAt": "2026-11-03T09:29:32.591Z",
-    "lastSnapshot": "[{\"id\":681972658,\"releaseId\":425627379,\"tag\":\"source-0a414ba6be7d62ddfe065186479353af8e779c71\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":143},{\"id\":686727336,\"releaseId\":427312102,\"tag\":\"v1.0.1\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":92},{\"id\":690996729,\"releaseId\":428671773,\"tag\":\"v1.0.2\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":174},{\"id\":698130702,\"releaseId\":430534739,\"tag\":\"v1.1.0\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":316}]"
+    "attemptedAt": "2026-11-03T17:49:30.878Z",
+    "lastSnapshot": "[{\"id\":681972658,\"releaseId\":425627379,\"tag\":\"source-0a414ba6be7d62ddfe065186479353af8e779c71\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":143},{\"id\":686727336,\"releaseId\":427312102,\"tag\":\"v1.0.1\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":92},{\"id\":690996729,\"releaseId\":428671773,\"tag\":\"v1.0.2\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":174},{\"id\":698130702,\"releaseId\":430534739,\"tag\":\"v1.1.0\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":337},{\"id\":705086773,\"releaseId\":432510771,\"tag\":\"desktop-v1.1.0-2026110306\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":8}]"
   },
-  "lastCollectedAt": "2026-11-03T09:29:32.591Z",
+  "lastCollectedAt": "2026-11-03T17:49:30.878Z",
   "automaticSourceArchiveDownloads": null
 }
