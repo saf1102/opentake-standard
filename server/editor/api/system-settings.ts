@@ -13,11 +13,16 @@ import {scan} from '../store.ts';
 import {scanGeneral} from '../../general/store.ts';
 import {binary} from '../media-binary.ts';
 import {findJianyingApp,findJianyingDraftDir,chooseExportDestination} from '../settings-host.ts';
+import {readJianyingPaths,writeJianyingPaths} from '../jianying/paths.ts';
 const hasBinary=(name:string)=>{try{return !!binary(name)}catch{return false}};
 export async function handleSystemSettingsApi(req:IncomingMessage,res:ServerResponse,parts:string[]){
  if(parts[0]!=='system-settings')return false;
  if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress||'')){sendJson(res,403,{ok:false,error:'系统设置请在这台电脑上打开'});return true;}
  const reply=(result:unknown)=>{sendJson(res,200,{ok:true,result});return true;};
+ if(parts[1]==='jianying'){
+  if(req.method==='GET')return reply({paths:readJianyingPaths(),detected:{app:findJianyingApp()||'',drafts:findJianyingDraftDir()||''}});
+  if(req.method==='PUT'){writeJianyingPaths(await bodyJson(req));return reply({paths:readJianyingPaths(),detected:{app:findJianyingApp()||'',drafts:findJianyingDraftDir()||''}});}
+ }
  if(await handleSettingsMigrations(req,res,parts))return true;
  if(req.method==='GET'&&parts.length===1)return reply(settingsView());
  if(req.method==='PUT'&&parts.length===1){const body=await bodyJson(req);assertStorageIdle();const releases:(()=>void)[]=[];try{for(const {dir} of scan(true)){const lease=await acquireExportCacheLease(dir);releases.push(lease.release);releases.push(lease.beginMaintenance());}assertStorageIdle();return reply(writeSystemSettings(body.preferences,body.revision));}finally{for(const release of releases.reverse())release();}}

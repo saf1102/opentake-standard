@@ -15,6 +15,7 @@ import { muxNormalizedAudio } from './audio.ts';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import {runExportTool,exportDiagnostic} from '../export-diagnostics.ts';
 import { renderVideo, preflightRenderPage } from '../frame-render/index.ts';
 import { PageExecutionError } from '../frame-render/page-execution.ts';
 import { injectPageScripts } from './kit/hfx-support.mjs';
@@ -23,7 +24,7 @@ import { volumePoints } from './hf-timeline.ts';
 import type { HfPageEdits } from '../../src/general/general-contract.ts';
 import { ffmpegPath, ffprobePath } from './kit-env.ts';
 
-const exec = promisify(execFile);
+const exec = runExportTool;
 const SHIM = fs.readFileSync(new URL('./hf-render-shim.js', import.meta.url), 'utf8');
 const EDITS = fs.readFileSync(new URL('./hf-edit-bridge.js', import.meta.url), 'utf8');
 const SPEED = fs.readFileSync(new URL('./hf-speed-bridge.js', import.meta.url), 'utf8');
@@ -130,7 +131,9 @@ export async function renderHyperframes(work: string, output: string, options: H
     }
     throw error;
   } finally {
-    server.close();
+    // Dispose the server before the export worker exits; do not leave delayed work behind.
+    await server.close();
+    exportDiagnostic({event:'stage',stage:'hyperframes-server-closed'});
     for (const f of [silent, sound]) cleanupPathSync(f);
     if (!options.cacheDir) cleanupPathSync(cacheDir, { recursive: true });
   }

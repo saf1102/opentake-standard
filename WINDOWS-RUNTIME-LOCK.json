@@ -85,6 +85,48 @@
       "source": "https://chromium.googlesource.com/chromium/src/+/153.0.8010.12",
       "sha256": "7aec872f3090e639c4237467624ea863c20fe2878914c93a6556bdbb52aa6c4c",
       "archiveFilesVerified": 290
+    },
+    {
+      "name": "Node.js export worker",
+      "version": "24.21.0",
+      "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip",
+      "sha256": "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541",
+      "licenseFile": "export-node/LICENSE"
+    },
+    {
+      "name": "pyjianyingdraft",
+      "version": "0.3.0",
+      "url": "https://files.pythonhosted.org/packages/fd/9e/b486e6e7670df7e1defa9d798d5c4015e7e4992b1bc18bd8e05b00d065b6/pyjianyingdraft-0.3.0-py3-none-any.whl",
+      "sha256": "09863de4b0cfbb23fff54b4122ef49eff3527685f7978c6230f0651942954bdc",
+      "licenseFiles": "jianying-python/*dist-info/licenses or LICENSE*"
+    },
+    {
+      "name": "pymediainfo",
+      "version": "7.0.1",
+      "url": "https://files.pythonhosted.org/packages/e7/26/9d50c2a330541bc36c0ea7ce29eeff5b0c35c2624139660df8bcfa9ae3ce/pymediainfo-7.0.1-py3-none-win_amd64.whl",
+      "sha256": "13224fa7590e198763b8baf072e704ea81d334e71aa32a469091460e243893c7",
+      "licenseFiles": "jianying-python/*dist-info/licenses or LICENSE*"
+    },
+    {
+      "name": "imageio",
+      "version": "2.38.1",
+      "url": "https://files.pythonhosted.org/packages/7d/8a/3b7f62b9df56460959f1b9bef094248d2a4d7f393c5b0d2da8efcdf0e40e/imageio-2.38.1-py3-none-any.whl",
+      "sha256": "36d23eb7423d2fb63f637098758edb3d2df3687f7125e0a5ce8596572022dcf9",
+      "licenseFiles": "jianying-python/*dist-info/licenses or LICENSE*"
+    },
+    {
+      "name": "uiautomation",
+      "version": "2.0.29",
+      "url": "https://files.pythonhosted.org/packages/b0/27/b9c4b33b4129805fa2c437fa13da06c71e74213ae46da098d194d89834fe/uiautomation-2.0.29-py3-none-any.whl",
+      "sha256": "5dd51c9e77e70470142a13d903be67f256c445e7cf20b47ada0ece2bdaff9f32",
+      "licenseFiles": "jianying-python/*dist-info/licenses or LICENSE*"
+    },
+    {
+      "name": "comtypes",
+      "version": "1.4.17",
+      "url": "https://files.pythonhosted.org/packages/89/9c/d0bc1fb69ad22a04bdc01dd9b5613a2ebc4d02ba1ec24b02127dc93791ba/comtypes-1.4.17-py3-none-any.whl",
+      "sha256": "4e0a221dde2c589b82977bed802efd71cd5eb67a380347b732e02735e597f586",
+      "licenseFiles": "jianying-python/*dist-info/licenses or LICENSE*"
     }
   ],
   "runtimeSourceArchives": [

@@ -20,6 +20,8 @@ import {editedCaptionPage,editedCaptionPages,editedHyperframes} from './hf-timel
 import {editedSpeedPages,withSpeedScripts} from './hf-speed.ts';
 import {validateDirectory} from '../system-settings.ts';
 import {assertVideoExportSupported} from '../../shared/export-video.ts';
+import {requireJianyingRuntime} from '../editor/jianying/runtime.ts';
+import {exportDiagnostic,decodeExportOutput,redactExportDiagnostic} from '../export-diagnostics.ts';
 
 export function readGeneralExport(dir:string,id:string):GeneralExport {
  if(!/^[0-9a-f-]{36}$/.test(id))throw Error('导出记录编号无效');
@@ -83,6 +85,11 @@ export async function startExport(id: string, version: number, format: unknown, 
   const parsed=ExportSettingsSchema.safeParse(value ?? exportSettingsForPreset(format==='jianying'?'jianying':'quick'));
   if(!parsed.success)throw Object.assign(Error('导出参数无效'),{status:400});
   const settings=parsed.data;
+  if(format==='jianying'){
+    await requireJianyingRuntime();
+    // Standard exports portable drafts. Import is an explicit subsequent action.
+    settings.importToJianying=false;
+  }
   if(format==='mp4')assertVideoExportSupported(settings.video,process.platform);
   const {work,layers,kind,media}=await generalExportSource(id,version);
   if(active.has(id))return active.get(id)!.task;
@@ -96,6 +103,9 @@ export async function startExport(id: string, version: number, format: unknown, 
   const output = path.join(destination, task.id);
   task.outputDir=output;
   const jobs=path.join(dir,'exports','.jobs');fs.mkdirSync(jobs,{recursive:true});
+  const diagnostics=path.join(jobs,task.id+'.diagnostics.jsonl');
+  const diagnostic=(event:Record<string,unknown>)=>exportDiagnostic({taskId:task.id,projectId:id,version,...event},diagnostics);
+  diagnostic({event:'start',format,node:process.version,electron:process.versions.electron});
   writeExportPreferences(dir,settings);
   const patch = (value: Partial<GeneralExport>) => { Object.assign(task, value); fs.writeFileSync(path.join(jobs,task.id+'.json'),JSON.stringify(task,null,2)); updateGeneral(id, p => { if (!p.exportTask || p.exportTask.id === task.id || !running(p.exportTask)) p.exportTask = { ...task }; }); };
   let child: ReturnType<typeof spawn> | undefined;
@@ -114,13 +124,15 @@ export async function startExport(id: string, version: number, format: unknown, 
         remove(output);
         patch({ state: 'cancelled', step: '导出已取消', endedAt: new Date().toISOString() });
       } else if (error) {
+        diagnostic({event:'failed',step:task.step,error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined});
         remove(output);
-        patch({ state: 'failed', endedAt: new Date().toISOString(), error: `导出失败：${error instanceof Error ? error.message : error}` });
+        patch({ state: 'failed', endedAt: new Date().toISOString(), error: `导出失败：${redactExportDiagnostic(String(error instanceof Error ? error.message : error)).slice(-8000)}；诊断记录：${diagnostics}` });
       } else {
         const result = format === 'mp4' ? `成片.${settings.video.codec==='prores422'?'mov':settings.video.container}` : '剪映工程';
         if (!fs.existsSync(path.join(output, result))) throw new Error('没有生成导出文件');
         for (const part of ['work', 'media']) remove(path.join(output, part));
         patch({ state: 'done', step: '导出完成', progress: 1, endedAt: new Date().toISOString(), ...(format === 'mp4' ? {downloadUrl:`/api/general/projects/${encodeURIComponent(id)}/exports/${task.id}/file`} : {folder:path.join(output,result)}) });
+        diagnostic({event:'complete'});
       }
     } catch (failure) {
       const result:Partial<GeneralExport>={ state:'failed',endedAt:new Date().toISOString(),error:`导出收尾失败：${failure instanceof Error?failure.message:failure}` };
@@ -175,9 +187,13 @@ export async function startExport(id: string, version: number, format: unknown, 
     }
     const env = prepareWork(output, { ...process.env, CW_NETWORK: '0', CW_STYLE: project.styleId, CW_EXPORT: '1' });
     const script = fileURLToPath(new URL('./export-worker.ts', import.meta.url));
-    child = spawn(process.execPath, ['--experimental-strip-types', script, output, format, project.name], { cwd: output, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const node=process.platform==='win32'?process.env.OPENTAKE_EXPORT_NODE||process.execPath:process.execPath;
+    if(process.platform==='win32'&&process.versions.electron&&(!process.env.OPENTAKE_EXPORT_NODE||!fs.existsSync(node)))throw Error('内置 Windows 导出运行库缺失，请重新安装完整包');
+    diagnostic({event:'worker-start',file:node,args:['--experimental-strip-types',script,output,format,'[project name]']});
+    child = spawn(node, ['--experimental-strip-types', script, output, format, project.name], { cwd: output, env: { ...env, ELECTRON_RUN_AS_NODE: '1',OPENTAKE_EXPORT_DIAGNOSTICS:diagnostics }, detached: true, windowsHide:true, stdio: ['ignore', 'pipe', 'pipe'] });
     fs.writeFileSync(path.join(lockPath(dir), 'owner.json'), JSON.stringify({ pid: process.pid, worker: child.pid }));
-    let tail = '', pending = '';
+    let tail = '', pending = '';const stderr:Buffer[]=[];let stderrBytes=0,truncated=false;
+    child.stdout?.setEncoding('utf8');
     process.once('exit', stop);
     child.stdout?.on('data', data => {
       pending += data.toString();
@@ -192,9 +208,15 @@ export async function startExport(id: string, version: number, format: unknown, 
         if (!line.startsWith('EXPORT:')) tail = (tail + line + '\n').slice(-8000);
       }
     });
-    child.stderr?.on('data', d => { tail = (tail + d).slice(-8000); });
+    child.stderr?.on('data', d => {const bytes=Buffer.from(d);if(stderrBytes<(8<<20)){stderr.push(bytes.subarray(0,(8<<20)-stderrBytes));stderrBytes+=bytes.length}else truncated=true;});
     child.once('error', done);
-    child.once('close', code => done(code === 0 ? undefined : tail.trim() || `出片工具退出（${code}）`));
+    child.once('close', (code,signal) => {
+      const errorText=decodeExportOutput(Buffer.concat(stderr));
+      diagnostic({event:'worker-exit',code,signal,stderr:errorText,truncated,stdoutTail:tail+pending});
+      // close has reaped the process; never kill a PID after it might have been reused.
+      child=undefined;
+      done(code === 0 ? undefined : errorText.trim()||tail.trim()||`出片工具退出（${code}${signal?', '+signal:''}）`);
+    });
     fs.writeFileSync(path.join(lockPath(dir), 'owner.json'), JSON.stringify({ pid: process.pid, worker: child.pid }));
   } catch (error) { done(error); }
   return { ...task };

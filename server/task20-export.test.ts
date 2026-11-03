@@ -56,6 +56,7 @@ async function fixture() {
     './openscreen-encode.ts':`export const encodeScreenExportMedia=(...a)=>f.encode(...a);`,
     '../general/export-media.ts':`export const probeExportMedia=async()=>({});`,
     '../general/export-draft.ts':`export const flatGeneralDraft=async()=>{};`,
+    './jianying/runtime.ts':`export const requireJianyingRuntimeSync=()=>{};`,
     '../export-preferences.ts':`export const writeExportPreferences=()=>{};`,
     '../system-settings.ts':`export const validateDirectory=v=>v;`,
    };

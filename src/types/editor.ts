@@ -373,6 +373,7 @@ export const ExportCapabilitiesSchema = z.object({
   freeBytes: z.number().nonnegative().optional(),
   jianying: z.object({
     available: z.boolean(),
+    draftBuilderReady: z.boolean().optional(),
     draftDir: z.string().optional(),
     appPath: z.string().optional(),
     warning: z.string().optional(),

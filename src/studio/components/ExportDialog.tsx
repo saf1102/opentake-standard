@@ -235,7 +235,8 @@ export function ExportDialog({
     setError(undefined);
     try {
       await persist();
-      await onStart(exportDialogSubmission(exportState));
+      const submission=exportDialogSubmission(exportState);
+      await onStart({...submission,importToJianying:submission.importToJianying&&Boolean(capabilities?.jianying.available)});
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "无法启动导出");
     }
@@ -320,7 +321,7 @@ export function ExportDialog({
             <footer className="export-footer">
               <div><ExportMethodIcon kind={settings.preset==='jianying'?'jianying':'video'} /><span><b>{copy[settings.preset].label}</b><small>导出会在后台执行，可继续编辑</small></span></div>
               <button type="button" className="export-secondary" onClick={() => void close()}>取消</button>
-              <button type="button" className="export-primary" disabled={!loaded || starting || Boolean(codecUnavailable) || !hasSelectedExport(settings.selection)} onClick={() => void submit()}><Download /> {starting ? "正在启动…" : settings.preset === "jianying" ? mode === "koubo" ? "导出并导入剪映" : "导出剪映草稿" : "导出成片"}</button>
+              <button type="button" className="export-primary" disabled={!loaded || starting || Boolean(codecUnavailable) || settings.preset==='jianying'&&capabilities?.jianying.draftBuilderReady===false || !hasSelectedExport(settings.selection)} onClick={() => void submit()}><Download /> {starting ? "正在启动…" : settings.preset === "jianying" ? mode === "koubo" ? "导出并导入剪映" : "导出剪映草稿" : "导出成片"}</button>
             </footer>
           </>
         )}

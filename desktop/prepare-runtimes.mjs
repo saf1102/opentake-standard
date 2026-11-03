@@ -4,8 +4,10 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import runtime from './bundled-runtimes.cjs';
 import {verifyWindowsCompositor} from '../scripts/build-windows-compositor.mjs';
+import {prepareWindowsExportRuntimes} from '../scripts/prepare-windows-export-runtimes.mjs';
 export async function prepareRuntimeManifest(source){
  const root=path.resolve(source,'../runtime-payload');
+ await prepareWindowsExportRuntimes(root);
  const origins=JSON.parse(await fs.readFile(path.join(root,'provenance.json'),'utf8'));
  if(origins.schema!==1||origins.components.length<10)throw Error('运行库来源清单不完整。');
  await fs.copyFile(path.join(source,'desktop/python-sitecustomize.py'),path.join(root,'python/sitecustomize.py'));

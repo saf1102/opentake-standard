@@ -9,6 +9,7 @@ import {probeExportMedia} from '../general/export-media.ts';
 import {encodeScreenExportMedia} from './openscreen-encode.ts';
 export {encodeScreenExportMedia} from './openscreen-encode.ts';
 import {flatGeneralDraft} from '../general/export-draft.ts';
+import {requireJianyingRuntimeSync} from './jianying/runtime.ts';
 import {writeExportPreferences} from '../export-preferences.ts';
 import {validateDirectory} from '../system-settings.ts';
 import {assertVideoExportSupported} from '../../shared/export-video.ts';
@@ -340,6 +341,7 @@ export function startOpenScreenExport(projectId: string, documentId: string, inp
     ? ['hevc','h265','prores422'].includes(String(input.codec)) ? ExportSettingsSchema.parse({fps:input.mp4Fps===24||input.mp4Fps===60?input.mp4Fps:'project',video:{codec:input.codec==='hevc'?'h265':input.codec}}) : undefined
     : ExportSettingsSchema.parse(input.settings);
   if(settings&&settings.preset!=='jianying')assertVideoExportSupported(settings.video,process.platform);
+  if(settings?.preset==='jianying')requireJianyingRuntimeSync();
   const runner = resolveOpenScreenExportRunner(current.document, process.platform === 'win32' ? undefined : {env:{...process.env,OPENSCREEN_USER_DATA_DIR:openScreenProjectProfile(projectId)}});
   const requestedFps=screenExportFrameRate(settings,found.project.settings.fps,current.document);
   if(settings)writeExportPreferences(found.dir,settings);

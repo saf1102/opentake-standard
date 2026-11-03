@@ -82,7 +82,7 @@ test('真实共享弹窗：口播、通用剪辑与录屏的剪映提交隔离�
    await click('.export-presets button',mode==='koubo'?'剪映工程':'剪映草稿');
    for(const button of dom.window.document.querySelectorAll<HTMLButtonElement>('.export-resolution button'))assert.equal(button.disabled,true);
    await click('.export-footer button.export-primary','导出');
-   assert.deepEqual(submissions[0],exportSettingsForPreset('jianying',film));
+   assert.deepEqual(submissions[0],{...exportSettingsForPreset('jianying',film),importToJianying:false},'portable draft export must not promise unavailable automatic import');
    assert.equal(Object.hasOwn(submissions[0],'fps'),false);
    assert.deepEqual(writes.at(-1),film,'保存的只有成片偏好');
    await click('.export-presets button',mode==='koubo'?'快速成片':'成片');

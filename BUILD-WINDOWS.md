@@ -19,6 +19,12 @@ npm run build:installer
 
 build:installer 编译 WGC、固定补丁的 OpenScreen 原生合成器、两套前端，更新独立运行库副本内的采集器及校验清单，然后生成 release/windows/OpenTake-Standard-Setup-1.1.0-x64.exe。其 win-unpacked 目录可单独启动验收。build:app 保留目录构建入口。
 
+Windows 导出运行库由 `scripts/prepare-windows-export-runtimes.mjs` 按 `desktop/windows-export-runtime-lock.json` 下载并校验。它使用官方 Node.js ZIP 和 PyPI wheels，准备独立的 `export-node` 与 `jianying-python`；不执行 pip、不安装到系统 Python。安装器构建会自动调用此步骤。缓存位于同级 `runtime-downloads`，完整离线重建需预先准备锁定缓存。
+
+剪映草稿可在未安装剪映时生成。Windows 导出后保留整个工程文件夹，退出剪映，再执行「导入剪映-Windows.cmd」；可在「导出默认值 → 剪映路径」设置自定义程序及草稿目录。导入器创建新 UUID 草稿、备份索引、使用进程互斥并在失败时回滚本次新草稿。它不会覆盖已有草稿，也不会自动启动或关闭剪映。实机打开和音画同步应在目标剪映版本单独验收。
+
+通用导出子进程使用包含 Windows 延迟任务关闭修复的 Node.js 24.21.0；应用版本仍为 1.1.0。阶段、运行库版本、子进程退出码、经过脱敏的错误输出和异常栈保存在工程 `exports/.jobs/<任务编号>.diagnostics.jsonl`，失败清理临时目录后仍保留。错误输出按 UTF-8 或 Windows GB18030 解码，每个子进程管道有大小上限；不记录环境变量值。没有加入无限自动重试。
+
 安装器保留分阶段界面、真实解压进度与关键文件校验，通过同盘重命名减少重复复制。许可、LGPL 对应源码、原始 OpenScreen helper 与运行库来源随包保留。产物不含测试工程、账号、密钥、node_modules 开发缓存或 Git 数据。
 
 在独立配置和工程目录验收首页、智能体列表、编辑保存重开、实际录制、通用 MP4 和录屏 MP4、取消重试与退出清理。Win10、Win11 分别记录结果；虚拟显卡硬件解码失败不得标为通过。Windows 安装包未签名，支持 GitHub 检查更新后由用户手动下载安装，未实现一键自动替换。发布步骤见 WINDOWS-RELEASE.md。

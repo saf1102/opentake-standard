@@ -25,7 +25,7 @@ test('S12：共享设置有未保存目录时，分组切换、外部入口、�
  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'}),saved=new Map<string,PropertyDescriptor|undefined>();
  for(const [key,value] of Object.entries({window:dom.window,document:dom.window.document,navigator:dom.window.navigator,IS_REACT_ACT_ENVIRONMENT:true,requestAnimationFrame:(fn:()=>void)=>setTimeout(fn,0)})){saved.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true})}
  const oldFetch=globalThis.fetch;const preferences={paths:{projects:'/fixture',cache:'',exports:'',backups:'/backups'},export:{preset:'quick',container:'mp4',quality:'fast',resolution:'original',revealWhenDone:false},backup:{automatic:true,intervalMinutes:15,keep:20},reserveGB:5};
- globalThis.fetch=(async()=>Response.json({ok:true,result:{revision:0,preferences,libraries:[],paths:{},cacheRoots:[],backupRoots:[],projectPathOverridden:false}})) as typeof fetch;
+ globalThis.fetch=(async(url:unknown)=>Response.json({ok:true,result:String(url).endsWith('/jianying')?{paths:{app:'',drafts:''},detected:{app:'',drafts:''}}:{revision:0,preferences,libraries:[],paths:{},cacheRoots:[],backupRoots:[],projectPathOverridden:false}})) as typeof fetch;
  let app:any;
  try{
   const outfile=path.join(temp,'harness.mjs');

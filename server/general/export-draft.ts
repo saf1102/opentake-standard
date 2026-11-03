@@ -1,19 +1,19 @@
 /** Shared single-track draft for versions whose editable source is one complete page or recording. */
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
+import {runExportTool,exportDiagnostic} from '../export-diagnostics.ts';
+import {requireJianyingRuntime} from '../editor/jianying/runtime.ts';
 import {fileURLToPath} from 'node:url';
 import {probeExportMedia} from './export-media.ts';
 import {ffmpegPath} from './kit-env.ts';
 import {writePortableJianyingImporters} from '../editor/jianying-portable.ts';
-const exec=promisify(execFile);
+const exec=runExportTool;
 export async function buildGeneralDraft(folder:string,signal?:AbortSignal) {
- const python=path.join(os.homedir(),'Library','Application Support','LinkReader','jianying-runtime-0.3.0','bin','python');
- if(!fs.existsSync(python))throw Error('缺少本机剪映导出组件，请先安装离线组件');
- await exec(python,[fileURLToPath(new URL('../editor/jianying/build.py',import.meta.url)),folder],{timeout:3600000,maxBuffer:8<<20,signal});
+ const {python,packages}=await requireJianyingRuntime(signal);
+ exportDiagnostic({event:'stage',stage:'draft-build'});
+ await exec(python,['-I','-X','utf8',fileURLToPath(new URL('../editor/jianying/build.py',import.meta.url)),folder,packages||''],{timeout:3600000,maxBuffer:8<<20,signal});
  writePortableJianyingImporters(folder);
+ exportDiagnostic({event:'stage',stage:'importer-ready'});
 }
 export async function flatGeneralDraft(source:string,folder:string,name:string,media:{width:number;height:number;fps:number;duration:number},signal?:AbortSignal) {
  const res=path.join(folder,'Resources');fs.mkdirSync(res,{recursive:true});

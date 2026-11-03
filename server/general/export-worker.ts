@@ -1,4 +1,6 @@
 import {buildGeneralDraft,flatGeneralDraft} from './export-draft.ts';
+import {runExportTool,exportDiagnostic} from '../export-diagnostics.ts';
+import {requireJianyingRuntime} from '../editor/jianying/runtime.ts';
 import {generalJianyingCaptions, splitJianyingText} from './jianying-captions.ts';
 import {encodeExportMedia} from './export-media.ts';
 import {assertVideoExportSupported} from '../../shared/export-video.ts';
@@ -18,10 +20,11 @@ import { writePortableJianyingImporters } from '../editor/jianying-portable.ts';
 import { volumeDb, type Film2 } from './layers.ts';
 import { renderHyperframes } from './hf-render.ts';
 import { hfPageEdits, type GeneralLayers } from '../../src/general/general-contract.ts';
-const exec = promisify(execFile);
+const exec = runExportTool;
 const [output, format, name] = process.argv.slice(2);
 const work = path.join(output, 'work');
-const progress = (step: string, n: number) => console.log(`EXPORT:${JSON.stringify({ step, progress: n })}`);
+let lastStage='',lastProgress=0;
+const progress = (step: string, n: number) => {lastProgress=n;if(lastStage!==step){lastStage=step;exportDiagnostic({event:'stage',step})}console.log(`EXPORT:${JSON.stringify({ step, progress: n })}`);};
 const run = async (bin: string, args: string[]) => {
   try { return await exec(bin, args, { cwd: work, env: process.env, timeout: 3_600_000, maxBuffer: 8 << 20 }); }
   catch (e) { const x = e as { stderr?: string; message?: string }; throw new Error((x.stderr || x.message || '工具运行失败').slice(-5000)); }
@@ -31,13 +34,15 @@ const ff = (args: string[]) => run(ffmpegPath(), ['-v','error','-y',...args]);
 try {
   const request=JSON.parse(fs.readFileSync(path.join(output,'request.json'),'utf8')) as {settings:ExportSettings;kind:string;media:{width:number;height:number;fps:number;duration:number}};
   const {settings,kind,media}=request;
+  exportDiagnostic({event:'worker-runtime',node:process.version,electron:process.versions.electron||null});
+  if(format==='jianying'){progress('检查剪映草稿组件',.01);await requireJianyingRuntime();}
   if(format!=='jianying')assertVideoExportSupported(settings.video,process.platform);
   const layers=fs.existsSync(path.join(output,'layers.json'))?JSON.parse(fs.readFileSync(path.join(output,'layers.json'),'utf8')) as GeneralLayers:undefined;
   const fps=format==='jianying'?media.fps:typeof settings.fps==='number'?settings.fps:media.fps;
   let source=path.join(work,'out.mp4');
   if(kind==='hyperframes') {
     progress('渲染画面',.05);
-    await renderHyperframes(work,source,{fps,edits:layers?hfPageEdits(layers):undefined,onProgress:p=>progress('渲染画面',.05+.8*p)});
+    await renderHyperframes(work,source,{fps,edits:layers?hfPageEdits(layers):undefined,onProgress:p=>progress('渲染画面',.05+.8*p),onActivity:step=>progress(step,lastProgress)});
   } else if(kind==='film') {
     progress('检查分轨和页面',.05);
     if(format==='jianying'){await jianying();source='';}
@@ -49,7 +54,7 @@ try {
     }
   } else source=path.join(work,'source.mp4');
   if(source) {
-    if(format==='jianying')await flatGeneralDraft(source,path.join(output,'剪映工程'),name,media);
+    if(format==='jianying'){progress('构建剪映草稿和导入脚本',.9);await flatGeneralDraft(source,path.join(output,'剪映工程'),name,media);}
     else {
       progress('编码成片',.9);
       const result=await encodeExportMedia(source,path.join(output,`成片.${settings.video.codec==='prores422'?'mov':settings.video.container}`),settings);
@@ -57,7 +62,8 @@ try {
       console.log(`EXPORT:${JSON.stringify({media:{width:result.width,height:result.height,fps:result.fps}})}`);
     }
   }
-} catch (error) { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; }
+  exportDiagnostic({event:'worker-complete'});
+} catch (error) { exportDiagnostic({event:'worker-error',step:lastStage,error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined});console.error(error instanceof Error ? error.stack : error); process.exitCode = 1; }
 
 async function jianying() {
   // Native captions need structure/media validation, not a raster rendering of their text.

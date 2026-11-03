@@ -4,6 +4,7 @@ const {environmentPath,environmentWithPath}=require('./platform.cjs');
 const RUNTIME_LAYOUT=Object.freeze({
  ffmpeg:'ffmpeg/bin/ffmpeg.exe',ffprobe:'ffmpeg/bin/ffprobe.exe',
  python:'python/python.exe',openscreen:'openscreen/Openscreen.exe',
+ exportNode:'export-node/node.exe',jianying:'jianying-python/pyJianYingDraft/__init__.py',
  compositor:'openscreen/resources/electron/native/bin/win32-x64/compositor_view.node',
  chromium:'browsers/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe',
  headless:'browsers/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe',
@@ -21,6 +22,9 @@ function bundledRuntimeEnvironment(input,resources){
  const env={...input};
  env.LINKREADER_BIN_DIR ||= path.dirname(files.ffmpeg);
  env.LINKREADER_PYTHON ||= files.python;
+ env.OPENTAKE_EXPORT_NODE = files.exportNode;
+ env.OPENTAKE_JIANYING_PYTHON = files.python;
+ env.OPENTAKE_JIANYING_PACKAGES = path.join(root,'jianying-python');
  env.OPENSCREEN_BIN ||= files.openscreen;
  env.PLAYWRIGHT_BROWSERS_PATH ||= path.join(root,'browsers');
  env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ||= files.chromium;

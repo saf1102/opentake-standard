@@ -1,4 +1,5 @@
 import {renameWithRetrySync} from '../file-ops.ts';
+import {jianyingCapabilities} from '../editor/jianying/runtime.ts';
 import {chooseExportDestination} from '../editor/settings-host.ts';
 import {videoExportCapabilities} from '../../shared/export-video.ts';
 import {handleProjectAgentChoices,withProjectAgentChoices} from '../editor/project-agent-choices.ts';
@@ -37,7 +38,7 @@ export async function handleEditorApi(req:IncomingMessage,res:ServerResponse){
   }
   if(parts[3]==='capabilities'&&req.method==='GET') {
    const destination=path.join(dir,'exports');fs.mkdirSync(destination,{recursive:true});
-   const stats=fs.statfsSync(destination);return ok({video:videoExportCapabilities(process.platform),defaultDestination:destination,freeBytes:stats.bavail*stats.bsize,jianying:{available:false,warning:'录屏运镜合成为完整视频轨道，完成后从导出文件夹导入剪映'}});
+   const stats=fs.statfsSync(destination);return ok({video:videoExportCapabilities(process.platform),defaultDestination:destination,freeBytes:stats.bavail*stats.bsize,jianying:{...await jianyingCapabilities()}});
   }
   if(parts[3]==='destination'&&req.method==='POST') {
    return ok({path:await chooseExportDestination('选择导出位置')});

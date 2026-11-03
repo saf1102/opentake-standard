@@ -519,5 +519,5 @@ async function measuredFps(file) {
   return ((ts.length - 1) / (ts.at(-1) - ts[0])).toFixed(2);
 }
 
-if (!cmd || !commands[cmd]) { say(HELP); process.exit(cmd ? 2 : 0); }
-commands[cmd]().then(() => process.exit(0), error => { console.error(`film ${cmd}：${error.message || error}`); process.exit(1); });
+if (!cmd || !commands[cmd]) { say(HELP); process.exitCode=cmd ? 2 : 0; }
+else commands[cmd]().catch(error => { console.error(`film ${cmd}：${error.stack || error}`); process.exitCode=1; });

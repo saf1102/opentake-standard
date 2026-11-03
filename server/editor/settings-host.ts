@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {execFileAsync} from "../proc.ts";
+import {readJianyingPaths,jianyingCandidates} from './jianying/paths.ts';
 const JIANYING_DRAFT_CANDIDATES = [
   path.join(os.homedir(), 'Movies', 'JianyingPro', 'User Data', 'Projects', 'com.lveditor.draft'),
   path.join(os.homedir(), 'Library', 'Application Support', 'JianyingPro', 'User Data', 'Projects', 'com.lveditor.draft'),
@@ -16,10 +17,21 @@ const JIANYING_APP_CANDIDATES = [
 ]
 
 export function findJianyingDraftDir() {
+  const configured=readJianyingPaths().drafts;
+  if(configured)return fs.existsSync(path.join(configured,'root_meta_info.json'))?configured:undefined;
+  if(process.platform==='win32')return jianyingCandidates().drafts.find(candidate=>fs.existsSync(path.join(candidate,'root_meta_info.json')));
   return JIANYING_DRAFT_CANDIDATES.find((candidate) => fs.existsSync(candidate))
 }
 
 export function findJianyingApp() {
+  const configured=readJianyingPaths().app;
+  if(configured)return fs.existsSync(configured)?configured:undefined;
+  if(process.platform==='win32'){
+    const choices=jianyingCandidates().apps;
+    const parent=path.dirname(choices[0]);
+    try{for(const entry of fs.readdirSync(parent,{withFileTypes:true})){if(entry.isDirectory()&&/^\d+(?:\.\d+)*$/.test(entry.name))choices.push(path.join(parent,entry.name,'JianyingPro.exe'));}}catch{}
+    return choices.find(candidate=>fs.existsSync(candidate));
+  }
   return JIANYING_APP_CANDIDATES.find((candidate) => fs.existsSync(candidate))
 }
 
