@@ -8,9 +8,9 @@
 | --- | --- |
 | **Windows 10 / 11（64 位）** | **[下载 EXE（628 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-Setup-1.1.0-x64.exe)** |
 | **Mac（Apple 芯片，M1 及以后）** | **[下载 DMG（377 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-1.1.0-mac-arm64.dmg)** |
-| **Mac（Intel 芯片，x64）** | [DMG 待验收后提供](#intel-mac-测试范围) |
+| **Mac（Intel 芯片）** | **[下载 DMG（388 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-mac-x64-v1.1.0-2026110401/OpenTake-Standard-1.1.0-mac-x64.dmg)**（[测试范围](#intel-mac-测试范围)） |
 
-下载后直接安装，不用自己编译。其他版本和校验值见 [Releases](https://github.com/saf1102/opentake-standard/releases)。Intel 版本正在验收，下载链接将在审核通过后补齐。
+下载后直接安装，不用自己编译。其他版本和校验值见 [Releases](https://github.com/saf1102/opentake-standard/releases)。
 
 安装包暂未做苹果公证和 Windows 代码签名，第一次打开时系统会拦一下：
 
@@ -101,13 +101,13 @@ Claude Code 默认关闭。订阅账号方式开启前有风险确认，推荐 A
 
 ## English
 
-OpenTake Standard is a local video editor for general creation and screen-recording motion. Download the [Windows installer](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-Setup-1.1.0-x64.exe) or the [Apple Silicon Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-1.1.0-mac-arm64.dmg), or use the [Intel Mac DMG placeholder](#intel-mac-测试范围) pending acceptance. Build from source on an Apple Silicon or Intel Mac with `npm run setup` and open with `npm start`. Agent connections support CLI accounts and API keys; film generation requires a supported CLI. Claude Code is off by default. Pro-only publishing, talking-head and analytics modules are not included.
+OpenTake Standard is a local video editor for general creation and screen-recording motion. Download the [Windows installer](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-Setup-1.1.0-x64.exe) the [Intel Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-mac-x64-v1.1.0-2026110401/OpenTake-Standard-1.1.0-mac-x64.dmg), or the [Apple Silicon Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-1.1.0-mac-arm64.dmg), or use the [Intel Mac DMG placeholder](#intel-mac-测试范围) pending acceptance. Build from source on an Apple Silicon or Intel Mac with `npm run setup` and open with `npm start`. Agent connections support CLI accounts and API keys; film generation requires a supported CLI. Claude Code is off by default. Pro-only publishing, talking-head and analytics modules are not included.
 
 ### Intel Mac 测试范围
 
-Intel x64 已加入安装、构建和更新代码；尚未完成 Intel 用户真机验收。GitHub `macos-15-intel` 工作流将运行测试并构建校验 DMG；本次修改尚未触发该工作流。M 芯片上通过 Rosetta 的检查也仍待执行，不能替代 Intel 真机的录屏、HEVC / ProRes 编码能力验证。请使用与芯片匹配的原生 Node；Apple 芯片上通过 Rosetta 运行 x64 Node 的安装方式仍会拒绝。
+Intel 版已在 GitHub 的 Intel 机器上通过全部自动测试和打包，并在 M 芯片 Mac 上用 Rosetta 实测了启动、打开工程、导出、取消和重启。还没有在 Intel 真机上测试过，录屏和老机型的硬件编码可能有差异；HEVC 导出不可用时，软件会提示改选 H.264 或 ProRes。
 
-Intel x64 is covered by the setup, build and updater code. Intel end-user hardware has not been tested. The `macos-15-intel` CI job is configured but has not run for this change; Rosetta acceptance is also pending. Neither a CI build nor Rosetta proves recording or HEVC / ProRes support on older Intel hardware. Use native Node matching your Mac chip; x64 Node under Rosetta on Apple Silicon remains unsupported for setup.
+The Intel build passes the full automated tests and packaging on GitHub's Intel runner, and was exercised under Rosetta on an Apple Silicon Mac (launch, open project, export, cancel, restart). It has not been tested on real Intel hardware; recording and hardware encoding on older models may differ.
 
 ## 许可与隐私
 
