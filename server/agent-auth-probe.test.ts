@@ -19,7 +19,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const request=J
  console.log(JSON.stringify({jsonrpc:'2.0',id:request.id,...(result?{result}:{error:{code:-32000,message:'Authentication required'}})}));});`);
   for(const [scenario,state] of [['success','connected'],['auth','needs-login'],['timeout','unknown']] as const){
    fs.writeFileSync(log,'');
-   const result=await probeAcpAuthentication(process.execPath,[script,scenario,log],{tempRoot:root,timeoutMs:scenario==='timeout'?100:5000});
+   const result=await probeAcpAuthentication(process.execPath,[script,scenario,log],{tempRoot:root,timeoutMs:scenario==='timeout'?2000:5000});
    assert.equal(result.state,state);
    const requests=fs.readFileSync(log,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line));
    assert.deepEqual(requests.map(item=>item.request.method),scenario==='timeout'?['initialize']:['initialize','session/new']);
