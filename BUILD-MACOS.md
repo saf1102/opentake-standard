@@ -1,8 +1,8 @@
 # macOS 1.1.0 安装包构建
 
-本轮支持 macOS Apple 芯片。FFmpeg/ffprobe、Python + numpy、智能体 CLI 和官方 OpenScreen 的准备方式仍按 README；DMG 包含 Standard App，没有新增 Mac 离线运行库或 Intel 支持。公开签名与公证暂不配置，保留原本的本机临时签名和严格验签。
+构建支持 macOS Apple 芯片和 Intel x64；Intel 实际验收范围见 README。FFmpeg/ffprobe、Python + numpy、智能体 CLI 和官方 OpenScreen 的准备方式仍按 README；DMG 包含 Standard App，没有新增 Mac 离线运行库。公开签名与公证暂不配置，保留原本的本机临时签名和严格验签。
 
-推荐合并后运行 .github/workflows/desktop-release.yml，从同一官方 main SHA 出两平台包。以下适用于官方仓库的干净 checkout：
+推荐合并后运行 .github/workflows/desktop-release.yml，从同一官方 main SHA 出 Apple 芯片、Intel 和 Windows 安装包。以下适用于官方仓库的干净 checkout：
 
 ```sh
 npm ci
@@ -29,3 +29,12 @@ npm run build:installer
 仅需本机 App 时仍运行 npm run build:app。没有 receipt 的 Git checkout 须位于干净的官方版本标签；新标签为 desktop-v{version}-{build}，不能把旧 v1.1.0 移到新提交。
 
 双击 DMG，在独立候选位置验证首页、旧工程副本、Codex 出片、录屏与导出。hdiutil verify、本机签名校验和 CI 构建通过不代表功能、公证或分发策略验收通过。完整流程见 RELEASE-HANDOFF-1.1.0.md。
+
+
+## 只补 Intel 安装包
+
+手动工作流 `.github/workflows/mac-intel-release.yml` 只构建 Intel DMG，使用 `desktop-mac-x64-v1.1.0-<日期序号>` 独立标签并创建草稿，显式 `--latest=false`。不递增 `windowsBuild`，不上传 `windows-update.json` 或后台清单，不改变现有 Latest。草稿仍须审核和实际安装验收；本次开发没有触发工作流或发布。
+
+Intel 产物为 `release/OpenTake-Standard-1.1.0-mac-x64.dmg`，本机 App 为 `release/mac/OpenTake Standard.app`；Apple 芯片路径保持 `release/mac-arm64/OpenTake Standard.app`。Intel 包仍为本机临时签名，未公证。
+
+Intel CI 标签按 [GitHub 官方 runner 文档](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) 选择 `macos-15-intel`（x64）；Apple 芯片继续使用 `macos-14`。

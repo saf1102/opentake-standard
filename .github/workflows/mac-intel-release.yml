@@ -1,0 +1,108 @@
+name: Build Intel Mac DMG and separate draft (preserve Latest)
+on:
+  workflow_dispatch:
+    inputs:
+      sequence:
+        description: '日期序号（例如 2026110401），不得复用'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: official-mac-intel-draft
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.repository == 'saf1102/opentake-standard' && github.ref == 'refs/heads/main'
+    # GitHub official runner reference: macos-15-intel is x64.
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    outputs:
+      commit: ${{ steps.identity.outputs.commit }}
+      tag: ${{ steps.identity.outputs.tag }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            vendor/openscreen/package-lock.json
+      - id: identity
+        env:
+          RELEASE_SEQUENCE: ${{ inputs.sequence }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          import release from './desktop/release-contract.cjs';
+          import {findReleaseByTag} from './scripts/publish-source-release.mjs';
+          if(process.platform!=='darwin'||process.arch!=='x64')throw Error('Intel runner required');
+          const commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+          execFileSync('git',['merge-base','--is-ancestor',commit,'refs/remotes/origin/main']);
+          const version=JSON.parse(fs.readFileSync('package.json')).version;
+          const tag=release.macIntelTag(version,process.env.RELEASE_SEQUENCE);
+          if(execFileSync('git',['tag','--list',tag],{encoding:'utf8'}).trim()||findReleaseByTag(process.env.GITHUB_REPOSITORY,tag))throw Error('Tag/draft exists; do not replace it');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,`commit=${commit}\ntag=${tag}\n`);
+          NODE
+      - run: npm ci --ignore-scripts
+      - run: npm --prefix vendor/openscreen ci --ignore-scripts
+      - run: node node_modules/electron/install.js
+      - run: npx --no-install playwright-core install chromium
+      - run: brew install ffmpeg
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:release
+      - name: Prepare frozen official source identity (not an update publication)
+        env:
+          SOURCE_SHA: ${{ steps.identity.outputs.commit }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          node scripts/prepare-source-release.mjs --ref "$SOURCE_SHA" --tag "$RELEASE_TAG" --out release/source
+          unzip -p release/source/OpenTake-Standard-source.zip opentake-standard/release-source.json > release-source.json
+      - run: npm run build:installer
+      - name: Verify Intel executable and prepare Intel-only bundle
+        env:
+          SOURCE_SHA: ${{ steps.identity.outputs.commit }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          file 'release/mac/OpenTake Standard.app/Contents/MacOS/OpenTake Standard'
+          lipo -verify_arch x86_64 'release/mac/OpenTake Standard.app/Contents/MacOS/OpenTake Standard'
+          node scripts/prepare-mac-intel-release.mjs --artifacts release --out release/intel-bundle --commit "$SOURCE_SHA" --tag "$RELEASE_TAG"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: intel-only-bundle
+          path: release/intel-bundle/*
+          if-no-files-found: error
+          retention-days: 14
+  draft:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.18.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: intel-only-bundle
+          path: release/intel-bundle
+      - name: Create separate Intel draft; never promote Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-mac-intel-draft.mjs --bundle release/intel-bundle --latest=false
+      - run: echo 'Intel draft only. Latest, windowsBuild and update feeds are unchanged. Complete acceptance before any publication.' >> "$GITHUB_STEP_SUMMARY"

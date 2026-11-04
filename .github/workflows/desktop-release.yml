@@ -72,6 +72,10 @@ jobs:
             platform: darwin-arm64
             installer: release/*.dmg
             receipt: release/*.dmg.build.json
+          - os: macos-15-intel
+            platform: darwin-x64
+            installer: release/*.dmg
+            receipt: release/*.dmg.build.json
           - os: windows-2025
             platform: win32-x64
             installer: release/windows/*.exe

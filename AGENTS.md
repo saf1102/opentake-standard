@@ -48,7 +48,7 @@ setup 成功只证明安装步骤完成。还须在隔离工程验证首页、�
 
 只修复自己从官方 OpenTake Standard 源码构建的 App。旧版构建可能在改名后留下失效的 Electron 签名；浏览器下载带来的隔离标记会使问题显现。新版 `npm run build:app` 在装配后先清理产物扩展属性，再做本机临时签名，最后严格验签；任何一步失败都不能把产物当作安装成功。不要关闭 Gatekeeper，不用 sudo，也不要对来路不明的 App 执行修复。
 
-在包含本修正的源码目录运行（Apple 芯片）：
+在包含本修正的源码目录运行（下例为 Apple 芯片；Intel 把 `mac-arm64` 改成 `mac`）：
 
 ```sh
 npm run build:app

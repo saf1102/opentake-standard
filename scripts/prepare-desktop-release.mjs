@@ -15,14 +15,14 @@ export async function prepareDesktopRelease({source,artifacts,out,commit}){
  const zip=path.join(source,manifest.filename);
  if(await release.fileSha256(zip)!==manifest.sha256||fs.statSync(zip).size!==manifest.bytes||fs.readFileSync(zip+'.sha256','utf8')!==`${manifest.sha256}  ${manifest.filename}\n`)throw Error('Source checksum differs');
  const receipts=[];
- for(const [platform,arch,name] of [['darwin','arm64',`OpenTake-Standard-${version}-mac-arm64.dmg`],['win32','x64',`OpenTake-Standard-Setup-${version}-x64.exe`]]){
+ for(const [platform,arch,name] of [['darwin','arm64',`OpenTake-Standard-${version}-mac-arm64.dmg`],['darwin','x64',`OpenTake-Standard-${version}-mac-x64.dmg`],['win32','x64',`OpenTake-Standard-Setup-${version}-x64.exe`]]){
   const file=path.join(artifacts,name),receipt=JSON.parse(fs.readFileSync(file+'.build.json','utf8'));
   if(receipt.schemaVersion!==1||receipt.repository!==release.REPOSITORY||receipt.commit!==commit||receipt.modified||receipt.version!==version||receipt.tag!==tag||receipt.platform!==platform||receipt.arch!==arch||receipt.filename!==name||release.desktopTag(version,receipt.desktopBuild)!==tag)throw Error('Installer identity differs: '+name);
   if(await release.fileSha256(file)!==receipt.sha256||fs.statSync(file).size!==receipt.bytes)throw Error('Installer checksum differs: '+name);
   receipts.push(receipt);
  }
- if(receipts[0].desktopBuild!==receipts[1].desktopBuild)throw Error('Installer builds differ');
- const win=receipts[1];
+ if(receipts.some(receipt=>receipt.desktopBuild!==receipts[0].desktopBuild))throw Error('Installer builds differ');
+ const win=receipts.find(receipt=>receipt.platform==='win32');
  const metadata=JSON.parse(fs.readFileSync(new URL('../desktop/windows-version.json',import.meta.url),'utf8'));
  if(win.desktopBuild!==metadata.windowsBuild||tag!==release.desktopTag(version,metadata.windowsBuild))throw Error('Current release build differs');
  if(fs.existsSync(out)&&fs.readdirSync(out).length)throw Error('Refusing to replace a prepared release');

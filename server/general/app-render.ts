@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {renderVideo, type Composition} from '../frame-render/index.ts';
-import {h264Encode} from '../editor/video-encode.ts';
+import {h264Encode,macVideoEncodingError} from '../editor/video-encode.ts';
 import {KIT_DIR} from './kit-env.ts';
 import type {Film2} from './layers.ts';
 
@@ -57,5 +57,5 @@ export async function renderAppFilm(film:Film2,work:string,options:{pageId?:stri
   options.cancelSignal?.throwIfAborted();
   if(process.env.CW_RENDER_TRACE)console.log(JSON.stringify({prepareMs:prepared-started,captureEncodeMs:captured-prepared,finishMs:performance.now()-captured}));
   return output;
- }catch(e){removeWithRetrySync(output,{force:true});throw e;}finally{removeWithRetrySync(scratch,{recursive:true,force:true});}
+ }catch(e){removeWithRetrySync(output,{force:true});throw options.cancelSignal?.aborted?e:macVideoEncodingError(e);}finally{removeWithRetrySync(scratch,{recursive:true,force:true});}
 }

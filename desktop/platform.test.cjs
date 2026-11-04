@@ -91,3 +91,23 @@ test('Windows Explorer uses the system directory independently of PATH and envir
  }
  for(const env of [{},{SystemRoot:'relative'},{SystemRoot:'C:\\Windows\0'}])assert.throws(()=>revealCommand(file,'win32',env),/Windows 系统目录无效/);
 });
+
+test('Mac 架构区分原生 Intel、Apple 芯片及 Rosetta，交叉构建必须显式指定',()=>{
+ const {validateMacArch,macBuildArch,macAppDirectory,macTranslated,validateUpdateNode}=require('./platform.cjs');
+ assert.equal(buildTarget('darwin','x64','24.0'),'mac');
+ assert.throws(()=>buildTarget('darwin','ia32','24.0'));
+ assert.equal(validateMacArch('x64',false),'x64');
+ assert.throws(()=>validateMacArch('x64',true),/Rosetta/);
+ for(const arch of ['arm64','x64'])assert.equal(macBuildArch({arch,env:{},translated:false}),arch);
+ assert.equal(macBuildArch({arch:'arm64',env:{OPENTAKE_MAC_BUILD_ARCH:'x64'},translated:false}),'x64');
+ assert.throws(()=>macBuildArch({arch:'x64',env:{},translated:true}),/Rosetta/);
+ assert.throws(()=>macBuildArch({arch:'x64',env:{OPENTAKE_MAC_BUILD_ARCH:'arm64'},translated:false}));
+ assert.equal(macAppDirectory('arm64'),'mac-arm64');assert.equal(macAppDirectory('x64'),'mac');
+ assert.equal(macTranslated(()=>({status:0,stdout:'1\n'})),true);
+ assert.equal(macTranslated(()=>({status:0,stdout:''})),false);
+ assert.equal(macTranslated(()=>({status:0,stdout:'0\n'})),false);
+ assert.throws(()=>macTranslated(()=>({error:Error('missing')})));
+ assert.equal(validateUpdateNode({arch:'x64',version:'v24.15.0'},'x64'),'x64');
+ assert.throws(()=>validateUpdateNode({arch:'x64',version:'v24.15.0'},'arm64'),/架构不同/);
+ assert.throws(()=>validateUpdateNode({arch:'x64',version:'v22.0.0'},'x64'),/24.15/);
+});

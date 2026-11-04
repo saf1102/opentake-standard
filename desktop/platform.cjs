@@ -55,10 +55,36 @@ async function revealPath(target,platform=process.platform){
  child.unref();
 }
 function buildTarget(platform=process.platform,arch=process.arch,release=os.release()){
- if(platform==='darwin')return 'mac';
+ if(platform==='darwin'){if(!['arm64','x64'].includes(arch))throw Error('macOS 仅支持 Apple 芯片 arm64 或 Intel x64');return 'mac';}
  if(platform!=='win32'||arch!=='x64')throw Error('仅支持 macOS 和 Windows 10/11 x64 本机构建');
  const [major,,build]=release.split('.').map(Number);
  if(major!==10||!Number.isInteger(build)||build<19045)throw Error('需要 Windows 10 22H2 或 Windows 11');
  return build>=22000?'win11':'win10';
 }
-module.exports={environmentPath,environmentWithPath,appDataRoot,standardDataRoot,projectsRoot,termination,killTree,revealCommand,revealPath,buildTarget};
+// sysctl.proc_translated is 1 only when an Intel process runs under Rosetta.
+function macTranslated(run=spawnSync){
+ const result=run('/usr/sbin/sysctl',['-in','sysctl.proc_translated'],{encoding:'utf8'});
+ if(result.error)throw Error('无法检查 Mac 芯片，请确认系统工具可用。');
+ return result.status===0 && String(result.stdout).trim()==='1';
+}
+function validateMacArch(arch,translated=false){
+ if(!['arm64','x64'].includes(arch))throw Error('macOS 仅支持 Apple 芯片 arm64 或 Intel x64。');
+ if(translated)throw Error('请使用 Apple 芯片 Mac 的原生终端与 arm64 Node，不要在 Rosetta 下运行。');
+ return arch;
+}
+function macBuildArch({arch=process.arch,env=process.env,translated=macTranslated()}={}){
+ validateMacArch(arch,translated);
+ const target=env.OPENTAKE_MAC_BUILD_ARCH || arch;
+ validateMacArch(target);
+ if(target!==arch && !(arch==='arm64' && target==='x64'))throw Error('仅允许 Apple 芯片 Mac 显式交叉构建 Intel x64。');
+ return target;
+}
+function macAppDirectory(arch){validateMacArch(arch);return arch==='arm64'?'mac-arm64':'mac';}
+function validateUpdateNode(info,appArch){
+ validateMacArch(info.arch);
+ if(info.arch!==appArch)throw Error('更新所用 Node 与 Standard App 芯片架构不同，请安装匹配本机的 Node；Apple 芯片请使用 arm64 Node，不要使用 Rosetta。');
+ const [major,minor]=String(info.version).replace(/^v/,'').split('.').map(Number);
+ if(major!==24 || !(minor>=15))throw Error('更新需要 Node.js 24.15.0 或更新的 24.x。');
+ return info.arch;
+}
+module.exports={validateUpdateNode,macTranslated,validateMacArch,macBuildArch,macAppDirectory,environmentPath,environmentWithPath,appDataRoot,standardDataRoot,projectsRoot,termination,killTree,revealCommand,revealPath,buildTarget};

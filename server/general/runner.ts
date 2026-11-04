@@ -27,7 +27,7 @@ import { quarantineSoftware } from './net-guard.ts';
 import { hyperframesToLayers, isHyperframesWork } from './hf-project.ts';
 import { renderHyperframes } from './hf-render.ts';
 import { PageExecutionError, type PageExecutionDiagnostic } from '../frame-render/page-execution.ts';
-import { h264Encode } from '../editor/video-encode.ts';
+import { h264Encode, macVideoEncodingError } from '../editor/video-encode.ts';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { GeneralAgentChoice, GeneralLayers, GeneralMessage, GeneralProject, GeneralReference, GeneralRun, GeneralSegment, GeneralStep } from '../../src/general/general-contract.ts';
@@ -470,6 +470,7 @@ async function drive(id: string) {
       afterTurn(id, dir, step);
     }
   } catch (error) {
+    error = macVideoEncodingError(error);
     const text = error instanceof Error ? error.message : String(error);
     const failure=classifyAgentFailure(error);
     try {

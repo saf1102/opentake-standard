@@ -20,10 +20,13 @@ function installUpdateIPC({app,ipcMain,trusted,root,getOrigin}){
   const target=path.dirname(path.dirname(path.dirname(process.execPath)));if(path.basename(target)!=='OpenTake Standard.app')throw Error('安装位置不支持自动更新');fs.accessSync(path.dirname(target),fs.constants.W_OK);
   const buildEnv=require('./agent-installation.cjs').loginEnvironment();
   const locate=name=>[...(buildEnv.PATH||'').split(path.delimiter),'/opt/homebrew/bin','/usr/local/bin'].filter(p=>path.isAbsolute(p)).map(p=>path.join(p,name)).find(p=>{try{fs.accessSync(p,fs.constants.X_OK);return true}catch{return false}});
-  const npm=locate('npm'),python=locate('python3');if(!npm||!python)throw Error('请先安装 Node/npm 与 Python 3，或交给智能体更新');
-  const work=path.join(updates,crypto.randomUUID());fs.mkdirSync(work);for(const name of ['update-worker.cjs','update-engine.cjs','update-extract.py','platform.cjs','update-source.cjs'])fs.copyFileSync(path.join(__dirname,name),path.join(work,name));
-  fs.rmSync(cancel,{force:true});fs.writeFileSync(state,JSON.stringify({step:0,status:'running'}));const config={release,work,state,cancel,target,testOrigin:process.env.OPENTAKE_UPGRADE_TEST_URL,pid:process.pid,backups:path.join(profile,'backups'),profile,npm,python,extract:path.join(work,'update-extract.py')};const file=path.join(work,'job.json');fs.writeFileSync(file,JSON.stringify(config));
-  running=true;const child=spawn(process.execPath,[path.join(work,'update-worker.cjs'),file],{env:{...process.env,ELECTRON_RUN_AS_NODE:'1',PATH:[path.dirname(npm),buildEnv.PATH,'/opt/homebrew/bin','/usr/local/bin'].filter(Boolean).join(path.delimiter)},detached:true,stdio:'ignore'});child.unref();
+  const npm=locate('npm'),python=locate('python3'),node=locate('node');if(!npm||!python||!node)throw Error('请先安装 Node/npm 与 Python 3，或交给智能体更新');
+  const nodeCheck=spawnSync(node,['-p','JSON.stringify({arch:process.arch,version:process.version})'],{env:buildEnv,encoding:'utf8',timeout:10000});
+  let nodeInfo;try{if(nodeCheck.status!==0)throw Error();nodeInfo=JSON.parse(nodeCheck.stdout)}catch{throw Error('Node 无法运行，请重新安装与本机芯片匹配的 Node 24。')}
+  require('./platform.cjs').validateUpdateNode(nodeInfo,process.arch);
+  const work=path.join(updates,crypto.randomUUID());fs.mkdirSync(work);for(const name of ['update-worker.cjs','update-build.cjs','update-engine.cjs','update-extract.py','platform.cjs','update-source.cjs'])fs.copyFileSync(path.join(__dirname,name),path.join(work,name));
+  fs.rmSync(cancel,{force:true});fs.writeFileSync(state,JSON.stringify({step:0,status:'running'}));const config={release,work,state,cancel,target,testOrigin:process.env.OPENTAKE_UPGRADE_TEST_URL,pid:process.pid,backups:path.join(profile,'backups'),profile,npm,python,arch:nodeInfo.arch,extract:path.join(work,'update-extract.py')};const file=path.join(work,'job.json');fs.writeFileSync(file,JSON.stringify(config));
+  running=true;const child=spawn(process.execPath,[path.join(work,'update-worker.cjs'),file],{env:{...process.env,ELECTRON_RUN_AS_NODE:'1',PATH:[path.dirname(node),path.dirname(npm),buildEnv.PATH,'/opt/homebrew/bin','/usr/local/bin'].filter(Boolean).join(path.delimiter)},detached:true,stdio:'ignore'});child.unref();
   const timer=setInterval(()=>{try{const s=JSON.parse(fs.readFileSync(state));if(['completed','failed','cancelled'].includes(s.status)){running=false;clearInterval(timer)}}catch{}},500);timer.unref();
  });
 }

@@ -8,8 +8,9 @@
 | --- | --- |
 | **Windows 10 / 11（64 位）** | **[下载 EXE（628 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-Setup-1.1.0-x64.exe)** |
 | **Mac（Apple 芯片，M1 及以后）** | **[下载 DMG（377 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-1.1.0-mac-arm64.dmg)** |
+| **Mac（Intel 芯片，x64）** | [DMG 待验收后提供](#intel-mac-测试范围) |
 
-下载后直接安装，不用自己编译。其他版本和校验值见 [Releases](https://github.com/saf1102/opentake-standard/releases)。暂不支持 Intel 芯片的 Mac。
+下载后直接安装，不用自己编译。其他版本和校验值见 [Releases](https://github.com/saf1102/opentake-standard/releases)。Intel 版本正在验收，下载链接将在审核通过后补齐。
 
 安装包暂未做苹果公证和 Windows 代码签名，第一次打开时系统会拦一下：
 
@@ -18,17 +19,17 @@
 
 **Windows** 安装包已带齐运行工具，装好后在设置里接通智能体就能用。
 
-**Mac** 安装包暂时不带运行工具，第一次出片前在终端运行一次（需要已安装 [Homebrew](https://brew.sh)），也可以把这段发给你的智能体执行：
+**Mac** 安装包暂时不带运行工具。先从 [nodejs.org](https://nodejs.org) 安装 Node.js 24（一键更新也要用），再在第一次出片前到终端运行一次（需要已安装 [Homebrew](https://brew.sh)），也可以把这段发给你的智能体执行：
 
 ```sh
-brew install node ffmpeg python
+brew install ffmpeg python
 python3 -m venv "$HOME/.opentake-venv" && "$HOME/.opentake-venv/bin/python3" -m pip install numpy
 npx --yes playwright-core@1.63.0 install chromium
 ```
 
-软件里如果提示「在 Standard 源码目录运行」安装 Chromium，用上面第三条命令即可，不需要源码目录。智能体在「设置 → 智能体接入」里接通。录屏运镜还需要安装官方 OpenScreen，见[从源码安装](#从源码安装macos--apple-芯片)里的说明。
+软件里如果提示「在 Standard 源码目录运行」安装 Chromium，用上面第三条命令即可，不需要源码目录。智能体在「设置 → 智能体接入」里接通。录屏运镜还需要安装官方 OpenScreen，见[从源码安装](#从源码安装macos--apple-芯片与-intel)里的说明。
 
-想自己构建，或者想看源码：[下载官方源码 ZIP](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip) · [核对 SHA-256](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip.sha256)，步骤见[从源码安装](#从源码安装macos--apple-芯片)。
+想自己构建，或者想看源码：[下载官方源码 ZIP](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip) · [核对 SHA-256](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip.sha256)，步骤见[从源码安装](#从源码安装macos--apple-芯片与-intel)。
 
 [每日下载统计](https://github.com/saf1102/opentake-standard/tree/repository-stats)显示的是请求次数，不是用户人数或安装成功数，App 不上报使用遥测。[统计口径](DOWNLOAD-STATS.md)
 
@@ -100,13 +101,19 @@ Claude Code 默认关闭。订阅账号方式开启前有风险确认，推荐 A
 
 ## English
 
-OpenTake Standard is a local video editor for general creation and screen-recording motion. Download the [Windows installer](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-Setup-1.1.0-x64.exe) or the [Apple Silicon Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-1.1.0-mac-arm64.dmg), or build from source on an Apple Silicon Mac with `npm run setup` and open with `npm start`. Agent connections support CLI accounts and API keys; film generation requires a supported CLI. Claude Code is off by default. Pro-only publishing, talking-head and analytics modules are not included.
+OpenTake Standard is a local video editor for general creation and screen-recording motion. Download the [Windows installer](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-Setup-1.1.0-x64.exe) or the [Apple Silicon Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.0-2026110306/OpenTake-Standard-1.1.0-mac-arm64.dmg), or use the [Intel Mac DMG placeholder](#intel-mac-测试范围) pending acceptance. Build from source on an Apple Silicon or Intel Mac with `npm run setup` and open with `npm start`. Agent connections support CLI accounts and API keys; film generation requires a supported CLI. Claude Code is off by default. Pro-only publishing, talking-head and analytics modules are not included.
+
+### Intel Mac 测试范围
+
+Intel x64 已加入安装、构建和更新代码；尚未完成 Intel 用户真机验收。GitHub `macos-15-intel` 工作流将运行测试并构建校验 DMG；本次修改尚未触发该工作流。M 芯片上通过 Rosetta 的检查也仍待执行，不能替代 Intel 真机的录屏、HEVC / ProRes 编码能力验证。请使用与芯片匹配的原生 Node；Apple 芯片上通过 Rosetta 运行 x64 Node 的安装方式仍会拒绝。
+
+Intel x64 is covered by the setup, build and updater code. Intel end-user hardware has not been tested. The `macos-15-intel` CI job is configured but has not run for this change; Rosetta acceptance is also pending. Neither a CI build nor Rosetta proves recording or HEVC / ProRes support on older Intel hardware. Use native Node matching your Mac chip; x64 Node under Rosetta on Apple Silicon remains unsupported for setup.
 
 ## 许可与隐私
 
 源码使用 AGPL-3.0，详见 LICENSE；OpenTake 名称与图标的使用边界见 TRADEMARK.md。默认不采集使用行为，公开更新检查可在设置中关闭。工程保存在本机；使用智能体或第三方接口时，任务内容会发送给你选择的提供方。
 
-## 从源码安装（macOS / Apple 芯片）
+## 从源码安装（macOS / Apple 芯片与 Intel）
 
 对你的智能体说：**按这个仓库的 AGENTS.md 帮我装好 OpenTake Standard。**
 
@@ -125,7 +132,7 @@ npm start
 
 也可以用 Git 获取源码：`git clone https://github.com/saf1102/opentake-standard.git`，然后进入目录执行上面的安装步骤。已有 Git 工作目录可继续按 Git 更新；ZIP 快照不会包含 Git 历史。
 
-`setup` 适用于 macOS 12+ / Apple 芯片（锁定 Electron 的最低系统版本；实际工具检查仍须通过），需要至少 8 GB 可用空间。它检查系统和 Node、执行两次 `npm ci`、安装匹配的 Playwright Chromium，在 `~/.opentake-venv` 准备 Python + numpy，并用 `build:live` 构建。失败会用中文说明并以非零退出码结束；修好后可重复运行，已完成且依赖完整的安装会跳过。缺少 FFmpeg 时只提示，不自动下载。OpenScreen 可选，不阻断通用剪辑安装。
+`setup` 适用于 macOS 12+ / Apple 芯片与 Intel x64（锁定 Electron 的最低系统版本；实际工具检查仍须通过），需要至少 8 GB 可用空间。它检查系统和 Node、执行两次 `npm ci`、安装匹配的 Playwright Chromium，在 `~/.opentake-venv` 准备 Python + numpy，并用 `build:live` 构建。失败会用中文说明并以非零退出码结束；修好后可重复运行，已完成且依赖完整的安装会跳过。缺少 FFmpeg 时只提示，不自动下载。OpenScreen 可选，不阻断通用剪辑安装。
 
 手动步骤仍可使用：
 
@@ -161,7 +168,7 @@ npm run build:live
 
 ## Recording and OpenScreen export
 
-Install OpenScreen separately. Standard discovers `openscreen` on PATH, the macOS Applications folders, or an explicit `OPENSCREEN_BIN` executable. The tested official release is 2.1.2 (macOS arm64). Official 1.10.0 rejects schema v7 exports. MP4 export uses H.264 and explicitly passes the selected 24/30/60 fps. The embedded editor saves projects locally; recording and export invoke the installed OpenScreen process and its own renderer. Standard does not bundle or borrow its native compositor. Missing or incompatible installations report an error and preserve the project; no alternative renderer is used. An installation being detected is not proof of export compatibility.
+Install OpenScreen separately. Standard discovers `openscreen` on PATH, the macOS Applications folders, or an explicit `OPENSCREEN_BIN` executable. The tested official release is 2.1.2 (macOS arm64); its official Intel download exists, but Intel recording/export acceptance is pending. Official 1.10.0 rejects schema v7 exports. MP4 export uses H.264 and explicitly passes the selected 24/30/60 fps. The embedded editor saves projects locally; recording and export invoke the installed OpenScreen process and its own renderer. Standard does not bundle or borrow its native compositor. Missing or incompatible installations report an error and preserve the project; no alternative renderer is used. An installation being detected is not proof of export compatibility.
 
 Grant screen/audio recording permission to OpenScreen when macOS requests it. You can still import and edit recordings in Standard without the external App, but native export requires it. No automatic OpenScreen or native SDK downloads are performed.
 
@@ -195,7 +202,7 @@ Chromium：在 Standard 源码目录运行 `npx --no-install playwright-core ins
 
 只修复自己从官方 OpenTake Standard 源码构建的 App。旧版构建可能在改名后留下失效的 Electron 签名；浏览器下载带来的隔离标记会使问题显现。新版 `npm run build:app` 在装配后先清理产物扩展属性，再做本机临时签名，最后严格验签；任何一步失败都不能把产物当作安装成功。不要关闭 Gatekeeper，不用 sudo，也不要对来路不明的 App 执行修复。
 
-在包含本修正的源码目录运行（Apple 芯片）：
+在包含本修正的源码目录运行（下例为 Apple 芯片；Intel 把 `mac-arm64` 改成 `mac`）：
 
 ```sh
 npm run build:app

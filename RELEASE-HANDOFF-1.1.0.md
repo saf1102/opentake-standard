@@ -1,12 +1,12 @@
 # OpenTake Standard 1.1.0 双平台发布交接
 
-交接对象：`saf1102/opentake-standard` 维护负责人。评估日期：2026-11-03。目标是在原仓库以同一份已合并源码发布 macOS Apple 芯片 DMG 与 Windows x64 EXE；本轮暂不配置公开签名证书或苹果公证。
+交接对象：`saf1102/opentake-standard` 维护负责人。评估日期：2026-11-03。目标是在原仓库以同一份已合并源码发布 macOS Apple 芯片 / Intel DMG 与 Windows x64 EXE；本轮暂不配置公开签名证书或苹果公证。
 
 ## 结论与上线边界
 
 Windows 最终 QA 分支包含当前官方 1.1.0 的全部代码，原仓库 main 是其祖先，合并预演无文本冲突。共享代码已经过平台路径审查、macOS 编码参数对照和 Windows 自动化回归。Windows 运行库已经从锁定归档在新目录重建，后续出包无需复制交接人的旧 App、账号目录或开发机运行库。
 
-这是兼容性预评估，不能代替 macOS 实机验收。新增 CI 在 Apple 芯片 macOS 和 Windows 执行测试及前端编译，并实际构建 Mac DMG、执行本机临时签名的严格校验及镜像完整性检查；CI 的 Mac 包带 localCandidate 标记，仅供验收，不能用于正式发布。手动发布工作流再从同一官方 main 提交构建两平台安装包。负责人须完成下表中的实际使用验收后公开上线；CLA 确认仍按 CONTRIBUTING.md 执行。
+这是兼容性预评估，不能代替 macOS 实机验收。新增 CI 在 Apple 芯片 macOS、Intel macOS 和 Windows 执行测试及前端编译，并实际构建 Mac DMG、执行本机临时签名的严格校验及镜像完整性检查；CI 的 Mac 包带 localCandidate 标记，仅供验收，不能用于正式发布。手动发布工作流再从同一官方 main 提交构建两平台安装包。负责人须完成下表中的实际使用验收后公开上线；CLA 确认仍按 CONTRIBUTING.md 执行。
 
 ## 源码与版本身份
 
@@ -75,7 +75,7 @@ Mac App 装配后的临时签名在 CI 命中文件句柄耗尽（EMFILE）；�
 2. 在独立配置和工程副本上完成 Mac 回归，确认后合入原仓库 main。若 main 在本次评估后有新增提交，先同步到集成分支并重跑相关检查。
 3. 检查 desktop/windows-version.json 的 repository、upstreamVersion、windowsBuild、windowsRevision。若同标签/构建号已发布，先递增构建号并提交 main。
 4. 在原仓库 Actions 的 main 分支手动运行 **Build desktop installers and prepare release draft**（.github/workflows/desktop-release.yml）。该流程只在官方仓库 main 启动。
-5. 工作流冻结 main 的完整 SHA、准备官方源码 ZIP；macos-14 Apple 芯片和 windows-2025 x64 使用相同 SHA 安装依赖、检查、编译、出包。没有扩展 Mac Intel 支持；Windows Server CI 不代替 Win10/Win11 实机。
+5. 工作流冻结 main 的完整 SHA、准备官方源码 ZIP；macos-14 Apple 芯片、macos-15-intel 和 windows-2025 x64 使用相同 SHA 安装依赖、检查、编译、出包。任务 34 新增 Intel 构建路径，Intel 用户真机与 Rosetta 实际验收仍待执行；Windows Server CI 不代替 Win10/Win11 实机。
 6. 汇总检查源码 SHA、版本、构建号、平台和 SHA-256，创建 Release 草稿。任一平台失败不会生成完整草稿；已有草稿保留检查，不覆盖标签或附件。
 7. 下载草稿候选包，完成下节验收，核对 SHA256SUMS，更新发布说明中的实际支持范围。
 8. 负责人确认后把草稿发布为稳定 Release，并设为 Latest。当前工作流不会自动公开上线。
@@ -119,3 +119,6 @@ Mac 手工构建见 BUILD-MACOS.md，Windows 见 BUILD-WINDOWS.md。两平台使
 固定下载不可用、哈希不符、工具链缺失或测试失败时保留日志、缓存，修复后重出候选包。不要绕过失败、换未核验镜像或借模型调用掩盖环境问题。
 
 上线前发现问题则保留草稿不公开。上线后需要回退时保留问题包和日志，将 Latest 指回上一完整、含更新清单的稳定 Release；Windows 不会自动降级，用户保存工程后手动安装旧包，不删除工程或配置。原 v1.1.0 标签及旧安装包继续保留。
+
+
+任务 34 只补 Intel 安装包时使用 `.github/workflows/mac-intel-release.yml`：独立 `desktop-mac-x64-v1.1.0-<日期序号>` 草稿，强制 `--latest=false`，不递增 Windows 构建号、不改现有 Latest 或任何更新清单。下次完整发版再用原 desktop-release 工作流。

@@ -23,6 +23,22 @@ export function videoEncodeArgs(video: ExportVideoSettings, canvas?: EncodeCanva
   return video.codec==='h265'?hevcEncode(options,platform):h264Encode(options,platform);
 }
 
+/** Explain unavailable Mac encoders without changing codec, quality, retries or cancellation. */
+export function macVideoEncodingError(error:unknown,platform:NodeJS.Platform=process.platform):unknown {
+  if(platform!=='darwin')return error;
+  const failure=error as {name?:string;code?:string;message?:string;stderr?:string};
+  if(failure?.name==='AbortError'||failure?.code==='ABORT_ERR')return error;
+  const detail=String(failure?.stderr||failure?.message||error);
+  if(detail.startsWith('当前 Mac 的')||/No space left on device|Permission denied|Operation canceled|已取消|已停止/i.test(detail))return error;
+  const missing=/Unknown encoder ['"]?(h264_videotoolbox|hevc_videotoolbox|prores_ks)/i.exec(detail);
+  if(missing)return new Error(`当前 Mac 的 FFmpeg 缺少 ${missing[1]} 编码器。请运行 npm run doctor 确认工具路径，安装包含该编码器的 FFmpeg 后重试；工程已保留。\n${detail}`,{cause:error});
+  const vt=/videotoolbox|VTCompressionSession/i.test(detail);
+  const unavailable=/cannot create compression session|could not create.*(?:encoder|compression)|hardware encoder.*(?:busy|not supported)|(?:Error while opening encoder|Error initializing output stream)|(?:failed|error).*VTCompressionSession|Try -allow_sw 1/i.test(detail);
+  if(!vt||!unavailable)return error;
+  const codec=/hevc_videotoolbox/i.test(detail)?'HEVC':'H.264';
+  return new Error(`当前 Mac 的 ${codec} VideoToolbox 编码器无法处理本次导出（硬件或系统不支持、编码器忙，或参数不兼容）。${codec==='HEVC'?'请改选 H.264；也可选 ProRes（软件编码，文件较大）。':'请关闭其他编码任务后重试，或改选 ProRes（软件编码，文件较大）。'}工程已保留。\n${detail}`,{cause:error});
+}
+
 export type VideoEncodingResult = {codec:string; requestedEncoder:ExportVideoSettings['encoder']; encoder:ExportVideoSettings['encoder']; implementation?:string; bitrate?:number; fallbackReason?:string};
 /** Auto may retry a failed hardware encoder once. Explicit hardware never silently falls back. */
 export async function runVideoEncode(video:ExportVideoSettings,canvas:EncodeCanvas,run:(args:string[])=>Promise<{stderr?:string}>,platform:NodeJS.Platform=process.platform):Promise<VideoEncodingResult> {
@@ -40,6 +56,7 @@ export async function runVideoEncode(video:ExportVideoSettings,canvas:EncodeCanv
         ...(fallbackReason?{fallbackReason}:{})};
     } catch(error) {
       const failure=error as Error&{code?:string;stderr?:string};
+      if(platform==='darwin')throw macVideoEncodingError(error,platform);
       const detail=String(failure.stderr||failure.message||error);
       const encoderFailure=/could not (?:find any MFT|create MFT|set (?:input|output) type)|MF_E_|Error while opening encoder|Error initializing output stream|Failed to (?:create|initialize).*(?:encoder|device|MFT|DXGI)/i.test(detail);
       if(!windowsH264||failure.name==='AbortError'||failure.code==='ABORT_ERR'||!encoderFailure)throw error;

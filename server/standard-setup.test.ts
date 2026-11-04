@@ -5,7 +5,8 @@ import {validateHost, installPlan} from '../scripts/setup.mjs';
 const good={platform:'darwin',arch:'arm64',node:'24.15.0',mac:'14.0',freeBytes:12*1024**3};
 test('安装前挡住不支持的系统、芯片、Node 和磁盘',()=>{
  assert.doesNotThrow(()=>validateHost(good));
- for(const change of [{platform:'win32'},{arch:'x64'},{node:'24.14.0'},{node:'25.0.0'},{mac:'11.7'},{mac:''},{freeBytes:1024}])assert.throws(()=>validateHost({...good,...change}));
+ assert.doesNotThrow(()=>validateHost({...good,arch:'x64'}));
+ for(const change of [{platform:'win32'},{arch:'ia32'},{arch:'x64',translated:true},{node:'24.14.0'},{node:'25.0.0'},{mac:'11.7'},{mac:''},{freeBytes:1024}])assert.throws(()=>validateHost({...good,...change}));
 });
 test('两份锁定安装不能漏掉录屏依赖，不执行其原生安装脚本',()=>{
  assert.deepEqual(installPlan().map((p:{cwd:string})=>p.cwd),['.','vendor/openscreen']);
@@ -18,7 +19,7 @@ import path from 'node:path';
 // @ts-ignore Script is dependency-free JavaScript by design.
 import {setup} from '../scripts/setup.mjs';
 test('重复安装检查依赖树，失败不写成功回执，重试可继续',async()=>{
- if(process.platform!=='darwin'||process.arch!=='arm64')return;
+ if(process.platform!=='darwin'||!['arm64','x64'].includes(process.arch))return;
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-setup-test-'));
  try{
   for(const dir of [root,path.join(root,'vendor/openscreen')]){

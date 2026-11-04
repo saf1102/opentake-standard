@@ -45,7 +45,7 @@ async function signLocalApp(app,{run=command,sign}={}){
    preAutoEntitlements:false,preEmbedProvisioningProfile:false,strictVerify:true,
    optionsForFile:()=>({entitlements:ENTITLEMENTS,hardenedRuntime:true,timestamp:'none',additionalArguments:['--generate-entitlement-der']})});
   return {...verifyLocalApp(target,{run}),signature:'adhoc',hardenedRuntime:true,notarized:false};
- }catch(e){throw Error('Standard 本机 App 签名未完成，不能打开或交付此产物。请保留构建日志，确认使用 Apple 芯片 Mac 并已安装锁定依赖，再重跑 npm run build:app。原因：'+e.message);}
+ }catch(e){throw Error('Standard 本机 App 签名未完成，不能打开或交付此产物。请保留构建日志，确认使用受支持的 Mac 并已安装匹配架构的锁定依赖，再重跑 npm run build:app。原因：'+e.message);}
 }
 function diagnoseLocalApp(app,{run=command}={}){
  if(!fs.existsSync(app))return {ok:true,state:'not-built',message:'尚未生成本机 App；npm run build:app 会清理隔离标记、临时签名并严格校验。'};

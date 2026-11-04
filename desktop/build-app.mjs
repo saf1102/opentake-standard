@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {spawnSync} from 'node:child_process';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const target=platform.buildTarget();
+const macArch=target==='mac'?platform.macBuildArch():undefined;
 if(target!=='mac'){
  const {writeWindowsSourceReceipt}=await import('./windows-source.cjs');
  writeWindowsSourceReceipt(root);
@@ -15,10 +16,13 @@ if(target==='mac'&&!fs.existsSync(receiptFile)&&fs.existsSync(path.join(root,'.g
  const origin=git(['remote','get-url','origin']),version=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version;
  const metadata=JSON.parse(fs.readFileSync(path.join(root,'desktop/windows-version.json'),'utf8'));
  const tags=git(['tag','--points-at','HEAD']).split(/\r?\n/);
- const officialTag=tags.includes('v'+version)||tags.includes(releaseContract.desktopTag(version,metadata.windowsBuild));
+ const regularTag=tags.includes('v'+version)||tags.includes(releaseContract.desktopTag(version,metadata.windowsBuild));
+ const intelTag=tags.find(tag=>releaseContract.isMacIntelTag(tag,version));
+ const officialTag=regularTag||Boolean(intelTag);
+ const sourceTag=releaseContract.macSourceTag(version,metadata.windowsBuild,tags,macArch);
  if(!['https://github.com/saf1102/opentake-standard.git','https://github.com/saf1102/opentake-standard','git@github.com:saf1102/opentake-standard.git'].includes(origin)||git(['status','--porcelain'])||!officialTag)throw Error('请在干净的官方版本标签上构建，或交给智能体保留你的源码改动');
  const entries=git(['ls-tree','-rz','HEAD']).split('\0').filter(Boolean).map(line=>{const m=/^(100644|100755) blob ([a-f0-9]+)\t([\s\S]+)$/.exec(line);if(!m)throw Error('不支持的源码项');return [m[3],m[2]]});
- fs.writeFileSync(receiptFile,JSON.stringify({repository:'saf1102/opentake-standard',version,commit:git(['rev-parse','HEAD']),files:Object.fromEntries(entries)}));
+ fs.writeFileSync(receiptFile,JSON.stringify({repository:'saf1102/opentake-standard',version,...(sourceTag?{tag:sourceTag}:{}),commit:git(['rev-parse','HEAD']),files:Object.fromEntries(entries)}));
 }
 if(target==='mac'&&fs.existsSync(receiptFile)){
  const receipt=JSON.parse(fs.readFileSync(receiptFile));
@@ -32,11 +36,14 @@ if(target==='mac'&&fs.existsSync(receiptFile)){
 }
 const run=(command,args)=>{const r=spawnSync(command,args,{cwd:root,stdio:'inherit',env:{...process.env,CSC_IDENTITY_AUTO_DISCOVERY:'false'}});if(r.error)throw r.error;if(r.status!==0)throw Error(command+' 失败')};
 if(target==='mac'){
+// electronDist is explicit: never label an arm64 Electron bundle as Intel (or vice versa).
+run('/usr/bin/lipo',['-verify_arch',macArch==='x64'?'x86_64':'arm64',path.join(root,'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron')]);
 const icons=path.join(root,'release','OpenTake.iconset');fs.mkdirSync(icons,{recursive:true});
 for(const size of [16,32,128,256,512])for(const scale of [1,2])run('sips',['-z',String(size*scale),String(size*scale),'public/opentake-icon-512.png','--out',path.join(icons,`icon_${size}x${size}${scale===2?'@2x':''}.png`)]);
 run('iconutil',['-c','icns',icons,'-o','release/OpenTake.icns']);
-run(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/builder.config.cjs','--mac','dir','--publish','never']);
-const app=path.join(root,'release',process.arch==='arm64'?'mac-arm64':'mac','OpenTake Standard.app');
+run(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/builder.config.cjs','--mac','dir','--'+macArch,'--publish','never']);
+const app=path.join(root,'release',platform.macAppDirectory(macArch),'OpenTake Standard.app');
+run('/usr/bin/lipo',['-verify_arch',macArch==='x64'?'x86_64':'arm64',path.join(app,'Contents/MacOS/OpenTake Standard')]);
 try{await localSignature.signLocalApp(app);}catch(error){console.error(error.message);process.exit(1);}
 }else{
 run(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/builder.config.cjs','--win','dir','--x64','--publish','never','--config.directories.output=release/'+target]);

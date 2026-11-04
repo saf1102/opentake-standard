@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import release from '../desktop/release-contract.cjs';
 export const PUBLIC_REPOSITORY='saf1102/opentake-standard';
 
 export function releaseNotes(version){
@@ -14,7 +15,7 @@ export function releaseNotes(version){
  const start=readme.indexOf(heading);
  if(start>=0)return readme.slice(start+heading.length).split(/\n## /,1)[0].trim();
  return `OpenTake Standard ${version} · 优化流程，提高生片速度
-仅支持 macOS（Apple 芯片）；Windows 适配中，暂不支持。
+支持 macOS（Apple 芯片与 Intel）和 Windows x64；各平台实测范围以发布交接为准。
 通用剪辑出片更快，进度实时显示；导出统一为画质、编码（H.264 / HEVC / ProRes）和帧率三组选项。
 修复录屏帧率、上传、声音峰值和页面出错恢复，补齐完整时间线、文件目录设置与录屏备份。
 统一智能体命令行与 API 密钥接入，可测试连接；首次打开通用剪辑引导选择智能体，录屏页增加引导卡，模型不可用时回退默认。
@@ -48,9 +49,9 @@ export function prepareSourceRelease({cwd=process.cwd(),ref='main',out,localCand
  for(const name of [filename,filename+'.sha256','source-release.json','release-notes.md','upgrade.json'])if(fs.existsSync(path.join(folder,name)))throw new Error('Refusing to overwrite a prepared source bundle');
  const pkg=JSON.parse(git(['show',sha+':package.json']));if(pkg.name!=='opentake-standard'||!/^\d+\.\d+\.\d+$/.test(pkg.version))throw Error('Invalid Standard version');
  const versionTag='v'+pkg.version;
- if(tag!==undefined&&tag!==versionTag&&!(tag.startsWith('desktop-v'+pkg.version+'-')&&/^[1-9]\d*$/.test(tag.slice(('desktop-v'+pkg.version+'-').length))))throw Error('Invalid source release tag');
+ if(tag!==undefined&&tag!==versionTag&&!release.isMacIntelTag(tag,pkg.version)&&!(tag.startsWith('desktop-v'+pkg.version+'-')&&/^[1-9]\d*$/.test(tag.slice(('desktop-v'+pkg.version+'-').length))))throw Error('Invalid source release tag');
  const releaseTag=tag||versionTag;
- const receipt=JSON.stringify({repository:PUBLIC_REPOSITORY,commit:sha,version:pkg.version,...(localCandidate?{localCandidate:true}:{}),files:Object.fromEntries(entries.map(e=>[e.path,e.blob]))});
+ const receipt=JSON.stringify({repository:PUBLIC_REPOSITORY,commit:sha,version:pkg.version,tag:releaseTag,...(localCandidate?{localCandidate:true}:{}),files:Object.fromEntries(entries.map(e=>[e.path,e.blob]))});
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'standard-source-'));
  try{const receiptFile=path.join(temporary,'release-source.json');fs.writeFileSync(receiptFile,receipt);git(['archive','--format=zip','--prefix=opentake-standard/',`--add-file=${receiptFile}`,`--output=${archive}`,sha]);}finally{fs.rmSync(temporary,{recursive:true,force:true})}
  const checksum=crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex');

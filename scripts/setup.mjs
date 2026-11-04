@@ -8,9 +8,10 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-export function validateHost({platform, arch, node, mac, freeBytes}) {
+const {validateMacArch,macTranslated}=require('../desktop/platform.cjs');
+export function validateHost({platform, arch, node, mac, freeBytes, translated=false}) {
  if(platform !== 'darwin') throw Error('一键安装目前只支持 macOS；其他系统请按 README 原有步骤安装。');
- if(arch !== 'arm64') throw Error('一键安装需要 Apple 芯片。请使用 Apple 芯片 Mac 的原生终端与 arm64 Node，不要在 Rosetta 下运行。');
+ validateMacArch(arch,translated);
  const n=node.replace(/^v/,'').split('.').map(Number);
  if(n[0] !== 24 || n[1] < 15) throw Error('需要 Node.js 24.15.0 或更新的 24.x。请从 https://nodejs.org 安装后重新打开终端，再运行 npm run setup。');
  if(!/^\d+(\.\d+)*$/.test(mac) || Number(mac.split('.')[0]) < 12) throw Error('需要 macOS 12 或更新版本（锁定 Electron 的最低系统版本），请先确认系统版本。');
@@ -21,21 +22,21 @@ export function installPlan() { return [
  {id:'openscreen', cwd:'vendor/openscreen', args:['ci','--ignore-scripts','--no-audit','--no-fund'], label:'录屏编辑器依赖'},
 ]; }
 export async function setup(options = {}) {
- const dir=options.root || root, env=options.env || process.env;
+ const dir=options.root || root, env={...(options.env || process.env),npm_config_arch:process.arch,npm_config_cpu:process.arch,npm_config_platform:process.platform};
  const log=options.log || console.log;
  const run=options.run || ((file,args,extra={})=>spawnSync(file,args,{cwd:dir,env,encoding:'utf8',timeout:20*60*1000,maxBuffer:4*1024*1024,...extra}));
  const must=(file,args,label,extra={})=>{const r=run(file,args,extra);if(r.error || r.status!==0)throw Error(`${label}失败。请检查网络、磁盘和工具版本后重试 npm run setup；已有文件会保留。${r.error?.code==='ENOENT'?'未找到命令 '+file+'。':''}`);return r.stdout?.trim() || '';};
  const stat=fs.statfsSync(dir);
  const mac=run('/usr/bin/sw_vers',['-productVersion']);
- validateHost({platform:process.platform,arch:process.arch,node:process.version,mac:mac.stdout?.trim() || '',freeBytes:Number(stat.bavail)*Number(stat.bsize)});
- log('1/7 系统、Apple 芯片、Node 和磁盘检查通过');
+ validateHost({platform:process.platform,arch:process.arch,translated:process.platform==='darwin' && macTranslated(run),node:process.version,mac:mac.stdout?.trim() || '',freeBytes:Number(stat.bavail)*Number(stat.bsize)});
+ log('1/7 系统、芯片、Node 和磁盘检查通过');
  const stampFile=path.join(dir,'.setup-state.json');
  let state={};try{state=JSON.parse(fs.readFileSync(stampFile,'utf8'))}catch{}
  const save=()=>fs.writeFileSync(stampFile,JSON.stringify(state,null,2)+'\n',{mode:0o600});
  for(const [i,step] of installPlan().entries()){
   const cwd=path.join(dir,step.cwd), lock=path.join(cwd,'package-lock.json');
   if(!fs.existsSync(lock))throw Error(`缺少${step.label}的 package-lock.json，请重新取得完整官方源码。`);
-  const digest=crypto.createHash('sha256').update(fs.readFileSync(lock)).update(fs.readFileSync(path.join(cwd,'package.json'))).update(process.version).digest('hex');
+  const digest=crypto.createHash('sha256').update(fs.readFileSync(lock)).update(fs.readFileSync(path.join(cwd,'package.json'))).update(process.version).update(process.platform).update(process.arch).digest('hex');
   const modules=path.join(cwd,'node_modules');
   // Validate the installed dependency tree as well as the receipt: partial removals must reinstall.
   const intact=state[step.id]===digest && fs.existsSync(modules) && run('npm',['ls','--depth=0','--omit=optional'],{cwd}).status===0;

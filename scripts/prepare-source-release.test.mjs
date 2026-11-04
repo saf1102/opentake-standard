@@ -48,3 +48,13 @@ test('rejects private origin, non-main branch commit and forbidden tracked paths
   assert.throws(()=>prepareSourceRelease({cwd:f.dir,out:path.join(f.dir,'out')}),/forbidden/);
  }finally{f.cleanup();}
 });
+
+
+test('Intel source receipt carries the independent Intel tag and rejects a mismatched version',()=>{
+ const f=fixture();try{
+  const out=path.join(f.dir,'intel'),tag='desktop-mac-x64-v1.0.1-2026110401';
+  const manifest=prepareSourceRelease({cwd:f.dir,out,ref:f.sha,tag});assert.equal(manifest.tag,tag);
+  const receipt=JSON.parse(spawnSync(unzip,['-p',path.join(out,manifest.filename),'opentake-standard/release-source.json'],{encoding:'utf8'}).stdout);assert.equal(receipt.tag,tag);
+  assert.throws(()=>prepareSourceRelease({cwd:f.dir,out:path.join(f.dir,'bad-intel'),ref:f.sha,tag:'desktop-mac-x64-v1.1.0-2026110401'}),/Invalid source release tag/);
+ }finally{f.cleanup();}
+});
