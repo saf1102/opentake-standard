@@ -1,9 +1,7 @@
 import tools from './agent-installation.ts';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
+import {execFileAsync} from './proc.ts';
 import fs from 'node:fs';
 import os from 'node:os';
-const execFileAsync=promisify(execFile);
 import {readAgentSettings,atomicAgentJson,agentSettingsFile,forgetStaleCliPath} from './agent-settings.ts';
 import path from 'node:path';
 /** Codex's standalone installer, as its official CLI page gives it first (learn.chatgpt.com/docs/codex/cli). It puts `codex` in ~/.local/bin, which detection searches. */

@@ -37,7 +37,7 @@ import { agentSettingsFile, atomicAgentJson, readAgentSettings } from '../agent-
 import { buildBrief, turnPrompt, type Phase, type QueuedNote, type StyleInfo } from './brief.ts';
 import { reviewArgs, type CodexProcess } from './codex.ts';
 import {filmAgentId,filmAgentArgs,startFilmAgent,applyFilmAgentEvent,filmAgentRedactor,type ResolvedFilmAgent} from './agent-adapter.ts';
-import {assertAgentExecutionAllowed,resolveAgentConnectionLaunch,getConnectionConfig,effectiveConnectionModel} from '../agent-connections.ts';
+import {assertAgentExecutionAllowed,resolveAgentConnectionLaunch,getConnectionConfig} from '../agent-connections.ts';
 import { beginRepair, finishAgentSteps, verifySelfCheck, applyCodexEvent, applyProgress, initialSteps, setStep, type Progress, type Usage } from './events.ts';
 import { KIT_DIR, ffmpegPath, ffprobePath, prepareWork } from './kit-env.ts';
 import { REVIEW_SCHEMA, extractFrames, machineChecks, parseVerdict, reviewPrompt, verdictText, type Verdict } from './review.ts';
@@ -79,8 +79,8 @@ let runtime: GeneralRuntime = {
       const agent = await resolveAgent('generalEditing', choice ? { ...selectedSettings, modules: { ...settings.modules, generalEditing: choice } } : selectedSettings);
       return { executable: agent.executable, model: agent.model, effort: agent.effort, ...(agent.requested ? {requested: agent.requested} : {}) };
     }
-    const launch=await resolveAgentConnectionLaunch(id);
-    const model=launch.transport==='acp'?(selected.model||'default'):effectiveConnectionModel(id,selected.model);
+    const launch=await resolveAgentConnectionLaunch(id,undefined,{},selected.model);
+    const model=launch.transport==='acp'?(selected.model||'default'):launch.model;
     const requested=selected.model && selected.model!=='default' && selected.model!==model?selected:undefined;
     return {agent:id,executable:launch.executable,model,effort:selected.effort||'medium',env:launch.env,args:launch.args,method:launch.method,...(launch.transport?{transport:launch.transport}:{}),...(requested?{requested}:{})};
   },

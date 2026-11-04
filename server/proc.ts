@@ -1,4 +1,5 @@
 import platform from './platform.ts'
+import {agentLaunch, spawnAgentProcess} from './agent-launch.ts'
 import { execFile, spawn, type ChildProcess, type ExecFileOptions, type ExecFileOptionsWithStringEncoding } from 'node:child_process'
 import { AsyncLocalStorage } from 'node:async_hooks'
 
@@ -128,7 +129,8 @@ export function execFileAsync(
   // missing from the ExecFileOptions type — hence the cast.
   const execOptions = { encoding: 'utf8', ...options, detached: detach } as unknown as ExecFileOptionsWithStringEncoding
   return new Promise((resolve, reject) => {
-    const child = execFile(file, args as string[], execOptions, (error, stdout, stderr) => {
+    const launch = agentLaunch(file, args, execOptions)
+    const child = execFile(launch.file, launch.args, launch.options, (error, stdout, stderr) => {
       untrackOwned(owner, child)
       if (error) reject(error)
       else resolve({ stdout, stderr })
@@ -163,7 +165,7 @@ export function runWithClosedStdin(
 ): Promise<{ stdout: string; stderr: string }> {
   const maxBuffer = options.maxBuffer ?? 16 * 1024 * 1024;
   return new Promise((resolve, reject) => {
-    const child = spawn(executable, args, {
+    const child = spawnAgentProcess(executable, args, {
       cwd: options.cwd,
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],

@@ -1,11 +1,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
+import {execFileAsync} from './proc.ts';
 import tools from './agent-installation.ts';
 import {appBundleForExecutable,findOpenScreenExecutable} from './editor/openscreen.ts';
-const execFileAsync=promisify(execFile);
 
 /** Shared native-agent discovery. Command contracts come from each provider's official docs; no third-party implementation is read. */
 export type RosterAgentId='kimi'|'deepseek'|'minimax'|'codebuddy'|'copilot'|'cursor'|'opencode'|'qwen'|'openscreen';
@@ -34,7 +32,7 @@ type RosterOptions={home?:string;env?:NodeJS.ProcessEnv;applicationDirs?:string[
 export function isClaudeExecutable(file:string,env:NodeJS.ProcessEnv=process.env,configured?:string){
  const real=(value:string)=>{try{return fs.realpathSync(value)}catch{return path.resolve(value)}};
  const target=real(file);
- const named=(value:string)=>/(?:^|[\\/])claude(?:-code)?(?:\.exe)?$/i.test(value)||/[\\/]@anthropic-ai[\\/]claude-code[\\/]|[\\/]claude[\\/]versions[\\/]|[\\/]Claude[\\/]claude-code[\\/]/i.test(value);
+ const named=(value:string)=>/(?:^|[\\/])claude(?:-code)?(?:\.(?:exe|cmd|bat))?$/i.test(value)||/[\\/]@anthropic-ai[\\/]claude-code[\\/]|[\\/]claude[\\/]versions[\\/]|[\\/]Claude[\\/]claude-code[\\/]/i.test(value);
  if(named(file)||named(target))return true;
  const known=[configured,env.LINKREADER_CLAUDE_EXECUTABLE,...String(env.PATH||'').split(path.delimiter).filter(dir=>path.isAbsolute(dir)).map(dir=>path.join(dir,'claude')),path.join(os.homedir(),'.local','bin','claude'),path.join(os.homedir(),'.claude','local','claude')].filter((value):value is string=>!!value);
  for(const candidate of known){
@@ -66,8 +64,8 @@ const appsMatching=(match:RegExp,apps:string[])=>apps.flatMap(dir=>{try{return f
 export function rosterExecutableCandidates(agent:RosterAgent,options:RosterOptions={}):string[]{
  const home=options.home??os.homedir(),apps=options.applicationDirs??['/Applications',path.join(home,'Applications')];
  const env=options.env??tools.loginEnvironment();
- const dirs=[...new Set([...String(env.PATH||'').split(path.delimiter),path.join(home,'.local','bin'),path.join(home,'.npm-global','bin'),'/opt/homebrew/bin','/usr/local/bin',...(agent.dirs?.(home,apps)??[])].filter(dir=>path.isAbsolute(dir)))];
- return dirs.flatMap(dir=>agent.names.map(name=>path.join(dir,process.platform==='win32'?name+'.exe':name))); 
+ const dirs=[...new Set([...String(env.PATH||env.Path||'').split(path.delimiter),...(process.platform==='win32'?[env.APPDATA&&path.join(env.APPDATA,'npm'),env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs')].filter((dir):dir is string=>!!dir):[]),path.join(home,'.local','bin'),path.join(home,'.npm-global','bin'),'/opt/homebrew/bin','/usr/local/bin',...(agent.dirs?.(home,apps)??[])].filter(dir=>path.isAbsolute(dir)))];
+ return dirs.flatMap(dir=>agent.names.flatMap(name=>(process.platform==='win32'?['.exe','.cmd','.bat'].map(ext=>name+ext):[name]).map(name=>path.join(dir,name))));
 }
 /** One agent: its program on the login shell's PATH, in the folders installers use, or inside its maker's app. */
 export async function rosterAgentStatus(agent:RosterAgent,options:RosterOptions={}):Promise<RosterStatus>{

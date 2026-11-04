@@ -1,3 +1,4 @@
+import {spawnAgentProcess} from '../agent-launch.ts';
 import {killProcessGroup} from './edition.ts';
 /**
  * 通用剪辑怎样调用 Codex：非交互的 `codex exec --json`。
@@ -45,7 +46,7 @@ export type CodexProcess = { child: ChildProcess; done: Promise<{ code: number |
 
 /** Start Codex in its own process group so stopping it also stops the commands it started (renders, Chrome). */
 export function startCodex(executable: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; prompt: string; eventLog?: string; redact?: (text:string)=>string; onEvent: (event: Record<string, unknown>) => void }): CodexProcess {
-  const child = spawn(executable, args, { cwd: options.cwd, env: options.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+  const child = spawnAgentProcess(executable, args, { cwd: options.cwd, env: options.env, stdio: ['pipe', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
   let stderr = '';
   const redact=options.redact || ((text:string)=>text);
   let callbackError:Error|undefined;

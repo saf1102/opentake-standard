@@ -9,7 +9,7 @@ function installFileDialogBridge(child,dialog,parent){
   if(busy)return send({error:'还有一个文件选择窗口未关闭'});
   busy=true;
   try{
-   const result=await dialog.showOpenDialog(parent(),{title:request.kind==='folder'?'选择文件夹':'选择智能体程序',properties:[request.kind==='folder'?'openDirectory':'openFile'],...(request.kind==='executable'?{filters:[{name:'Windows 程序',extensions:['exe']}]}:{})});
+   const result=await dialog.showOpenDialog(parent(),{title:request.kind==='folder'?'选择文件夹':'选择智能体程序',properties:[request.kind==='folder'?'openDirectory':'openFile'],...(request.kind==='executable'?{filters:[{name:'Windows 程序',extensions:['exe','cmd','bat']}]}:{})});
    send({path:result.canceled?null:result.filePaths[0]||null});
   }catch{send({error:'无法打开文件选择窗口'})}finally{busy=false}
  };

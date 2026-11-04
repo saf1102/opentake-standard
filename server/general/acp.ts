@@ -1,3 +1,4 @@
+import {spawnAgentProcess} from '../agent-launch.ts';
 /** ACP v1 stdio transport. Provider programs retain their own login; no credentials are read here.
  * https://agentclientprotocol.com/protocol/v1/tool-calls
  * https://agentclientprotocol.com/protocol/v1/session-config-options
@@ -124,7 +125,7 @@ export function startAcpAgent(executable:string,args:readonly string[],options:A
  if(!agentAcpArgs(options.agent))throw Error('这个智能体的 ACP 出片还没完成适配');
  const root=path.resolve(options.projectRoot||options.cwd);
  if(!acpPathInside(root,options.cwd))throw Error('ACP 工作目录必须位于工程目录内');
- const child=spawn(executable,[...args],{cwd:options.cwd,env:options.env,stdio:['pipe','pipe','pipe'],detached:process.platform!=='win32'});
+ const child=spawnAgentProcess(executable,[...args],{cwd:options.cwd,env:options.env,stdio:['pipe','pipe','pipe'],detached:process.platform!=='win32'});
  const secretSafe=(text:string)=>options.redact?options.redact(text):text;
  const safe=(text:string)=>redactAcpText(secretSafe(text));
  let closed=false,stopping=false,completed=false,hasOutput=false,hasToolActivity=false,sessionId='',text='',stderr='',buffer='',sequence=0,killTimer:ReturnType<typeof setTimeout>|undefined;

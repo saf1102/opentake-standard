@@ -8,8 +8,9 @@ import {windowsConnectionSecretStore} from './windows-connection-secrets.ts';
 
 test('Windows 登录命令把路径和参数作为 PowerShell 字面量，只收集退出码',()=>{
  const script=windowsAgentScript("C:\\测试 空格\\a'b\\kimi.exe",['login'],"C:\\测试 空格\\exit-code");
- assert.ok(script.includes("& 'C:\\测试 空格\\a''b\\kimi.exe' 'login'"));
- assert.ok(script.includes('$LASTEXITCODE'));
+ assert.ok(script.includes("$start.FileName='C:\\测试 空格\\a''b\\kimi.exe'"));
+ assert.ok(script.includes('$operation.ExitCode'));
+ assert.ok(script.includes('$start.UseShellExecute=$false'));
  assert.ok(!/ExecutionPolicy|RedirectStandard|Out-File/.test(script));
  assert.throws(()=>powershellLiteral('invalid\ncommand'));
 });

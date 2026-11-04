@@ -1,3 +1,4 @@
+import {spawnAgentProcess} from './agent-launch.ts';
 import {AGENT_CONNECTION_IDS,LIGHT_AGENT_MODULES,connectionReadyForLight,connectionReadyForFilm} from '../shared/agent-connections.ts';
 import platform from './platform.ts';
 import {atomicJsonSync} from './file-ops.ts';
@@ -66,7 +67,7 @@ export async function getAgentCatalog(configured: string, refresh = false): Prom
   const request = (async () => {
     const { cliVersion } = await checkCliPath(executable);
     const models = await new Promise<AgentCatalog['models']>((resolve, reject) => {
-      const child = spawn(executable, ['app-server', '--stdio'], { stdio: ['pipe','pipe','ignore'], env: installations.loginEnvironment() });
+      const child = spawnAgentProcess(executable, ['app-server', '--stdio'], { stdio: ['pipe','pipe','ignore'], env: installations.loginEnvironment() });
       const lines = createInterface({ input: child.stdout });
       let settled = false, bytes = 0;
       const all: AgentCatalog['models'] = [];

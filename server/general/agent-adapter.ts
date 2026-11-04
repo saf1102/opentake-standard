@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import type {GeneralAgentChoice, GeneralStep} from '../../src/general/general-contract.ts';
-import {assertAgentWorkAllowed, onAgentDisabled, markAgentCredentialsRejected, getConnectionConfig} from '../agent-connections.ts';
+import {assertAgentWorkAllowed, assertConnectionModel, onAgentDisabled, markAgentCredentialsRejected, getConnectionConfig} from '../agent-connections.ts';
 import {filmTurnArgs, startCodex, type CodexProcess, type TurnArgs} from './codex.ts';
 import {applyCodexEvent, type EventOutcome} from './events.ts';
 import {agentAcpArgs,connectionDefinition,type AgentConnectionId} from '../../shared/agent-connections.ts';
@@ -28,6 +28,7 @@ export function claudeTurnArgs(a:TurnArgs & {method?:'cli'|'api'}):string[] {
 }
 export function filmAgentArgs(agent:ResolvedFilmAgent,a:TurnArgs):string[] {
   const id=filmAgentId(agent);
+  if(agent.method==='api')assertConnectionModel(id,a.model);
   if(id!=='codex'&&id!=='claude')return [...(agent.args??agentAcpArgs(id)??[])];
   if(id==='claude')return [...claudeTurnArgs({...a,method:agent.method}),...(agent.args||[])];
   const args=filmTurnArgs(a);
@@ -70,6 +71,7 @@ export function startFilmAgent(agent:ResolvedFilmAgent,args:string[],options:Par
   const id=filmAgentId(agent);
   // Kept immediately before transport start; even stale jobs must re-read the current switch.
   assertAgentWorkAllowed(id);
+  if(agent.method==='api')assertConnectionModel(id,agent.model);
   const config=getConnectionConfig(id),method=agent.method||config.mode,revision=config.revision||0;
   // session/new can succeed without usable credentials (observed with Kimi).
   // The actual prompt rejection overrides the cached, non-generating probe immediately.

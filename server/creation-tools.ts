@@ -14,7 +14,7 @@ export async function checkCreationEnvironment(choice?:GeneralAgentChoice):Promi
  const api=id==='codex' && getConnectionConfig(id).mode==='api';
  if(id==='codex' && !api)return checker.doctor({codexPath:()=>resolveCliPath(getConnectionConfig('codex').cliPath||undefined),onlyCodex:!standardEdition});
  const result=await checker.doctor({onlyCodex:!standardEdition,agentLabel:`${connectionDefinition(id).name} ${api?'API ':''}接入`,agentCheck:async()=>{
-  assertAgentExecutionAllowed(id);const launch=await resolveAgentConnectionLaunch(id);return {id,executable:launch.executable};
+  assertAgentExecutionAllowed(id);const launch=await resolveAgentConnectionLaunch(id,undefined,{},selected.model);return {id,executable:launch.executable};
  }});
  // Legacy tools consumers retain their Codex field; Claude never borrows that executable.
  if(result.tools && !result.tools.codex)result.tools.codex=id==='codex'?result.tools.agent?.executable||'':'';

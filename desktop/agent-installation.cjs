@@ -3,6 +3,7 @@ const os=require('node:os');
 const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const platform=require('./platform.cjs');
+const {agentLaunch}=require('./agent-launch.cjs');
 const versions=new Map();
 let shellCache;
 function sanitizeAgentEnv(input=process.env,connection){
@@ -44,7 +45,8 @@ function versionOf(kind,file,env){
  try{
   const stat=fs.statSync(file),key=`${kind}:${fs.realpathSync(file)}:${stat.mtimeMs}:${stat.size}`;
   if(versions.has(key))return versions.get(key);
-  const r=spawnSync(file,['--version'],{env,encoding:'utf8',timeout:2000,maxBuffer:65536});
+  const launch=agentLaunch(file,['--version'],{env,encoding:'utf8',timeout:2000,maxBuffer:65536});
+  const r=spawnSync(launch.file,launch.args,launch.options);
   const value=(r.stdout||'').trim();
   const valid=r.status===0&&/^codex(?:-cli)?\b/i.test(value);
   const result=valid?{version:value,semver:value.match(/\d+\.\d+\.\d+(?:-[\w.-]+)?/)?.[0]||'0.0.0'}:null;
@@ -86,7 +88,7 @@ function detectAgent(kind,options={}){
  if(configured)add(configured,'manual');
  else{
   add(env[kind==='codex'?'LINKREADER_CODEX_EXECUTABLE':'LINKREADER_CLAUDE_EXECUTABLE'],'environment');
-  for(const dir of [...platform.environmentPath(env).split(path.delimiter),path.join(home,'.local/bin'),path.join(home,'.npm-global/bin'),'/opt/homebrew/bin','/usr/local/bin'].filter(d=>path.isAbsolute(d)))add(path.join(dir,process.platform==='win32'?kind+'.exe':kind),'PATH');
+  for(const dir of [...platform.environmentPath(env).split(path.delimiter),...(process.platform==='win32'?[env.APPDATA&&path.join(env.APPDATA,'npm'),env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs')].filter(Boolean):[]),path.join(home,'.local/bin'),path.join(home,'.npm-global/bin'),'/opt/homebrew/bin','/usr/local/bin'].filter(d=>path.isAbsolute(d)))for(const name of process.platform==='win32'?['.exe','.cmd','.bat'].map(ext=>kind+ext):[kind])add(path.join(dir,name),'PATH');
   for(const apps of options.applicationDirs||[path.join(home,'Applications'),'/Applications'])if(kind==='codex')for(const app of ['Codex.app','ChatGPT.app'])for(const relative of ['Contents/Resources/codex','Contents/Resources/codex-cli/bin/codex','Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex'])add(path.join(apps,app,relative),'app');
   if(process.platform==='win32'&&kind==='codex'){
    const npm=env.APPDATA&&path.join(env.APPDATA,'npm','node_modules','@openai','codex');

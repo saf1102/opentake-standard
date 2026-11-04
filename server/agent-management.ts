@@ -3,8 +3,7 @@ import {startWindowsAgentTerminal,windowsAgentTerminalState} from './windows-age
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
+import {execFileAsync} from './proc.ts';
 import {connectionDefinition,type ConnectionId,type AgentConnectionId,type ConnectionView} from '../shared/agent-connections.ts';
 import {assertAgentExecutionAllowed,detectConnectionExecutable,getConnectionConfig,refreshAgentConnection,saveAgentConnection,markAgentCredentialsRejected,setAgentAccountChanging} from './agent-connections.ts';
 import {ROSTER_AGENTS,isClaudeExecutable,rosterExecutableCandidates} from './agent-roster.ts';
@@ -12,7 +11,7 @@ import {CODEX_INSTALL_COMMAND} from './agent-installations.ts';
 import installations from './agent-installation.ts';
 import {agentLoginManager} from './agent-login.ts';
 
-const exec=promisify(execFile);
+const exec=execFileAsync;
 const quoteShell=(value:string)=>`'${value.replace(/'/g,`'\\''`)}'`;
 const quoteApple=(value:string)=>`"${value.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`;
 const assertAgent=(id:ConnectionId)=>{if(connectionDefinition(id).kind!=='agent')throw Error('这里只能管理智能体程序');};

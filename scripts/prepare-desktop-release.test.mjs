@@ -28,6 +28,8 @@ test('combined release contains three installers, source, official update feed a
   const result=await prepareDesktopRelease(f);assert.equal(result.tag,release.desktopTag('1.1.0',metadata.windowsBuild));
   const feed=JSON.parse(fs.readFileSync(path.join(f.out,'windows-update.json'),'utf8'));
   assert.equal(feed.url,`https://github.com/${release.REPOSITORY}/releases/download/${result.tag}/OpenTake-Standard-Setup-1.1.0-x64.exe`);
+  assert.equal(feed.windowsBuild,2026110401);
+  assert.match(feed.notes,/极少量额度/);assert.match(feed.notes,/mac-x64\.dmg/);assert.match(feed.notes,/mac-arm64\.dmg/);assert.match(feed.notes,/x64\.exe/);assert.match(feed.notes,/仍要打开/);assert.match(feed.notes,/仍要运行/);assert.doesNotMatch(feed.notes,/发布负责人|候选安装包验收|最终 QA/);
   for(const line of fs.readFileSync(path.join(f.out,'SHA256SUMS.txt'),'utf8').trim().split('\n')){const [hash,name]=line.split('  ');assert.equal(sha(fs.readFileSync(path.join(f.out,name))),hash,name)}
   await assert.rejects(prepareDesktopRelease(f),/replace/);
  }finally{f.cleanup();}

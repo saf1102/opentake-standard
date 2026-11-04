@@ -1,3 +1,5 @@
+import {execFileAsync} from './proc.ts';
+import {spawnAgentProcess} from './agent-launch.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,7 +40,7 @@ export async function probeAcpAuthentication(executable:string,args:readonly str
  const cwd=fs.mkdtempSync(path.join(options.tempRoot??os.tmpdir(),'opentake-auth-'));
  try{return await new Promise<AuthProbeResult>(resolve=>{
   let child:ReturnType<typeof spawn>;
-  try{child=spawn(executable,[...args],{cwd,env:options.env,stdio:['pipe','pipe','ignore'],detached:process.platform!=='win32'});}catch{resolve({state:'unknown',message:'没查到，命令行未能启动'});return;}
+  try{child=spawnAgentProcess(executable,[...args],{cwd,env:options.env,stdio:['pipe','pipe','ignore'],detached:process.platform!=='win32'});}catch{resolve({state:'unknown',message:'没查到，命令行未能启动'});return;}
   let buffer='',bytes=0,finished=false,phase:'initialize'|'session'='initialize',answer:AuthProbeResult|undefined,killTimer:ReturnType<typeof setTimeout>|undefined;
   const terminate=(signal:NodeJS.Signals)=>{try{if(child.pid&&process.platform!=='win32')process.kill(-child.pid,signal);else child.kill(signal)}catch{/* already exited */}};
   const clean=()=>{clearTimeout(timeout);if(killTimer)clearTimeout(killTimer);options.signal?.removeEventListener('abort',abort);resolve(answer??{state:'unknown',message:'没查到，命令行提前退出'});};
@@ -103,7 +105,7 @@ export async function probeAgentStatusCommand(executable:string,args:readonly st
  const cwd=fs.mkdtempSync(path.join(options.tempRoot??os.tmpdir(),'opentake-status-'));
  try{
   let output='',failed=false;
-  try{const result=await promisify(execFile)(executable,[...args],{cwd,env:options.env,timeout:options.timeoutMs??8000,signal:options.signal,maxBuffer:65536});output=result.stdout+' '+result.stderr;}
+  try{const result=await execFileAsync(executable,[...args],{cwd,env:options.env,timeout:options.timeoutMs??8000,signal:options.signal,maxBuffer:65536});output=result.stdout+' '+result.stderr;}
   catch(error){failed=true;const result=error as {stdout?:string;stderr?:string};output=String(result.stdout??'')+' '+String(result.stderr??'');}
   const text=output.replace(/\x1b\[[0-9;]*m/g,'');
   if(/not (?:logged in|authenticated)|unauthenticated|authentication required|please (?:log|sign) in/i.test(text))return {state:'needs-login',message:'还没登录'};

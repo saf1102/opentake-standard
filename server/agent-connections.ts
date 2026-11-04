@@ -159,7 +159,7 @@ async function requestJson(id:ConnectionId,route:string,deps:ConnectionDependenc
  const headers:Record<string,string>={'Content-Type':'application/json'};
  if(connectionDefinition(id).protocol==='anthropic'){headers['x-api-key']=key;headers['anthropic-version']='2023-06-01';}else headers.Authorization=`Bearer ${key}`;
  let response:Response;try{response=await (deps.fetcher??fetch)(connectionEndpoint(validateConnectionBaseUrl(config.baseUrl),route),{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(deps.timeoutMs??15000)]):AbortSignal.timeout(deps.timeoutMs??15000)});}catch{throw Error('连接超时或网络不可用，请检查地址、代理和网络');}
- if(!response.ok)throw await providerResponseError(response);
+ if(!response.ok)throw Object.assign(await providerResponseError(response),{httpStatus:response.status});
  const raw=await response.text();if(raw.length>2*1024*1024)throw Error('服务返回内容过大');try{return JSON.parse(raw.split(key).join('[密钥已隐藏]')) as Record<string,unknown>}catch{throw Error('接口格式不兼容：服务没有返回 JSON');}
 }
 export async function refreshConnectionModels(id:ConnectionId,deps:ConnectionDependencies={}){
@@ -209,9 +209,22 @@ async function probeApiConnection(id:ConnectionId,config:ConnectionConfig,reques
    else {
     const models=await loadModels();
     if(definition.protocol==='responses'||definition.protocol==='anthropic'){
-     const model=config.model!=='default'&&models.some(m=>m.id===config.model)?config.model:models.find(m=>m.isDefault)?.id||models[0].id;
-     const data=await request(definition.protocol==='responses'?'responses/input_tokens':(/\/v1$/.test(config.baseUrl)?'messages/count_tokens':'v1/messages/count_tokens'),definition.protocol==='responses'?{model,input:'OpenTake connectivity check'}:{model,messages:[{role:'user',content:'OpenTake connectivity check'}]});
-     if(typeof data.input_tokens!=='number')throw Error('接口格式不兼容：没有返回输入Token计数；未发送生成请求');
+     const selected=modelFromConfig({...config,models});
+     // A token-only probe may use a listed model; generation must use the same resolved model as film work.
+     const model=selected==='default'?models[0].id:selected;
+     let data:Record<string,unknown>;
+     try{
+      data=await request(definition.protocol==='responses'?'responses/input_tokens':(/\/v1$/.test(config.baseUrl)?'messages/count_tokens':'v1/messages/count_tokens'),definition.protocol==='responses'?{model,input:'OpenTake connectivity check'}:{model,messages:[{role:'user',content:'OpenTake connectivity check'}]});
+     }catch(error){
+      if(definition.protocol!=='responses'||![404,405,501].includes((error as {httpStatus?:number}).httpStatus??0))throw error;
+      let response:Record<string,unknown>;
+      try{response=await request('responses',{model,input:'Hi',max_output_tokens:16,store:false});}
+      catch(fallbackError){if((fallbackError as {httpStatus?:number}).httpStatus===404)throw Error('这个接口不支持 Responses 协议，不能用于出片');throw fallbackError;}
+      const result=z.object({id:z.string().min(1),object:z.literal('response'),status:z.enum(['completed','incomplete']),error:z.null().optional(),incomplete_details:z.object({reason:z.literal('max_output_tokens')}).nullable().optional(),output:z.array(z.object({type:z.string(),content:z.array(z.object({type:z.string(),text:z.string().optional()})).optional()}))}).safeParse(response);
+      if(!result.success||(result.data.status==='incomplete'&&!result.data.incomplete_details)||(result.data.status==='completed'&&!result.data.output.some(item=>item.type==='message'&&item.content?.some(content=>content.type==='output_text'&&typeof content.text==='string'))))throw Error('Responses 返回结构不正确，不能用于出片');
+      return '连接正常；已发送一次最小请求，会用掉极少量额度';
+     }
+     if(typeof data.input_tokens!=='number'||!Number.isFinite(data.input_tokens)||data.input_tokens<0)throw Error('接口格式不兼容：没有返回输入Token计数；未发送生成请求');
     }
    }
  return ['hailuo','ark'].includes(definition.protocol)?'连接正常；仅查询已有任务，API 生成业务待适配':'连接正常；已读取模型或音色列表，未运行生成任务';
@@ -229,10 +242,19 @@ export async function testTransientConnection(id:ConnectionId,input:unknown,deps
   return {ok:true,message,durationMs:Date.now()-start};
  }catch(error){return {ok:false,error:error instanceof Error?error.message:'连接失败，请检查配置',durationMs:Date.now()-start};}
 }
-export function effectiveConnectionModel(id:ConnectionId,requested?:string){const config=getConnectionConfig(id);const selected=requested||config.model;if(selected==='default')return config.models.find(m=>m.isDefault)?.id||'default';return config.models.length&&!config.models.some(m=>m.id===selected)?config.models.find(m=>m.isDefault)?.id||'default':selected;}
-export async function resolveAgentConnectionLaunch(id:ConnectionId,baseEnv?:NodeJS.ProcessEnv,deps:ConnectionDependencies={}){
+function modelFromConfig(config:ConnectionConfig,requested?:string){const selected=requested&&requested!=='default'?requested:config.model;if(selected==='default')return config.models.find(m=>m.isDefault)?.id||'default';return config.models.length&&!config.models.some(m=>m.id===selected)?config.models.find(m=>m.isDefault)?.id||'default':selected;}
+export function effectiveConnectionModel(id:ConnectionId,requested?:string){return modelFromConfig(getConnectionConfig(id),requested);}
+/** Only the canonical official endpoint may delegate an unresolved model to its own CLI default. */
+export function assertConnectionModel(id:ConnectionId,model:string,config=getConnectionConfig(id)){
+ if(config.mode!=='api'||model&&model!=='default')return;
+ const normalize=(base:string)=>{try{const url=new URL(base);return url.origin+url.pathname.replace(/\/+$/,'');}catch{return base}};
+ if(normalize(config.baseUrl)!==normalize(connectionDefinition(id).baseUrl))throw Object.assign(Error('服务没有声明默认模型，请在接入设置里选择模型'),{status:412});
+}
+export async function resolveAgentConnectionLaunch(id:ConnectionId,baseEnv?:NodeJS.ProcessEnv,deps:ConnectionDependencies={},requestedModel?:string){
  assertAgentExecutionAllowed(id);const config=getConnectionConfig(id),definition=connectionDefinition(id);
+ const model=effectiveConnectionModel(id,requestedModel);
  if(!definition.heavySupported)throw Error(`${definition.name} 命令行出片待适配`);
+ if(id==='codex'||id==='claude')assertConnectionModel(id,model,config);
  const executable=await (deps.detect??detectExecutable)(id,config);if(!executable)throw Error('出片和写卡片代码需要安装命令行；只有 API 密钥时可处理纯文字');
  let env=installations.sanitizeAgentEnv({...installations.loginEnvironment(),...baseEnv});const args:string[]=[];
  if(id!=='codex'&&id!=='claude'){
@@ -240,14 +262,14 @@ export async function resolveAgentConnectionLaunch(id:ConnectionId,baseEnv?:Node
   const acpArgs=agentAcpArgs(id);if(!acpArgs)throw Error(`${definition.name} 命令行出片待适配`);
   const status=await getConnectionStatus(id,deps);if(!status.enabled||!status.connected)throw Error('所选智能体未接通，请到设置重新接通');
   if(status.filmOutdated)throw Error(`${definition.name} ${status.cliVersion} 太旧，需要 ${status.filmMinimumVersion} 以上才能出片`);
-  assertAgentWorkAllowed(id);return {executable,env,args:[...acpArgs],model:effectiveConnectionModel(id),method:config.mode,transport:'acp' as const};
+  assertAgentWorkAllowed(id);return {executable,env,args:[...acpArgs],model,method:config.mode,transport:'acp' as const};
  }
  if(config.mode==='api'){
-  if(!config.connected)throw Error('API 接入还没有测试通过，请先测试连接');const key=await connectionSecretStore().read(id);if(!key)throw Error('系统钥匙串中没有 API 密钥，请重新保存');
+  if(!config.connected)throw Error('API 接入还没有测试通过，请先测试连接');const key=await (deps.store??connectionSecretStore()).read(id);if(!key)throw Error('系统钥匙串中没有 API 密钥，请重新保存');
   if(id==='claude')env=installations.sanitizeAgentEnv(env,{agent:id,variables:{ANTHROPIC_API_KEY:key,ANTHROPIC_BASE_URL:config.baseUrl}});
   else {env=installations.sanitizeAgentEnv(env,{agent:id,variables:{OPENTAKE_CODEX_API_KEY:key}});args.push('-c','model_provider="opentake"','-c',`model_providers.opentake={name="OpenTake",base_url=${JSON.stringify(config.baseUrl)},env_key="OPENTAKE_CODEX_API_KEY",wire_api="responses",requires_openai_auth=false}`);}
  }
- assertAgentExecutionAllowed(id);return {executable,env,args,model:effectiveConnectionModel(id),method:config.mode};
+ assertAgentExecutionAllowed(id);return {executable,env,args,model,method:config.mode};
 }
 /** 轻活只发送文字，不授予工具、文件或 shell。业务调用与测试连接分离。 */
 export async function runConnectionText(id:ConnectionId,prompt:string,model?:string,signal?:AbortSignal,deps:ConnectionDependencies={}){
