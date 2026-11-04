@@ -75,7 +75,7 @@ jobs:
           RELEASE_TAG: ${{ steps.identity.outputs.tag }}
         run: |
           file 'release/mac/OpenTake Standard.app/Contents/MacOS/OpenTake Standard'
-          lipo -verify_arch x86_64 'release/mac/OpenTake Standard.app/Contents/MacOS/OpenTake Standard'
+          lipo 'release/mac/OpenTake Standard.app/Contents/MacOS/OpenTake Standard' -verify_arch x86_64
           node scripts/prepare-mac-intel-release.mjs --artifacts release --out release/intel-bundle --commit "$SOURCE_SHA" --tag "$RELEASE_TAG"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

@@ -37,13 +37,13 @@ if(target==='mac'&&fs.existsSync(receiptFile)){
 const run=(command,args)=>{const r=spawnSync(command,args,{cwd:root,stdio:'inherit',env:{...process.env,CSC_IDENTITY_AUTO_DISCOVERY:'false'}});if(r.error)throw r.error;if(r.status!==0)throw Error(command+' 失败')};
 if(target==='mac'){
 // electronDist is explicit: never label an arm64 Electron bundle as Intel (or vice versa).
-run('/usr/bin/lipo',['-verify_arch',macArch==='x64'?'x86_64':'arm64',path.join(root,'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron')]);
+run('/usr/bin/lipo',[path.join(root,'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'),'-verify_arch',macArch==='x64'?'x86_64':'arm64']);
 const icons=path.join(root,'release','OpenTake.iconset');fs.mkdirSync(icons,{recursive:true});
 for(const size of [16,32,128,256,512])for(const scale of [1,2])run('sips',['-z',String(size*scale),String(size*scale),'public/opentake-icon-512.png','--out',path.join(icons,`icon_${size}x${size}${scale===2?'@2x':''}.png`)]);
 run('iconutil',['-c','icns',icons,'-o','release/OpenTake.icns']);
 run(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/builder.config.cjs','--mac','dir','--'+macArch,'--publish','never']);
 const app=path.join(root,'release',platform.macAppDirectory(macArch),'OpenTake Standard.app');
-run('/usr/bin/lipo',['-verify_arch',macArch==='x64'?'x86_64':'arm64',path.join(app,'Contents/MacOS/OpenTake Standard')]);
+run('/usr/bin/lipo',[path.join(app,'Contents/MacOS/OpenTake Standard'),'-verify_arch',macArch==='x64'?'x86_64':'arm64']);
 try{await localSignature.signLocalApp(app);}catch(error){console.error(error.message);process.exit(1);}
 }else{
 run(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/builder.config.cjs','--win','dir','--x64','--publish','never','--config.directories.output=release/'+target]);
