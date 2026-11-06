@@ -17,6 +17,8 @@ const fixes = {
  ffmpeg: 'macOS：brew install ffmpeg。需要同时包含 ffmpeg 和 ffprobe；也可设置 LINKREADER_BIN_DIR 为两者所在目录。',
  codex: 'macOS：npm install -g @openai/codex，然后在终端运行 codex login；登录后重新检查。'
 };
+const PACKAGED_CHROMIUM_FIX='安装包已自带 Chromium，不用另外安装。请先点“重新检查”；仍失败时，核对或清除 CW_HFX_CHROME、CW_CHROME、PLAYWRIGHT_CHROMIUM_EXECUTABLE 的旧值，再把失败阶段与路径交给维护者。不要关闭 Codex 沙盒或自行放宽系统权限。';
+const packagedWindows=()=>process.platform==='win32'&&fs.existsSync(path.join(path.resolve(__dirname,'../../..'),'opentake-payload.json'));
 // Default: only the agent sample mode. The server explicitly passes renderArgs().
 async function probeBrowser(chromium, file, env, args = sampleArgs(env.CW_CHROME_GL)) {
  let browser,stage='launch';
@@ -61,7 +63,10 @@ async function probeSandbox(codex,file,env) {
    '--',process.execPath,path.join(__dirname,'probe-creation-browser.cjs'),file],
    {cwd:root,env:{...env,TMPDIR:tmp,...(process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{}),...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{})},timeout:process.platform==='win32'?60000:40000,maxBuffer:65536});
   if(!result.stdout.includes('OPENTAKE_BROWSER_READY'))throw Object.assign(Error('未完成截图'),{stage:'protocol',stderr:result.stderr});
- } finally { fs.rmSync(root,{recursive:true,force:true}); }
+ } finally {
+  // Windows can briefly keep the sandbox working folder locked. Leftover temp files must not fail the check.
+  try { fs.rmSync(root,{recursive:true,force:true,maxRetries:process.platform==='win32'?5:0,retryDelay:200}); } catch {}
+ }
 }
 async function doctor(options = {}) {
  const env = options.env || installations.loginEnvironment(process.env, true);
@@ -69,7 +74,7 @@ async function doctor(options = {}) {
  const items = [], tools = {};
  async function check(id,label,fn) {
   try { const result = await fn(); items.push({id,label,ok:true,...result}); }
-  catch(e) { items.push({id,label,ok:false,message:e.message,...(e.diagnostic?{diagnostic:e.diagnostic}:{}),install:fixes[id],color:'#9869dc'}); }
+  catch(e) { items.push({id,label,ok:false,message:e.message,...(e.diagnostic?{diagnostic:e.diagnostic}:{}),install:id==='chromium'&&packagedWindows()?PACKAGED_CHROMIUM_FIX:fixes[id],color:'#9869dc'}); }
  }
  if (options.agentCheck) {
   await check('agent', options.agentLabel || '出片智能体', async()=>{

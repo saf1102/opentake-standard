@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import {defaultConnection,type ConnectionConfig,type ConnectionId} from '../shared/agent-connections.ts';
-import {effectiveConnectionModel,assertConnectionModel,resolveAgentConnectionLaunch,testUnifiedConnection,runConnectionText,type ConnectionDependencies,testTransientConnection} from './agent-connections.ts';
+import {getConnectionConfig,saveAgentConnection,effectiveConnectionModel,assertConnectionModel,resolveAgentConnectionLaunch,testUnifiedConnection,runConnectionText,type ConnectionDependencies,testTransientConnection} from './agent-connections.ts';
 import {filmAgentArgs,startFilmAgent} from './general/agent-adapter.ts';
 
 const KEY='task35-fixture-not-a-real-key';
@@ -102,3 +102,44 @@ test('任务35：第三方接口没标默认模型时，测试连接用列表第
  assert.match(String(result.message),/最小请求/);
  assert.equal(bodies.length,1);assert.equal(bodies[0].model,'first-model');
 });
+
+const relay=(ok:(url:string)=>boolean,reply:(url:string)=>unknown,calls:string[]=[]):typeof fetch=>(async(input:string|URL|Request)=>{const url=String(input);calls.push(url);return ok(url)?Response.json(reply(url)):new Response('not found',{status:404})}) as typeof fetch;
+const relayReply=(url:string)=>url.endsWith('/models')?{data:[{id:'relay-model'}]}:url.endsWith('count_tokens')?{input_tokens:3}:url.endsWith('/messages')?{type:'message',role:'assistant',content:[{type:'text',text:'Hi'}]}:{choices:[{message:{content:'Hi'}}]};
+
+test('接口地址：去掉多填的路径，已保存的旧地址和启动 Claude 时也一样',async()=>fixture(async(save,deps)=>{
+ for(const [input,expected] of [['https://www.k98.top/v1/messages','https://www.k98.top'],['https://www.k98.top/v1/messages/','https://www.k98.top'],['https://www.k98.top/v1','https://www.k98.top'],['https://x.example/anthropic/v1/messages/count_tokens','https://x.example/anthropic']]){
+  save('claude',{baseUrl:input});assert.equal(getConnectionConfig('claude').baseUrl,expected);
+  const saved=await saveAgentConnection('claude',{mode:'api',baseUrl:input},deps);assert.equal(saved.baseUrl,expected);
+ }
+ for(const [input,expected] of [['https://relay.example/v1/responses','https://relay.example/v1'],['https://relay.example/v1/chat/completions','https://relay.example/v1'],['https://relay.example/v1/models','https://relay.example/v1'],['https://relay.example/v1','https://relay.example/v1'],['https://messages.example','https://messages.example']]){
+  save('codex',{baseUrl:input});assert.equal(getConnectionConfig('codex').baseUrl,expected);
+ }
+ save('claude',{baseUrl:'https://www.k98.top/v1',model:'relay-model',connected:true});
+ const launch=await resolveAgentConnectionLaunch('claude',{},deps);assert.equal(launch.env.ANTHROPIC_BASE_URL,'https://www.k98.top');
+}));
+
+test('中转站：截图里的完整地址能测通，请求不再叠路径',async()=>fixture(async(save,deps)=>{
+ const calls:string[]=[];save('claude',{baseUrl:'https://www.k98.top/v1/messages',model:'relay-model',connected:false});
+ const result=await testUnifiedConnection('claude',{...deps,fetcher:relay(url=>/^https:\/\/www\.k98\.top\/v1\/(models|messages\/count_tokens)$/.test(url),relayReply,calls)});
+ assert.equal(result.ok,true,result.error);assert.deepEqual(calls,['https://www.k98.top/v1/models','https://www.k98.top/v1/messages/count_tokens']);
+}));
+
+test('中转站：没有模型列表或计数接口时，手填模型走最小请求；没填模型明确提示',async()=>fixture(async(save,deps)=>{
+ const onlyMessages=(url:string)=>url==='https://r.example/v1/messages';
+ save('claude',{baseUrl:'https://r.example',model:'relay-model',connected:false});
+ const manual=await testUnifiedConnection('claude',{...deps,fetcher:relay(onlyMessages,relayReply)});assert.equal(manual.ok,true,manual.error);assert.match(manual.connection.message||'',/最小请求/);
+ save('claude',{baseUrl:'https://r.example',model:'default',connected:false});
+ const noModel=await testUnifiedConnection('claude',{...deps,fetcher:relay(onlyMessages,relayReply)});assert.equal(noModel.ok,false);assert.match(noModel.error||'',/手动填写模型/);
+ save('kimi',{baseUrl:'https://r.example/v1',model:'relay-model',connected:false});
+ const chat=await testUnifiedConnection('kimi',{...deps,fetcher:relay(url=>url.endsWith('/chat/completions'),relayReply)});assert.equal(chat.ok,true,chat.error);
+}));
+
+test('中转站：协议不对和鉴权失败不算通过；404 提示实际地址',async()=>fixture(async(save,deps)=>{
+ save('claude',{baseUrl:'https://r.example',model:'relay-model',connected:false});
+ const missing=await testUnifiedConnection('claude',{...deps,fetcher:relay(()=>false,relayReply)});assert.equal(missing.ok,false);assert.match(missing.error||'',/不支持 Anthropic Messages/);
+ const wrongShape=await testUnifiedConnection('claude',{...deps,fetcher:relay(url=>url.endsWith('/messages'),()=>({choices:[]}))});assert.equal(wrongShape.ok,false);assert.match(wrongShape.error||'',/返回结构不正确/);
+ const denied=await testUnifiedConnection('claude',{...deps,fetcher:(async()=>new Response('{}',{status:401})) as typeof fetch});assert.equal(denied.ok,false);assert.doesNotMatch(denied.error||'',/不支持/);
+ save('codex',{baseUrl:'https://r.example',model:'default',connected:false});
+ const noList=await testTransientConnection('codex',{transient:true,apiKey:'fixture-key-123',baseUrl:'https://r.example/v1/responses'},{fetcher:(async(input:string|URL|Request)=>{assert.equal(String(input),'https://r.example/v1/models');return new Response('not found',{status:404})}) as typeof fetch});
+ assert.equal(noList.ok,false);assert.match(String(noList.error),/手动填写模型/);
+}));

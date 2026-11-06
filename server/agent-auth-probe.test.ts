@@ -89,11 +89,11 @@ test('错误绑定 Claude 的路径、符号链接和硬链接不能作为其他
 });
 
 
-test('十家智能体共享明确的 ACP/登录命令；未知 DeepSeek 保留待适配',()=>{
+test('十家智能体共享明确的 ACP/登录命令；DeepSeek 用官方 ACP profile、不提供登录命令',()=>{
  assert.equal(AGENT_CONNECTION_IDS.length,10);
  for(const id of AGENT_CONNECTION_IDS){
   const def=connectionDefinition(id);
-  if(id==='deepseek'){assert.equal(def.heavySupported,false);assert.equal(agentAcpArgs(id),undefined);continue;}
+  if(id==='deepseek'){assert.equal(def.heavySupported,true);assert.deepEqual(agentAcpArgs(id),['--profile','acp']);assert.equal(agentCliLoginArgs(id),undefined);continue;}
   assert.equal(def.heavySupported,true);
   assert.ok(agentCliLoginArgs(id));
   if(id!=='codex'&&id!=='claude')assert.ok(agentAcpArgs(id)?.length);

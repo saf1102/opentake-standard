@@ -15,7 +15,7 @@ test('任务24第二部分：失败卡只列可出片的接通家，明确换家
  const saved=new Map<string,PropertyDescriptor|undefined>(),oldFetch=globalThis.fetch;
  for(const[key,value]of Object.entries({window:dom.window,document:dom.window.document,navigator:dom.window.navigator,Event:dom.window.Event,CustomEvent:dom.window.CustomEvent,IS_REACT_ACT_ENVIRONMENT:true})){saved.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true});}
  const view=(id:ConnectionId,patch:Partial<ConnectionView>={}):ConnectionView=>({...defaultConnection(id),...connectionDefinition(id),cliInstalled:true,connected:true,enabled:true,state:'connected',relay:false,cliAuthState:'connected',...patch});
- const connections=[view('codex'),view('kimi'),view('minimax'),view('deepseek'),view('claude',{enabled:false}),view('copilot',{connected:false}),view('qwen',{cliInstalled:false})];
+ const connections=[view('codex'),view('kimi'),view('minimax'),view('deepseek',{heavySupported:false}),view('claude',{enabled:false}),view('copilot',{connected:false}),view('qwen',{cliInstalled:false})];
  const calls:unknown[]=[],requests:string[]=[];let app:any,unmounted=false;
  try {
   const outfile=path.join(dir,'harness.mjs');await build({stdin:{contents:`import React,{act}from'react';import{createRoot}from'react-dom/client';import{GeneralFailoverCard}from'./src/general/GeneralFailoverCard';export{React,act,createRoot,GeneralFailoverCard};`,resolveDir:root,loader:'tsx'},outfile,jsx:'automatic',bundle:true,platform:'node',format:'esm',packages:'external',logLevel:'silent'});

@@ -13,7 +13,7 @@ const update=u=>out({method:'session/update',params:{sessionId:'test-session',up
 const mode=process.env.TEST_ACP_MODE||'model';
 rl.on('line',line=>{const m=JSON.parse(line);fs.appendFileSync('received.jsonl',line+'\n');
  if(m.method==='initialize')out({id:m.id,result:{protocolVersion:1}});
- else if(m.method==='session/new')out({id:m.id,result:{sessionId:'test-session',...(mode==='model'?{configOptions:[{id:'pick-model',category:'model',type:'select',currentValue:'default-model',options:[{value:'chosen-model',name:'Chosen'}]}]}:mode==='legacy'?{models:{currentModelId:'legacy-default',availableModels:[{modelId:'chosen-model',name:'Chosen'}]}}:{})}});
+ else if(m.method==='session/new')out({id:m.id,result:{sessionId:'test-session',...(mode==='model'?{configOptions:[{id:'pick-model',category:'model',type:'select',currentValue:'default-model',options:[{value:'chosen-model',name:'Chosen'}]}]}:mode==='legacy'?{models:{currentModelId:'legacy-default',availableModels:[{modelId:'chosen-model',name:'Chosen'}]}}:mode==='split-catalog'?{configOptions:[{id:'pick-model',category:'model',type:'select',currentValue:'short-id',options:[{value:'short-id',name:'Chosen'}]}],models:{currentModelId:'custom-local:chosen-model',availableModels:[{modelId:'custom-local:chosen-model',name:'Chosen'}]}}:{})}});
  else if((m.method==='session/set_config_option'||m.method==='session/set_model'))out({id:m.id,result:{}});
  else if(m.method==='session/prompt'){
   if(['empty','whitespace','tools-only','thought-only','plan-only'].includes(mode)){
@@ -108,6 +108,9 @@ test('任务24：旧版models选择与不可用模型提前停止，不偷偷换
  const bad=await run('model','not-available');try{assert.notEqual((await bad.proc.done).code,0);const wire=fs.readFileSync(path.join(bad.dir,'received.jsonl'),'utf8');assert.doesNotMatch(wire,/session\/prompt/);assert.equal(bad.events.some(e=>e.type==='acp.error'),true);}finally{bad.proc.stop();fs.rmSync(bad.dir,{recursive:true,force:true});}
 });
 
+test('接入修复：模型只在 ACP 模型目录里时走 set_model，不误报不可用',async()=>{
+ const job=await run('split-catalog','custom-local:chosen-model');try{assert.equal((await job.proc.done).code,0);const wire=fs.readFileSync(path.join(job.dir,'received.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));assert.equal(wire.find(m=>m.method==='session/set_model').params.modelId,'custom-local:chosen-model');assert.equal(wire.some(m=>m.method==='session/set_config_option'),false);}finally{job.proc.stop();fs.rmSync(job.dir,{recursive:true,force:true});}
+});
 test('任务24：Kimi官方content JSON工具格式可映射并用session cwd审批',async()=>{
  const {dir,events,proc}=await run('kimi');try{assert.equal((await proc.done).code,0);const wire=fs.readFileSync(path.join(dir,'received.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));assert.equal(wire.find(m=>m.id===94).result.outcome.optionId,'yes');const update=events.find(e=>(e.update as {toolCallId?:string})?.toolCallId==='kimi-shell');assert.equal((update!.update as {kind:string}).kind,'execute');assert.equal(applyAcpEvent(initialSteps('topic','first'),update!,'now').steps.find(s=>s.id==='render')?.state,'running');}finally{proc.stop();fs.rmSync(dir,{recursive:true,force:true});}
  const raw=normalizeAcpTool({title:'Unknown: harmless',content:[{type:'content',content:{type:'text',text:'please approve'}}]},'/project');assert.equal(acpPermissionDecision('/project',raw).allowed,false);

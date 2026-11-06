@@ -13,7 +13,7 @@ export const ROSTER_AGENTS:readonly RosterAgent[]=[
   installer:'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',page:'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html'},
  // DeepSeek Harness's desktop app carries the command; its own setting only links it into the PATH
  {id:'deepseek',name:'DeepSeek',names:['dsh'],dirs:(_home,apps)=>apps.map(dir=>path.join(dir,'DeepSeek Harness.app','Contents','Resources','runtime','cli','bin')),
-  page:'https://github.com/deepseek-ai/deepseek-harness'},
+  installer:'npm install -g @deepseek-ai/dsh',page:'https://github.com/deepseek-ai/deepseek-harness'},
  {id:'minimax',name:'MiniMax Code',names:['mcode','mmx-code'],dirs:home=>[path.join(home,'.minimax-code','bin')],app:{name:'MiniMax',match:/^MiniMax.*\.app$/i},
   installer:'curl -fsSL https://filecdn.minimax.chat/public/install.sh | bash',page:'https://www.npmjs.com/package/@minimax-ai/code'},
  {id:'codebuddy',name:'CodeBuddy',names:['codebuddy','cbc'],app:{name:'CodeBuddy',match:/^CodeBuddy.*\.app$/i},

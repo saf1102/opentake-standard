@@ -18,8 +18,11 @@ test('任务24：选择规则只接受已接通且有对应接法的智能体，
   assert.equal(connectionReadyForFilm(view(id,{connected:false})),false);assert.equal(connectionReadyForLight(view(id,{connected:false})),false);
   assert.equal(connectionReadyForFilm(view(id,{enabled:false})),false);assert.equal(connectionReadyForLight(view(id,{enabled:false})),false);
  }
- assert.equal(connectionReadyForFilm(view('deepseek')),false);
- assert.equal(connectionReadyForLight(view('deepseek')),false);
+ assert.equal(connectionReadyForFilm(view('deepseek')),true);
+ assert.equal(connectionReadyForLight(view('deepseek')),true);
+ assert.equal(connectionReadyForFilm(view('deepseek',{mode:'api'})),false);
+ assert.equal(connectionReadyForFilm(view('deepseek',{heavySupported:false})),false);
+ assert.equal(connectionReadyForLight(view('deepseek',{heavySupported:false})),false);
  assert.equal(connectionReadyForLight(view('kimi',{mode:'api',cliInstalled:false})),true);
  assert.equal(connectionReadyForFilm(view('kimi',{mode:'api'})),false);
  assert.equal(connectionReadyForLight(view('copilot',{mode:'api'})),false);

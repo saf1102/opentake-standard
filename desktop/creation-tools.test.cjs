@@ -1,7 +1,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {doctor,probeBrowser,PYTHON_ENV}=require('./creation-tools.cjs');
+const {doctor,probeBrowser,probeSandbox,PYTHON_ENV}=require('./creation-tools.cjs');
 const {SAMPLE_ARGS,RENDER_ARGS}=require('../shared/browser-launch.cjs');
 
 function fixture() {
@@ -114,4 +114,20 @@ test('服务端渲染失败仍阻断，不用样张成功掩盖，并提示清�
   for(const name of ['CW_HFX_CHROME','CW_CHROME','PLAYWRIGHT_CHROMIUM_EXECUTABLE'])assert.ok(item.install.includes(name));
   assert.match(item.install,/不要关闭 Codex 沙盒/);
  }finally{f.close()}
+});
+
+test('临时目录删不掉不算 Chromium 检查失败',{skip:process.platform==='win32'},async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'browser-check-clean-'));const codex=path.join(root,'codex');
+ fs.writeFileSync(codex,'#!/bin/sh\necho OPENTAKE_BROWSER_READY\n',{mode:0o755});
+ const rm=fs.rmSync;let seen;
+ fs.rmSync=(target,...rest)=>{if(String(target).includes('opentake-browser-check-')){seen=target;throw Object.assign(Error("EPERM, Permission denied: \\\\?\\"+target),{code:'EPERM'});}return rm(target,...rest)};
+ try{await probeSandbox(codex,'/bin/true',{PATH:process.env.PATH});assert.ok(seen);}
+ finally{fs.rmSync=rm;if(seen)rm(seen,{recursive:true,force:true});rm(root,{recursive:true,force:true});}
+});
+test('路径里的 opentake 不会被误判成脚本加载失败',()=>{
+ const {browserDiagnostic}=require('./browser-diagnostic.cjs');
+ const wrong=browserDiagnostic(Error("EPERM, Permission denied: \\\\?\\C:\\Temp\\opentake-browser-check-EH5dHn"),'sandbox');
+ assert.notEqual(wrong.diagnostic.stage,'script-load');
+ const real=browserDiagnostic(Error("EPERM: operation not permitted, stat 'C:\\Temp\\probe-creation-browser.cjs'"),'sandbox');
+ assert.equal(real.diagnostic.stage,'script-load');
 });

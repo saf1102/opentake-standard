@@ -193,7 +193,8 @@ export function startAcpAgent(executable:string,args:readonly string[],options:A
   const configs=(Array.isArray(session.configOptions)?session.configOptions:[]).map(object),config=configs.find(c=>c.category==='model'&&c.type==='select');
   const models=object(session.models);let actual=String(config?.currentValue||models.currentModelId||'default'),selected=false;
   const requested=options.model||'default';
-  if(requested!=='default'&&config){const values=(Array.isArray(config.options)?config.options:[]).map(object).flatMap(o=>Array.isArray(o.options)?o.options.map(object):[o]);if(!values.some(o=>o.value===requested))throw Error('所选模型不在智能体可用模型列表中，请修改工程模型设置');await rpc('session/set_config_option',{sessionId,configId:config.id,value:requested});actual=requested;selected=true;}
+  const configValues=config?(Array.isArray(config.options)?config.options:[]).map(object).flatMap(o=>Array.isArray(o.options)?o.options.map(object):[o]):[],catalogued=Array.isArray(models.availableModels)&&models.availableModels.some(m=>object(m).modelId===requested);
+  if(requested!=='default'&&config&&(configValues.some(o=>o.value===requested)||!catalogued)){const values=configValues;if(!values.some(o=>o.value===requested))throw Error('所选模型不在智能体可用模型列表中，请修改工程模型设置');await rpc('session/set_config_option',{sessionId,configId:config.id,value:requested});actual=requested;selected=true;}
   else if(requested!=='default'&&Array.isArray(models.availableModels)){if(!models.availableModels.some(m=>object(m).modelId===requested))throw Error('所选模型不在智能体可用模型列表中，请修改工程模型设置');await rpc('session/set_model',{sessionId,modelId:requested});actual=requested;selected=true;}
   emit({type:'acp.model',model:actual,modelSelection:selected?'selected':'default',requestedModel:requested});if(stopping)return;
   const prompt=options.prompt+(options.images?.length?`\n\n请读取以下工程内参考图片：\n${options.images.filter(p=>acpPathInside(root,p)).join('\n')}`:'');

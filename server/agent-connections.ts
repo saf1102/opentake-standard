@@ -9,11 +9,11 @@ import {ROSTER_AGENTS,rosterAgentStatus,isClaudeExecutable} from './agent-roster
 import {createAuthProbeCache,probeAcpAuthentication,probeAgentStatusCommand,type AuthProbeResult} from './agent-auth-probe.ts';
 import {agentSettingsFile,atomicAgentJson,readAgentSettings,getAgentCatalog} from './agent-settings.ts';
 import {connectionSecretStore,type ConnectionSecretStore} from './connection-secrets.ts';
-import {filmVersionOutdated,agentAcpArgs,agentCliLoginArgs,CONNECTION_IDS,CONNECTION_DEFINITIONS,connectionDefinition,defaultConnection,isRelay,type ConnectionId,type ConnectionConfig,type ConnectionView,type ConnectionModel} from '../shared/agent-connections.ts';
+import {filmVersionOutdated,agentAcpArgs,agentCliLoginArgs,CONNECTION_IDS,CONNECTION_DEFINITIONS,connectionDefinition,defaultConnection,isRelay,normalizeConnectionBaseUrl,type ConnectionId,type ConnectionConfig,type ConnectionView,type ConnectionModel} from '../shared/agent-connections.ts';
 const configSchema=z.object({authRejectedAt:z.string().optional(),revision:z.number().int().nonnegative().optional(),mode:z.enum(['cli','api']),enabled:z.boolean(),baseUrl:z.string().max(2048),model:z.string().regex(/^[\w.\/:_,-]+$/),cliPath:z.string().max(4096),hasKey:z.boolean(),models:z.array(z.object({id:z.string(),name:z.string(),isDefault:z.boolean().optional()})),checkedAt:z.string().optional(),connected:z.boolean().optional(),message:z.string().optional()}).strict();
 const file=()=>process.env.LINKREADER_CONNECTION_SETTINGS_FILE||path.join(path.dirname(agentSettingsFile()),'agent-connections.json');
 function readConfigs():Partial<Record<ConnectionId,ConnectionConfig>> {if(!fs.existsSync(file()))return {};try{return z.partialRecord(z.enum(CONNECTION_IDS),configSchema).parse(JSON.parse(fs.readFileSync(file(),'utf8')))}catch{throw Error('接入设置文件损坏，未覆盖原文件，请恢复备份');}}
-export function getConnectionConfig(id:ConnectionId):ConnectionConfig{return {...defaultConnection(id),...readConfigs()[id]};}
+export function getConnectionConfig(id:ConnectionId):ConnectionConfig{const config={...defaultConnection(id),...readConfigs()[id]};return {...config,baseUrl:normalizeConnectionBaseUrl(id,config.baseUrl)};}
 function persist(id:ConnectionId,config:ConnectionConfig){atomicAgentJson(file(),{...readConfigs(),[id]:configSchema.parse(config)});}
 const disabledListeners=new Set<(id:ConnectionId)=>void>();
 const credentialRejectedListeners=new Set<(id:ConnectionId)=>void>();
@@ -116,6 +116,7 @@ async function connectionStatus(id:ConnectionId,deps:ConnectionDependencies,forc
   auth=!config.enabled?{state:'disabled',message:executable?'已安装 · 默认不调用':'默认不调用'}:!executable?{state:'missing',message:'未安装'}:config.mode==='cli'?await cliAuthentication(id,config,executable,deps,force):undefined;
   if(config.mode==='cli')connected=auth?.state==='connected';
  }
+ if(id==='codebuddy'&&auth?.state==='needs-login')auth={...auth,message:`CodeBuddy 命令行还没登录。只用自己的模型（models.json）也要先登录${process.platform==='win32'?'，或设置环境变量 CODEBUDDY_API_KEY 后重启 OpenTake':''}。`};
  // Discard stale results if the user changed a path, mode or the Claude switch while a check was in flight.
  if(getConnectionConfig(id).revision!==config.revision)return connectionStatus(id,deps);
  connected=connected&&config.enabled&&(config.mode==='api'?config.hasKey:!!executable);
@@ -130,7 +131,7 @@ export async function listAgentConnections(includeServices=true,deps:ConnectionD
 export async function saveAgentConnection(id:ConnectionId,input:unknown,deps:ConnectionDependencies={}){
  const patch=z.object({mode:z.enum(['cli','api']).optional(),enabled:z.boolean().optional(),baseUrl:z.string().optional(),model:z.string().regex(/^[\w.\/:_,-]+$/).optional(),cliPath:z.string().optional(),apiKey:z.string().optional(),confirmSubscriptionRisk:z.boolean().optional()}).strict().parse(input);
  const previous=getConnectionConfig(id),next={...previous,...patch,revision:(previous.revision||0)+1};delete (next as Record<string,unknown>).apiKey;delete (next as Record<string,unknown>).confirmSubscriptionRisk;
- if(next.mode==='api'&&next.baseUrl)next.baseUrl=validateConnectionBaseUrl(next.baseUrl);
+ if(next.mode==='api'&&next.baseUrl)next.baseUrl=normalizeConnectionBaseUrl(id,validateConnectionBaseUrl(next.baseUrl));
  if(id==='claude'&&next.enabled&&next.mode==='cli'&&(!previous.enabled||previous.mode!=='cli')&&!patch.confirmSubscriptionRisk)throw Error('使用 Claude Code 订阅账号前必须确认风险；推荐改用 API 密钥');
  if(patch.apiKey){await (deps.store??connectionSecretStore()).write(id,patch.apiKey);next.hasKey=true;}
  const changed=patch.apiKey||['mode','baseUrl','model','cliPath'].some(key=>next[key as keyof ConnectionConfig]!==previous[key as keyof ConnectionConfig]);
@@ -158,9 +159,10 @@ async function requestJson(id:ConnectionId,route:string,deps:ConnectionDependenc
  const config=transient?.config??getConnectionConfig(id),key=transient?.key??await (deps.store??connectionSecretStore()).read(id);if(!key)throw Error('请先保存 API 密钥');
  const headers:Record<string,string>={'Content-Type':'application/json'};
  if(connectionDefinition(id).protocol==='anthropic'){headers['x-api-key']=key;headers['anthropic-version']='2023-06-01';}else headers.Authorization=`Bearer ${key}`;
- let response:Response;try{response=await (deps.fetcher??fetch)(connectionEndpoint(validateConnectionBaseUrl(config.baseUrl),route),{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(deps.timeoutMs??15000)]):AbortSignal.timeout(deps.timeoutMs??15000)});}catch{throw Error('连接超时或网络不可用，请检查地址、代理和网络');}
- if(!response.ok)throw Object.assign(await providerResponseError(response),{httpStatus:response.status});
- const raw=await response.text();if(raw.length>2*1024*1024)throw Error('服务返回内容过大');try{return JSON.parse(raw.split(key).join('[密钥已隐藏]')) as Record<string,unknown>}catch{throw Error('接口格式不兼容：服务没有返回 JSON');}
+ const endpoint=connectionEndpoint(validateConnectionBaseUrl(config.baseUrl),route);
+ let response:Response;try{response=await (deps.fetcher??fetch)(endpoint,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(deps.timeoutMs??15000)]):AbortSignal.timeout(deps.timeoutMs??15000)});}catch{throw Error('连接超时或网络不可用，请检查地址、代理和网络');}
+ if(!response.ok){const failure=await providerResponseError(response);if(connectionDefinition(id).kind==='agent'&&[404,405].includes(response.status)&&failure.message===statusError(response.status))failure.message=`接口格式不兼容：${endpoint} 不存在。接口地址通常只填到域名或 /v1，不用带 /messages、/responses 这类路径`;throw Object.assign(failure,{httpStatus:response.status});}
+ const raw=await response.text();if(raw.length>2*1024*1024)throw Error('服务返回内容过大');try{return JSON.parse(raw.split(key).join('[密钥已隐藏]')) as Record<string,unknown>}catch{throw Object.assign(Error('接口格式不兼容：服务没有返回 JSON'),{routeMissing:true});}
 }
 export async function refreshConnectionModels(id:ConnectionId,deps:ConnectionDependencies={}){
  const config=getConnectionConfig(id);let models:ConnectionModel[]=[];
@@ -197,9 +199,10 @@ async function readApiModels(id:ConnectionId,config:ConnectionConfig,request:Pro
   if(!['responses','anthropic','chat'].includes(definition.protocol))throw Error('官方未提供可读取的模型列表，请手动填写模型');
   const data=await request(definition.protocol==='anthropic'&&!/\/v1$/.test(config.baseUrl)?'v1/models':'models');
   const items=z.array(z.object({id:z.string(),display_name:z.string().optional(),name:z.string().optional(),is_default:z.boolean().optional()})).safeParse(data.data);
-  if(!items.success||!items.data.length)throw Error('接口格式不兼容：没有返回可用模型列表');
+  if(!items.success||!items.data.length)throw Object.assign(Error('接口格式不兼容：没有返回可用模型列表'),{routeMissing:true});
   return items.data.map(m=>({id:m.id,name:m.display_name||m.name||m.id,isDefault:m.is_default}));
 }
+const routeMissing=(error:unknown)=>{const value=error as {httpStatus?:number;routeMissing?:boolean};return value?.routeMissing===true||[404,405,501].includes(value?.httpStatus??0)};
 async function probeApiConnection(id:ConnectionId,config:ConnectionConfig,request:ProbeRequest,loadModels:()=>Promise<ConnectionModel[]>){
  const definition=connectionDefinition(id);
    if(definition.protocol==='pending')throw Error(definition.apiReason||'API 接入待适配');
@@ -207,27 +210,36 @@ async function probeApiConnection(id:ConnectionId,config:ConnectionConfig,reques
    else if(definition.protocol==='hailuo'){const data=await request('query/video_generation?page_num=1&page_size=1');if(!Array.isArray(data.items))throw Error('接口格式不兼容：没有返回任务列表');}
    else if(definition.protocol==='ark'){const data=await request('contents/generations/tasks?page_size=1');if(!Array.isArray(data.items))throw Error('接口格式不兼容：没有返回任务列表');}
    else {
-    const models=await loadModels();
+    let models:ConnectionModel[]=[];
+    // Many relays have no model list. A model the user typed in can still be checked below.
+    try{models=await loadModels();}
+    catch(error){if(!routeMissing(error))throw error;if(!config.model||config.model==='default')throw Error('接口格式不兼容：这家服务读不到模型列表，请手动填写模型名称后再测试');}
+    const selected=modelFromConfig({...config,models});
+    // A token-only probe may use a listed model; generation must use the same resolved model as film work.
+    const model=selected==='default'?models[0].id:selected;
+    const minimalProbe=async()=>{
+     const name=definition.protocol==='responses'?'Responses':definition.protocol==='anthropic'?'Anthropic Messages':'Chat Completions';
+     let response:Record<string,unknown>;
+     try{
+      response=definition.protocol==='responses'?await request('responses',{model,input:'Hi',max_output_tokens:16,store:false})
+       :definition.protocol==='anthropic'?await request(/\/v1$/.test(config.baseUrl)?'messages':'v1/messages',{model,max_tokens:16,messages:[{role:'user',content:'Hi'}]})
+       :await request('chat/completions',{model,max_tokens:16,messages:[{role:'user',content:'Hi'}]});
+     }catch(fallbackError){if(routeMissing(fallbackError))throw Error(`这个接口不支持 ${name} 协议，不能用于出片`);throw fallbackError;}
+     if(definition.protocol==='responses'){
+      const result=z.object({id:z.string().min(1),object:z.literal('response'),status:z.enum(['completed','incomplete']),error:z.null().optional(),incomplete_details:z.object({reason:z.literal('max_output_tokens')}).nullable().optional(),output:z.array(z.object({type:z.string(),content:z.array(z.object({type:z.string(),text:z.string().optional()})).optional()}))}).safeParse(response);
+      if(!result.success||(result.data.status==='incomplete'&&!result.data.incomplete_details)||(result.data.status==='completed'&&!result.data.output.some(item=>item.type==='message'&&item.content?.some(content=>content.type==='output_text'&&typeof content.text==='string'))))throw Error('Responses 返回结构不正确，不能用于出片');
+     }else if(definition.protocol==='anthropic'?!Array.isArray(response.content):!Array.isArray(response.choices)||!response.choices.length)throw Error(`${name} 返回结构不正确，不能用于出片`);
+     return '连接正常；已发送一次最小请求，会用掉极少量额度';
+    };
     if(definition.protocol==='responses'||definition.protocol==='anthropic'){
-     const selected=modelFromConfig({...config,models});
-     // A token-only probe may use a listed model; generation must use the same resolved model as film work.
-     const model=selected==='default'?models[0].id:selected;
      let data:Record<string,unknown>;
      try{
       data=await request(definition.protocol==='responses'?'responses/input_tokens':(/\/v1$/.test(config.baseUrl)?'messages/count_tokens':'v1/messages/count_tokens'),definition.protocol==='responses'?{model,input:'OpenTake connectivity check'}:{model,messages:[{role:'user',content:'OpenTake connectivity check'}]});
-     }catch(error){
-      if(definition.protocol!=='responses'||![404,405,501].includes((error as {httpStatus?:number}).httpStatus??0))throw error;
-      let response:Record<string,unknown>;
-      try{response=await request('responses',{model,input:'Hi',max_output_tokens:16,store:false});}
-      catch(fallbackError){if((fallbackError as {httpStatus?:number}).httpStatus===404)throw Error('这个接口不支持 Responses 协议，不能用于出片');throw fallbackError;}
-      const result=z.object({id:z.string().min(1),object:z.literal('response'),status:z.enum(['completed','incomplete']),error:z.null().optional(),incomplete_details:z.object({reason:z.literal('max_output_tokens')}).nullable().optional(),output:z.array(z.object({type:z.string(),content:z.array(z.object({type:z.string(),text:z.string().optional()})).optional()}))}).safeParse(response);
-      if(!result.success||(result.data.status==='incomplete'&&!result.data.incomplete_details)||(result.data.status==='completed'&&!result.data.output.some(item=>item.type==='message'&&item.content?.some(content=>content.type==='output_text'&&typeof content.text==='string'))))throw Error('Responses 返回结构不正确，不能用于出片');
-      return '连接正常；已发送一次最小请求，会用掉极少量额度';
-     }
+     }catch(error){if(!routeMissing(error))throw error;return await minimalProbe();}
      if(typeof data.input_tokens!=='number'||!Number.isFinite(data.input_tokens)||data.input_tokens<0)throw Error('接口格式不兼容：没有返回输入Token计数；未发送生成请求');
-    }
+    }else if(!models.length)return await minimalProbe();
    }
- return ['hailuo','ark'].includes(definition.protocol)?'连接正常；仅查询已有任务，API 生成业务待适配':'连接正常；已读取模型或音色列表，未运行生成任务';
+ return ['hailuo','ark'].includes(definition.protocol)?'连接正常；仅查询已有任务，API 生成业务待适配':definition.kind==='agent'&&definition.protocol==='chat'?'连接正常；API 密钥只能处理纯文字，出片要用命令行接入':'连接正常；已读取模型或音色列表，未运行生成任务';
 }
 /** 一次性 API 连通检查：不读取/保存配置，不访问钥匙串，不检测或执行 CLI。 */
 export async function testTransientConnection(id:ConnectionId,input:unknown,deps:Pick<ConnectionDependencies,'fetcher'|'timeoutMs'>={}){
@@ -236,7 +248,7 @@ export async function testTransientConnection(id:ConnectionId,input:unknown,deps
  if(!parsed.success)return {ok:false,error:'一次性测试参数不正确，请检查密钥格式和接口地址',durationMs:Date.now()-start};
  const {apiKey,baseUrl}=parsed.data;
  try{
-  const config={...defaultConnection(id),mode:'api' as const,baseUrl:validateConnectionBaseUrl(baseUrl||connectionDefinition(id).baseUrl)};
+  const config={...defaultConnection(id),mode:'api' as const,baseUrl:normalizeConnectionBaseUrl(id,validateConnectionBaseUrl(baseUrl||connectionDefinition(id).baseUrl))};
   const request:ProbeRequest=(route,body)=>requestJson(id,route,deps,body,undefined,{config,key:apiKey});
   const message=await probeApiConnection(id,config,request,()=>readApiModels(id,config,request));
   return {ok:true,message,durationMs:Date.now()-start};

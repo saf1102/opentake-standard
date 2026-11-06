@@ -8,7 +8,7 @@ test('任务24：真实选择器组件列出接通的CLI，断开不换人；未
  const saved=new Map<string,PropertyDescriptor|undefined>(),oldFetch=globalThis.fetch;
  for(const[key,value]of Object.entries({window:dom.window,document:dom.window.document,navigator:dom.window.navigator,Event:dom.window.Event,CustomEvent:dom.window.CustomEvent,requestAnimationFrame:(fn:()=>void)=>{fn();return 1},IS_REACT_ACT_ENVIRONMENT:true})){saved.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true});}
  const view=(id:ConnectionId,patch:Partial<ConnectionView>={}):ConnectionView=>({...defaultConnection(id),...connectionDefinition(id),cliInstalled:true,connected:true,enabled:true,state:'connected',relay:false,cliAuthState:'connected',...patch});
- let connections=[view('codex'),view('kimi',{acpModelSelection:false}),view('deepseek'),view('claude',{enabled:false,connected:false}),view('copilot',{cliInstalled:false,connected:false}),view('minimax',{mode:'api',cliInstalled:false})];
+ let connections=[view('codex'),view('kimi',{acpModelSelection:false}),view('deepseek',{heavySupported:false}),view('claude',{enabled:false,connected:false}),view('copilot',{cliInstalled:false,connected:false}),view('minimax',{mode:'api',cliInstalled:false})];
  const settings=defaultAgentSettings();settings.modules.captionTranslation={agent:'kimi',model:'default',effort:'none'};settings.modules.generalEditing={agent:'kimi',model:'default',effort:'none'};
  let app:any;const changes:unknown[]=[];
  try{

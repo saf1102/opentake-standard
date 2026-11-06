@@ -22,6 +22,7 @@ export function ConnectionActions({connection,onConfigure,compact=false,disabled
     :connection.cliAuthState==='pending'?<><span className="connection-adaptation">{connection.cliAuthMessage||'命令行接通待适配'}</span><button type="button" disabled={disabled} onClick={()=>onConfigure('api')}>改用 API 密钥</button></>
     :showRecheck?<><span>{compact?'没查到':''}</span><button type="button" disabled={isBusy||disabled} onClick={()=>void recheckConnection(id)}>{isBusy?'检查中…':'重新检查'}</button></>:null}
   </div>
+  {!compact&&!isWaiting&&connection.cliAuthState==='needs-login'&&connection.cliAuthMessage&&connection.cliAuthMessage!=='还没登录'&&<span className="connection-adaptation">{connection.cliAuthMessage}</span>}
   {isWaiting&&definition.loginHint&&<span className="connection-wait-copy">{definition.loginHint}</span>}
   {errors[id]&&<span role="alert" className="connection-inline-error">{errors[id]}</span>}
  </div>;
