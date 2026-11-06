@@ -68,7 +68,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             platform: darwin-arm64
             installer: release/*.dmg
             receipt: release/*.dmg.build.json

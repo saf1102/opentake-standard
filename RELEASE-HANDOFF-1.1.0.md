@@ -75,7 +75,7 @@ Mac App 装配后的临时签名在 CI 命中文件句柄耗尽（EMFILE）；�
 2. 在独立配置和工程副本上完成 Mac 回归，确认后合入原仓库 main。若 main 在本次评估后有新增提交，先同步到集成分支并重跑相关检查。
 3. 检查 desktop/windows-version.json 的 repository、upstreamVersion、windowsBuild、windowsRevision。若同标签/构建号已发布，先递增构建号并提交 main。
 4. 在原仓库 Actions 的 main 分支手动运行 **Build desktop installers and prepare release draft**（.github/workflows/desktop-release.yml）。该流程只在官方仓库 main 启动。
-5. 工作流冻结 main 的完整 SHA、准备官方源码 ZIP；macos-14 Apple 芯片、macos-15-intel 和 windows-2025 x64 使用相同 SHA 安装依赖、检查、编译、出包。任务 34 新增 Intel 构建路径，Intel 用户真机与 Rosetta 实际验收仍待执行；Windows Server CI 不代替 Win10/Win11 实机。
+5. 工作流冻结 main 的完整 SHA、准备官方源码 ZIP；macos-15 Apple 芯片、macos-15-intel 和 windows-2025 x64 使用相同 SHA 安装依赖、检查、编译、出包。任务 34 新增 Intel 构建路径，Intel 用户真机与 Rosetta 实际验收仍待执行；Windows Server CI 不代替 Win10/Win11 实机。
 6. 汇总检查源码 SHA、版本、构建号、平台和 SHA-256，创建 Release 草稿。任一平台失败不会生成完整草稿；已有草稿保留检查，不覆盖标签或附件。
 7. 下载草稿候选包，完成下节验收，核对 SHA256SUMS，更新发布说明中的实际支持范围。
 8. 负责人确认后把草稿发布为稳定 Release，并设为 Latest。当前工作流不会自动公开上线。
