@@ -35,6 +35,18 @@ npx --yes playwright-core@1.63.0 install chromium
 
 已经在用源码版的 Mac 用户不需要重装，软件内的更新照旧。**1.0.0 用户请对智能体说：按 AGENTS.md 更新到最新版。** 1.0.0 没有更新提醒；从 1.0.1 开始每天检查。
 
+## 1.1.1 更新
+
+OpenTake 1.1.1
+
+智能体
+- DeepSeek Harness（`dsh`）现在可以用来出片，它里面配置的千问等其他模型也能用。这是新支持的接法，遇到问题请反馈。
+- DeepSeek 卡片的 API 密钥只能处理纯文字，界面会写明；只有 API 密钥也要出片时，可以在 Codex 的 API 密钥里点「填入官方地址」接 DeepSeek。
+- CodeBuddy 没登录时说清楚原因：只用自己的模型（models.json）也要先登录；Windows 上也可以设置环境变量 `CODEBUDDY_API_KEY`。
+- 接口地址填错不再直接失败：多填的 `/v1/messages`、`/responses`、`/chat/completions` 等路径会自动去掉，已保存的地址也一样。
+- 兼容更多中转站：没有模型列表或 token 计数接口时，手动填写模型后会发一次最小请求来确认，消耗极少量额度。接口不存在时，报错会写明实际请求的地址。
+- 修复 Windows 上 Chromium 检查偶尔报 `EPERM` 导致无法渲染（[#2](https://github.com/saf1102/opentake-standard/issues/2)）。
+
 ## 1.1.0 更新
 
 OpenTake 1.1.0
