@@ -1,11 +1,11 @@
 # OpenTake Standard 每日下载统计
 
-仓库：saf1102/opentake-standard。最后尝试采集（UTC）：2026-11-07T07:06:00.826Z。
+仓库：saf1102/opentake-standard。最后尝试采集（UTC）：2026-11-07T13:58:38.570Z。
 
 | 指标 | 结果 |
 |---|---|
 | 官方 Release 源码 ZIP，已观测资产的累计下载次数（含首次基线、已删除资产） | 1038 |
-| ZIP 本次采集状态 | 成功 |
+| ZIP 本次采集状态 | 不可用；以下保留值不是本次实时数据 |
 | ZIP 最近成功采集（UTC） | 2026-11-07T07:06:00.826Z |
 | Clone 本次状态 | 未知（无权限或 API 不可用），不按 0 次处理 |
 | GitHub 自动 Download ZIP / 自动 Source code archive | 未知，API 无对应计数 |

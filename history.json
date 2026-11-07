@@ -6,10 +6,10 @@
     "status": "unavailable",
     "lastSuccessAt": null,
     "history": null,
-    "attemptedAt": "2026-11-07T07:06:00.826Z"
+    "attemptedAt": "2026-11-07T13:58:38.570Z"
   },
   "sourceZip": {
-    "status": "ok",
+    "status": "unavailable",
     "lastSuccessAt": "2026-11-07T07:06:00.826Z",
     "assets": [
       {
@@ -1916,9 +1916,9 @@
         ]
       }
     ],
-    "attemptedAt": "2026-11-07T07:06:00.826Z",
+    "attemptedAt": "2026-11-07T13:58:38.570Z",
     "lastSnapshot": "[{\"id\":681972658,\"releaseId\":425627379,\"tag\":\"source-0a414ba6be7d62ddfe065186479353af8e779c71\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":143},{\"id\":686727336,\"releaseId\":427312102,\"tag\":\"v1.0.1\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":92},{\"id\":690996729,\"releaseId\":428671773,\"tag\":\"v1.0.2\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":175},{\"id\":698130702,\"releaseId\":430534739,\"tag\":\"v1.1.0\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":373},{\"id\":705086773,\"releaseId\":432510771,\"tag\":\"desktop-v1.1.0-2026110306\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":17},{\"id\":708337793,\"releaseId\":433542475,\"tag\":\"desktop-v1.1.0-2026110401\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":158},{\"id\":715822420,\"releaseId\":436081386,\"tag\":\"desktop-v1.1.1-2026110601\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":80}]"
   },
-  "lastCollectedAt": "2026-11-07T07:06:00.826Z",
+  "lastCollectedAt": "2026-11-07T13:58:38.570Z",
   "automaticSourceArchiveDownloads": null
 }
