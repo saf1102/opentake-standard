@@ -112,7 +112,7 @@ if (typeof process.send === 'function') process.on('message', message => {
 });
 
 const NativeRecordingRequest = z.object({
-  sourceId:z.string().min(1), sourceType:z.enum(['window','display']),
+  sourceId:z.string().min(1), sourceType:z.enum(['window','display']), microphoneId:z.string().optional(),
   systemAudio:z.boolean().default(false), microphone:z.boolean().default(false),
   durationSeconds:z.number().int().min(0).max(3600).default(0),
 });
@@ -132,13 +132,13 @@ export async function startNativeRecording(projectId:string, input:unknown) {
   if(nativeRecorder.busy) throw Error('已有录制正在启动、录制或保存，请先停止并保存。');
   const now=Date.now();
   const session=OpenScreenHostSessionSchema.parse({id:crypto.randomUUID(),projectId,status:'launching',mode:'cli',
-    createdAt:now,updatedAt:now,sourceName:source.name,durationSeconds:request.durationSeconds||undefined});
+    createdAt:now,updatedAt:now,sourceName:source.name,sourceType:source.type,sourceId:source.id,durationSeconds:request.durationSeconds||undefined});
   persist(session);
   const args=[...openScreenProfileArgs(), 'record', '--json', '--cursor','editable-overlay', '--project', managedProjectFile(session),
     source.type==='window'?'--window':'--display',source.captureValue];
   if(request.durationSeconds) args.push('--duration',String(request.durationSeconds));
   if(request.systemAudio) args.push('--system-audio');
-  if(request.microphone) args.push('--mic');
+  if(request.microphone) {args.push('--mic');if(request.microphoneId)args.push('--mic-device',request.microphoneId);}
   nativeRecorder.start({projectId,id:session.id,sourceName:source.name,executable,args,env:{...process.env,OPENSCREEN_WGC_CAPTURE_EXE:captureHelper},
     projectFile:managedProjectFile(session),durationSeconds:session.durationSeconds,
     diagnosticFile:path.join(sessionDir(projectId),`${session.id}.diagnostic.json`)});
@@ -426,7 +426,7 @@ function rootMediaUrl(projectId: string, assetId: string, kind = "original") {
   return `/api/editor/projects/${encodeURIComponent(projectId)}/media/${encodeURIComponent(assetId)}/file?kind=${kind}`;
 }
 
-async function materializeCandidate(projectId: string, selected: string, raw: JsonObject) {
+async function materializeCandidate(projectId: string, selected: string, raw: JsonObject, nativeSource?:OpenScreenHostSession) {
   const found = findProject(projectId, true);
   const document = compatibleOpenScreenDocument(raw) as JsonObject;
   const documentProject = asObject(document.project);
@@ -483,8 +483,9 @@ async function materializeCandidate(projectId: string, selected: string, raw: Js
       openScreenDocumentId: documentId,
       capture: {
         engine: "openscreen",
-        sourceType: "display",
-        sourceName: String(asset.label || "OpenScreen 屏幕录制"),
+        sourceType: nativeSource?.sourceType || "display",
+        sourceId: nativeSource?.sourceId,
+        sourceName: nativeSource?.sourceName || String(asset.label || "OpenScreen 屏幕录制"),
         cursorDataFile,
         openscreenProjectFile: `analysis/openscreen/${documentId}/project.openscreen`,
         recordedAt: Date.now(),
@@ -545,7 +546,7 @@ export async function importOpenScreenHostCandidate(
   session.status = "processing";
   persist(session);
   try {
-    const materialized = await materializeCandidate(projectId, selected, raw);
+    const materialized = await materializeCandidate(projectId, selected, raw, session.mode==='cli'?session:undefined);
     const imported = createOpenScreenDocument(projectId, {
       document: materialized.document,
       documentId: materialized.documentId,

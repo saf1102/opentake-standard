@@ -43,4 +43,4 @@ function requestCaptureSources(channel=process,timeoutMs=20000){
   try{channel.send({captureSourcesRequest:{id}},error=>{if(error)finish(error)})}catch(error){finish(error)}
  });
 }
-module.exports={SOURCE_OPTIONS,captureSources,installCaptureSourceBridge,requestCaptureSources};
+module.exports={validSources,SOURCE_OPTIONS,captureSources,installCaptureSourceBridge,requestCaptureSources};

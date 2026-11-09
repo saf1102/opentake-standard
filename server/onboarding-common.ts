@@ -35,7 +35,12 @@ export async function openscreen():Promise<CheckResult>{
  return openScreenCheckResult(await openScreenEnvironmentStatus(),process.platform);
 }
 /** Shared by deployment and the recording page. Unknown permission is never reported as denied. */
-export function openScreenCheckResult(environment:{installed:boolean;version?:string},platform:NodeJS.Platform):CheckResult{
+export function openScreenCheckResult(environment:{installed:boolean;version?:string;supported?:boolean},platform:NodeJS.Platform):CheckResult{
+ if(platform==='win32') {
+  if(!environment.installed)return {id:'openscreen',state:'opt',text:'Windows 录屏运行组件缺失，请修复安装后重新检测。'};
+  if(environment.version!=='2.1.2'||environment.supported===false)return {id:'openscreen',state:'opt',text:'Windows 录屏运行组件版本未通过检查，需要已验证的 OpenScreen 2.1.2。'};
+  return {id:'openscreen',state:'ok',text:'Windows 录屏组件已就绪 · 选择窗口或屏幕后开始录制；使用麦克风时请允许 Windows 麦克风访问。'};
+ }
  const guide=(state:ScreenGuide['state'])=>platform==='darwin'?{screenGuide:{state,version:environment.version,minimum:OPENSCREEN_MIN}}:{};
  const status={state:environment.installed?'found':'missing',version:environment.version};const tool={page:'https://github.com/getopenscreen/openscreen/releases/latest'};
  if(status.state!=='found')return {...guide('missing'),id:'openscreen',state:'opt',text:'没安装 · 录屏运镜的录制和导出都要用它',action:{kind:'link',label:'去下载',target:tool.page}};

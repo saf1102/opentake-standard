@@ -1,3 +1,4 @@
+import {nativeRecordingBusy} from './openscreen-host.ts';
 import type {IncomingMessage,ServerResponse} from 'node:http';
 import {activeGeneralRuns} from '../general/runner.ts';
 import {activeGeneralExports} from '../general/export.ts';
@@ -8,5 +9,5 @@ export function trackStorageRequest(req:IncomingMessage,res:ServerResponse){
  if(['GET','HEAD','OPTIONS'].includes(req.method||'GET'))return;
  activeRequests++;let released=false;const release=()=>{if(!released){released=true;activeRequests--;}};res.once('finish',release);res.once('close',release);
 }
-export const activeDesktopJobs=()=>activeGeneralRuns()+activeGeneralExports()+activeOpenScreenExports();
+export const activeDesktopJobs=()=>activeGeneralRuns()+activeGeneralExports()+activeOpenScreenExports()+(nativeRecordingBusy()?1:0);
 export const desktopHost=()=>({activeRequests,activeJobs:activeDesktopJobs});

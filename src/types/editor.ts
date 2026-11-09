@@ -218,6 +218,8 @@ export const OpenScreenHostSessionSchema = z.object({
   projectId: z.string(),
   status: z.enum(['launching', 'waiting', 'recording', 'stopping', 'processing', 'selecting', 'completed', 'cancelled', 'failed']),
   mode: z.enum(['native-hud', 'cli']),
+  sourceType: z.enum(['display','window']).optional(),
+  sourceId: z.string().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   candidateFiles: z.array(z.string()).default([]),

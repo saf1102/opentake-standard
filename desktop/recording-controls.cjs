@@ -7,17 +7,25 @@ const busy=state=>Boolean(state&&['starting','recording','stopping'].includes(st
  * the toolbar's More button. Locale/theme changes cannot replace its stop item. */
 function createRecordingControls({electron,root,parent,onStop,onShow,onQuit}){
  const {BrowserWindow,Menu,Tray,nativeImage,globalShortcut,ipcMain,screen}=electron;
- let state=null,window=null,shortcutAvailable=false;
+ let state=null,window=null,shortcutAvailable=false,theme='original';
  const page=pathToFileURL(path.join(root,'desktop/recording.html')).href;
  const trusted=event=>Boolean(window&&!window.isDestroyed()&&event.sender===window.webContents&&event.senderFrame===window.webContents.mainFrame&&event.senderFrame.url===page);
- const snapshot=()=>({...state,shortcutAvailable,shortcut:'Ctrl+Shift+F9'});
+ const snapshot=()=>({...state,theme,shortcutAvailable,shortcut:'Ctrl+Shift+F9'});
+ async function refreshTheme(){
+  if(!parent||parent.isDestroyed()||!parent.webContents?.executeJavaScript)return;
+  try{const value=await parent.webContents.executeJavaScript('document.documentElement.dataset.uiTheme');theme=value==='warm'?'warm':'original';if(window&&!window.isDestroyed())window.webContents.send('recording:state',snapshot())}catch{/* Keep the last known theme if the owned page is reloading. */}
+ }
  const showProject=()=>{window?.hide();onShow(state?.projectId)};
- const stop=()=>{
-  if(!busy(state)||state.phase==='stopping')return {accepted:false,state:snapshot()};
-  try{onStop(state.projectId,state.id)}catch(error){
-   update({...state,phase:'failed',error:error instanceof Error?error.message:String(error)});
+ let stopPending=false;
+ const stop=async()=>{
+  if(stopPending||!busy(state)||state.phase==='stopping')return {accepted:false,state:snapshot()};
+  const recordingId=state.id;stopPending=true;
+  try{await onStop(state.projectId,state.id)}catch(error){
+   if(state.id!==recordingId)return {accepted:false,state:snapshot()};
+   update({...state,error:error instanceof Error?error.message:String(error)});
    return {accepted:false,state:snapshot()};
   }
+  finally{stopPending=false}
   return {accepted:true};
  };
  const menu=Menu.buildFromTemplate([
@@ -30,6 +38,7 @@ function createRecordingControls({electron,root,parent,onStop,onShow,onQuit}){
  const tray=new Tray(nativeImage.createFromPath(path.join(assetRoot(root),'opentake-icon-512.png')).resize({width:20,height:20}));
  tray.setToolTip('OpenTake Standard');tray.setContextMenu(menu);tray.on('double-click',()=>busy(state)?show():showProject());
  function show(){
+  void refreshTheme();
   if(!window||window.isDestroyed()){
    const owner=parent&&!parent.isDestroyed()?parent:undefined;
    const area=(owner?screen.getDisplayMatching(owner.getBounds()):screen.getPrimaryDisplay()).workArea;
@@ -44,6 +53,7 @@ function createRecordingControls({electron,root,parent,onStop,onShow,onQuit}){
    window.webContents.on('did-finish-load',()=>window?.webContents.send('recording:state',snapshot()));
    window.on('close',event=>{if(busy(state)){event.preventDefault();window.hide()}});
    window.on('closed',()=>{window=null});
+   window.on('focus',()=>void refreshTheme());
    void window.loadURL(page);
   }
   if(window.isMinimized())window.restore();

@@ -7,7 +7,7 @@ function render(state){
  // A delayed initial IPC reply must not restore an older enabled Stop button.
  if(next.id&&next.id===current.id&&rank[next.phase]<rank[current.phase])return;
  if(next.id!==current.id||!['starting','recording'].includes(next.phase)){stopPending=false;clearConfirmation()}
- current=next;
+ current=next;document.documentElement.dataset.uiTheme=current.theme==='warm'?'warm':'original';
  const phase=stopPending?'stopping':current.phase;
  byId('source').textContent=current.sourceName||'本机录制';
  byId('status').textContent=({starting:'正在准备录制…',recording:'正在录制',stopping:'正在停止并保存…',saved:'录制已保存',failed:'录制未完成'})[phase]||'尚未开始录制';

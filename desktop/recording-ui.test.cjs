@@ -30,3 +30,5 @@ test('late earlier states cannot resurrect Stop, while a new recording can enabl
   f.update({id:'next',projectId:'project',phase:'recording'});assert.equal(f.button.textContent,'停止并保存');assert.equal(f.button.disabled,false);
  }finally{f.dom.window.close()}
 });
+
+test('控制栏仅跟随原色/暖雾主题，错误提示保持可读',async()=>{const f=fixture();try{await flush();f.update({id:'take',projectId:'project',phase:'recording',theme:'warm',error:'组件错误'});assert.equal(f.window.document.documentElement.dataset.uiTheme,'warm');assert.equal(f.window.document.getElementById('error').textContent,'组件错误');f.update({id:'take',projectId:'project',phase:'recording',theme:'unknown'});assert.equal(f.window.document.documentElement.dataset.uiTheme,'original')}finally{f.dom.window.close()}});

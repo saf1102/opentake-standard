@@ -55,10 +55,10 @@ async function build(){
  if(!fs.existsSync(cargo))throw Error('缺少 Rust MSVC 工具链，请安装 rustup 后重试。');
  const quote=value=>{if(/["\r\n]/.test(value))throw Error('构建路径无效');return '"'+value.replaceAll('%','%%')+'"';};
  const command=path.join(work,'build.cmd');
- fs.writeFileSync(command,`@echo off\r\n${quote(path.join(process.env.SystemRoot||'C:\\Windows','System32/chcp.com'))} 65001 >nul\r\ncall ${quote(vcvars)} x64\r\nif errorlevel 1 exit /b %errorlevel%\r\n${quote(cargo)} build --locked --release -j 2 -p compositor-view-napi\r\nexit /b %errorlevel%\r\n`);
+ fs.writeFileSync(command,`@echo off\r\n${quote(path.join(process.env.SystemRoot||'C:\\Windows','System32/chcp.com'))} 65001 >nul\r\ncall ${quote(vcvars)} x64\r\nif errorlevel 1 exit /b %errorlevel%\r\n${quote(cargo)} +stable-x86_64-pc-windows-msvc build --locked --release -j 2 -p compositor-view-napi --target x86_64-pc-windows-msvc\r\nexit /b %errorlevel%\r\n`);
  run(process.env.ComSpec||'cmd.exe',['/d','/s','/c',`""${command}""`],{cwd:path.join(checkout,'crates'),windowsVerbatimArguments:true,env:{...process.env,FFMPEG_DIR:sdk,LIBCLANG_PATH:clang},stdio:'inherit'});
  const out=path.join(defaultRoot,'native/windows/compositor');fs.mkdirSync(out,{recursive:true});
- const binary=path.join(out,'compositor_view.node');fs.copyFileSync(path.join(checkout,'crates/target/release/compositor_view.dll'),binary);
+ const binary=path.join(out,'compositor_view.node');fs.copyFileSync(path.join(checkout,'crates/target/x86_64-pc-windows-msvc/release/compositor_view.dll'),binary);
  fs.copyFileSync(path.join(vendor,'LICENSE'),path.join(out,'LICENSE'));
  fs.writeFileSync(path.join(out,'build.json'),JSON.stringify({kind:'opentake-compositor-software-video-v2',upstreamCommit:upstream.commit,sourceSha256,binarySha256:sha(fs.readFileSync(binary)),ffmpegSdkSha256:upstream.sdkSha256},null,2)+'\n');
  verifyWindowsCompositor();console.log('Windows 原生合成器已构建，支持视频硬件初始化失败后的软件解码及编码回退。');

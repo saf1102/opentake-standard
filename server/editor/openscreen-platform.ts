@@ -12,3 +12,5 @@ export const skipExecutableVersionProbe = () => process.platform === 'win32';
 export const windowsVersionSupported = (version: string | undefined) => Boolean(version && /^2\.1\.2$/.test(version));
 export const openScreenAppDataRoot = () => platform.appDataRoot();
 export const legacyWindowsHud = false;
+
+export const windowsRecordingSupported = true;
