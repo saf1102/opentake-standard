@@ -152,5 +152,12 @@ html[data-ui-theme] .ge-en .ge-en-compose textarea:not([disabled]):focus,.ge-en-
 .ge-en-row .ge-model-group { height:auto;border-color:var(--en-chip-line);background:var(--en-pill); }
 .ge-en-row .ge-model-group .ge-model-pick { font-size:13px;padding:0 12px;color:var(--en-ink); }
 .ge-en-row .ge-model-group .ge-model-pick i { color:var(--en-muted); }
+/* 一行放不下时：视频、图片、音乐、开始保持一行字不折行；模型胶囊收窄，后面的说明用省略号 */
+.ge-en-row > button { flex:none;white-space:nowrap; }
+.ge-en-tools { min-width:0; }
+.ge-en-row .ge-model-group,.ge-en-row .ge-model-group .ge-model { min-width:0; }
+.ge-en-row .ge-model-group .ge-model-pick:not(.ge-net) { min-width:0;max-width:100%; }
+.ge-en-row .ge-model-group .ge-model-pick.ge-net { flex:none; }
+.ge-en-row .ge-model-group .ge-model-pick i { min-width:0;overflow:hidden;text-overflow:ellipsis; }
 /* 拿去剪：带着稿子来的，放在标题和三个入口之间 */
 .ge-en-from { position:absolute; left:72px; top:134px; width:500px; z-index:3; color:var(--en-ink); }
