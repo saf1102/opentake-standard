@@ -30,7 +30,7 @@ export async function prepareDesktopRelease({source,artifacts,out,commit}){
  const copy=(from,name)=>fs.copyFileSync(from,path.join(out,name),fs.constants.COPYFILE_EXCL);
  for(const name of [manifest.filename,manifest.filename+'.sha256','source-release.json','upgrade.json'])copy(path.join(source,name),name);
  for(const receipt of receipts){copy(path.join(artifacts,receipt.filename),receipt.filename);copy(path.join(artifacts,receipt.filename+'.build.json'),receipt.filename+'.build.json');}
- const notes=fs.readFileSync(new URL('../RELEASE-NOTES-1.1.1.md',import.meta.url),'utf8');
+ const notes=fs.readFileSync(new URL('../RELEASE-NOTES-1.1.2.md',import.meta.url),'utf8');
  fs.writeFileSync(path.join(out,'release-notes.md'),notes+`\n\n源码提交：${commit}\n发布标签：${tag}\n构建号：${win.desktopBuild}\n`);
  const handoff=fileURLToPath(new URL('../RELEASE-HANDOFF-1.1.0.md',import.meta.url));
  copy(handoff,'RELEASE-HANDOFF-1.1.0.md');

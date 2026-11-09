@@ -20,7 +20,7 @@ unzip -p release/source/OpenTake-Standard-source.zip opentake-standard/release-s
 npm run build:installer
 ```
 
-产物为 release/OpenTake-Standard-1.1.1-mac-arm64.dmg 及 .dmg.build.json。构建先生成 release/mac-arm64/OpenTake Standard.app，保留 framework 相对链接，执行本机临时签名、严格验签，再用 ditto/hdiutil 生成并校验 DMG。已有同名 DMG 时停止，先保留旧候选包到其他位置。
+产物为 release/OpenTake-Standard-1.1.2-mac-arm64.dmg 及 .dmg.build.json。构建先生成 release/mac-arm64/OpenTake Standard.app，保留 framework 相对链接，执行本机临时签名、严格验签，再用 ditto/hdiutil 生成并校验 DMG。已有同名 DMG 时停止，先保留旧候选包到其他位置。
 
 打包入口使用 .build/ui-public-* 临时目录重编译编辑器，再生成 dist，保留仓库跟踪的 public/openscreen 快照。这避免不同系统的构建哈希改变源码，源码凭据校验仍会检查所有跟踪文件。
 
@@ -35,6 +35,6 @@ npm run build:installer
 
 手动工作流 `.github/workflows/mac-intel-release.yml` 只构建 Intel DMG，使用 `desktop-mac-x64-v1.1.0-<日期序号>` 独立标签并创建草稿，显式 `--latest=false`。不递增 `windowsBuild`，不上传 `windows-update.json` 或后台清单，不改变现有 Latest。草稿仍须审核和实际安装验收；本次开发没有触发工作流或发布。
 
-Intel 产物为 `release/OpenTake-Standard-1.1.1-mac-x64.dmg`，本机 App 为 `release/mac/OpenTake Standard.app`；Apple 芯片路径保持 `release/mac-arm64/OpenTake Standard.app`。Intel 包仍为本机临时签名，未公证。
+Intel 产物为 `release/OpenTake-Standard-1.1.2-mac-x64.dmg`，本机 App 为 `release/mac/OpenTake Standard.app`；Apple 芯片路径保持 `release/mac-arm64/OpenTake Standard.app`。Intel 包仍为本机临时签名，未公证。
 
 Intel CI 标签按 [GitHub 官方 runner 文档](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) 选择 `macos-15-intel`（x64）；Apple 芯片继续使用 `macos-14`。

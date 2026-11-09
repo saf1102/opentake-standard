@@ -18,7 +18,7 @@ npm run test:release
 npm run build:installer
 ```
 
-build:installer 编译 WGC、固定补丁的 OpenScreen 原生合成器、两套前端，准备并更新独立运行库副本内的采集器及校验清单，再生成 release/windows/OpenTake-Standard-Setup-1.1.1-x64.exe 和 .exe.build.json。win-unpacked 可单独启动验收，build:app 保留目录构建入口。正式出包须使用已提交的干净源码；汇总工具会拒绝脏构建凭据。
+build:installer 编译 WGC、固定补丁的 OpenScreen 原生合成器、两套前端，准备并更新独立运行库副本内的采集器及校验清单，再生成 release/windows/OpenTake-Standard-Setup-1.1.2-x64.exe 和 .exe.build.json。win-unpacked 可单独启动验收，build:app 保留目录构建入口。正式出包须使用已提交的干净源码；汇总工具会拒绝脏构建凭据。
 
 Windows 导出运行库由 `scripts/prepare-windows-export-runtimes.mjs` 按 `desktop/windows-export-runtime-lock.json` 下载并校验。它使用官方 Node.js ZIP 和 PyPI wheels，准备独立的 `export-node` 与 `jianying-python`；不执行 pip、不安装到系统 Python。安装器构建会自动调用此步骤。缓存位于同级 `runtime-downloads`，完整离线重建需预先准备锁定缓存。
 
