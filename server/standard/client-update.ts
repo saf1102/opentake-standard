@@ -45,7 +45,12 @@ type State={install?:string;skip?:string;later?:string;release?:Release};
 function read():State{try{return JSON.parse(fs.readFileSync(file(),'utf8'))}catch{return {}}}
 function write(v:State){fs.mkdirSync(path.dirname(file()),{recursive:true});const tmp=file()+'.tmp';fs.writeFileSync(tmp,JSON.stringify(v),{mode:0o600});fs.renameSync(tmp,file())}
 export function installId(){const s=read();if(!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(s.install||'')){s.install=crypto.randomUUID();write(s)}return s.install!}
-export function clientHeaders(withInstall=false){return {'X-OpenTake-Client':`standard/${clientVersion}`,...(withInstall?{'X-OpenTake-Install':installId()}:{})}}
+export function clientHeaders(withInstall=false,os:NodeJS.Platform=process.platform){
+ const tag=os==='darwin'?'standard-mac':os==='win32'?'standard-win':'standard';
+ // Reporting only: authorization continues to send scope "standard". Older
+ // gateways ignore unknown report tags without rejecting login/apply requests.
+ return {'X-OpenTake-Client':`${tag}/${clientVersion}`,...(withInstall?{'X-OpenTake-Install':installId()}:{})};
+}
 const identity=(r:Release)=>`${r.version}:${r.desktopBuild}`;
 export function updateView(release?:unknown,manual=false){const s=read();if(release!==undefined){s.release=releaseOf(release)||undefined;write(s)}const r=s.release&&releaseOf(s.release);const available=!!r&&mac.newerBuild(r,clientVersion,clientBuild);return {currentVersion:clientVersion,currentBuild:clientBuild,release:r||null,available,notify:available&&(manual||(s.skip!==identity(r!)&&s.later!==new Date().toLocaleDateString('en-CA')))}}
 export function dismissUpdate(action:string){const s=read();const r=s.release&&releaseOf(s.release);if(action==='skip')s.skip=r?identity(r):undefined;else if(action==='later')s.later=new Date().toLocaleDateString('en-CA');else throw Error('无效操作');write(s);return updateView()}

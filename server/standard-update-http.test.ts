@@ -1,3 +1,4 @@
+import {clientHeaders} from './standard/client-update.ts';
 import pkg from '../package.json' with {type:'json'};
 import metadata from '../desktop/windows-version.json' with {type:'json'};
 const nextVersion=pkg.version.split('.').map((n,i)=>i===2?String(Number(n)+1):n).join('.');
@@ -12,10 +13,10 @@ test('local HTTP: version headers, GitHub fallback, silent offline and disabled 
  await new Promise<void>(r=>remote.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+(remote.address() as {port:number}).port;
  process.env.OPENTAKE_STANDARD_USER_DATA=root;process.env.OPENTAKE_UPGRADE_TEST_URL=origin;process.env.OPENTAKE_UPGRADE_FALLBACK_URL=origin+'/fallback';process.env.OPENTAKE_MAC_UPDATE_TEST_URL=origin+'/mac-update.json';const {upgradeApi}=await import('./standard/upgrade.ts');const local=http.createServer((req,res)=>void upgradeApi(req,res));await new Promise<void>(r=>local.listen(0,'127.0.0.1',r));const client='http://127.0.0.1:'+(local.address() as {port:number}).port+'/api/upgrade';
  try{const call=async(route:string,method='GET',body?:unknown)=>(await fetch(client+route,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})})).json();
- const first=(await call('/state')).clientUpdate;assert.equal(first.available,true);assert.equal(first.release.version,nextVersion);assert.equal(first.release.kind,'dmg');assert.ok(['arm64','x64'].includes(first.release.arch));assert.equal(seen[0].headers['x-opentake-client'],'standard/'+pkg.version);
+ const first=(await call('/state')).clientUpdate;assert.equal(first.available,true);assert.equal(first.release.version,nextVersion);assert.equal(first.release.kind,'dmg');assert.ok(['arm64','x64'].includes(first.release.arch));assert.equal(seen[0].headers['x-opentake-client'],clientHeaders()['X-OpenTake-Client']);
  feedDown=true;const mirrored=(await call('/state')).clientUpdate;assert.equal(mirrored.release.version,laterVersion);feedDown=false;assert.match(String(seen[0].headers['x-opentake-install']),/^[a-f0-9-]{36}$/);sourceDown=true;assert.equal((await call('/state')).clientUpdate.available,true);const fb=seen.filter(x=>x.url==='/fallback').at(-1)!;assert.ok(fb);assert.equal(fb.headers['x-opentake-install'],undefined);assert.equal(fb.headers['x-opentake-client'],undefined);assert.equal(seen.filter(x=>x.url==='/mac-update.json').every(x=>x.headers['x-opentake-install']===undefined&&x.headers['x-opentake-client']===undefined),true);
  await call('/preferences','PUT',{daily:false});const count=seen.length;assert.equal((await call('/daily')).skipped,true);assert.equal(seen.length,count);await call('/state');assert.ok(seen.length>count);
- await call('/intent','PUT',{plan:'monthly'});assert.equal(seen.at(-1)!.headers['x-opentake-client'],'standard/'+pkg.version);assert.equal(seen.at(-1)!.headers['x-opentake-install'],undefined);
+ await call('/intent','PUT',{plan:'monthly'});assert.equal(seen.at(-1)!.headers['x-opentake-client'],clientHeaders()['X-OpenTake-Client']);assert.equal(seen.at(-1)!.headers['x-opentake-install'],undefined);
  allDown=true;const offline=await call('/state');assert.equal(offline.clientUpdate.notify,false);assert.equal(offline.error,'');
  }finally{await Promise.all([new Promise<void>(r=>local.close(()=>r())),new Promise<void>(r=>remote.close(()=>r()))]);for(const k of keys){if(before[k]===undefined)delete process.env[k];else process.env[k]=before[k]}fs.rmSync(root,{recursive:true,force:true})}
 });

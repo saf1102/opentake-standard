@@ -1,5 +1,6 @@
 import {clientHeaders,updateView,dismissUpdate,macFeed} from './client-update.ts';
 import {windowsUpdateApi} from './windows-update.ts';
+import {proDownloadPlatform,proDownloadUrl} from './pro-download.ts';
 import platform from '../platform.ts';
 import {atomicJsonSync} from '../file-ops.ts';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import type {IncomingMessage,ServerResponse} from 'node:http';import {bodyJson,sendJson} from '../http.ts';
@@ -28,6 +29,6 @@ export async function upgradeApi(req:IncomingMessage,res:ServerResponse){const r
  if(req.method==='POST'&&(route==='/apply'||route==='/login')){const input=await bodyJson(req);const result=await remote(route==='/apply'?'/api/standard/apply':'/api/login','POST',{...input,...(route==='/login'?{scope:'standard'}:{}),device:'电脑 · '+(process.platform==='darwin'?'macOS':process.platform)});saved.token=result.token;save();return sendJson(res,200,publicView(result))}
  if(req.method==='PUT'&&route==='/intent')return sendJson(res,200,await remote('/api/pro/intent','PUT',await bodyJson(req)));
  if(req.method==='POST'&&route==='/logout'){try{await remote('/api/logout','POST')}finally{delete saved.token;save()}return sendJson(res,200,{ok:true})}
- if(req.method==='GET'&&route==='/download'){if(process.platform!=='darwin')throw Object.assign(Error('Windows 版 Pro 尚未提供，请勿下载 macOS 安装包。'),{status:409});const value=await remote('/api/me');if(!value.downloadUrl)throw Error(value.downloadMessage||'当前账号没有可用下载');const u=new URL(value.downloadUrl,origin);if(u.origin!==origin||!u.pathname.startsWith('/releases/'))throw Error('下载地址无效');res.writeHead(302,{Location:u.href,'Referrer-Policy':'no-referrer','Cache-Control':'no-store'});return res.end()}
+ if(req.method==='GET'&&route==='/download'){const target=proDownloadPlatform();const value=await remote('/api/me?platform='+target);const location=proDownloadUrl(value,origin,target,local);res.writeHead(302,{Location:location,'Referrer-Policy':'no-referrer','Cache-Control':'no-store'});return res.end()}
  return sendJson(res,404,{error:'接口不存在'});
  }catch(e){return sendJson(res,(e as {status?:number}).status||503,{error:e instanceof Error?e.message:'服务暂时不可用'})}}
