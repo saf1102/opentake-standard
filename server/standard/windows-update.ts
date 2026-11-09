@@ -9,8 +9,9 @@ import pkg from '../../package.json' with {type:'json'};
 import metadata from '../../desktop/windows-version.json' with {type:'json'};
 
 export type WindowsRelease = {schemaVersion:1; product:string; platform:'win32'; arch:'x64'; channel:'stable'; version:string; windowsBuild:number; revision:string; notes:string; url:string; sha256:string; size:number};
-const {endpoint, windowsRelease, newerWindows} = createRequire(import.meta.url)('../../desktop/windows-update-manifest.cjs') as {endpoint:string; windowsRelease:(v:unknown)=>WindowsRelease|null; newerWindows:(r:WindowsRelease, v:string, b:number)=>boolean};
+const {endpoint, windowsRelease, newerWindows} = createRequire(import.meta.url)('../../desktop/windows-update-manifest.cjs') as {endpoint:string; windowsRelease:(v:unknown,testOrigin?:string)=>WindowsRelease|null; newerWindows:(r:WindowsRelease, v:string, b:number)=>boolean};
 type State = {daily?:boolean; checkedDay?:string; skip?:string; later?:string; release?:WindowsRelease; error?:string};
+const testOrigin = (value?:string) => value && /^http:\/\/127\.0\.0\.1:\d+\/windows-update\.json$/.test(value) ? new URL(value).origin : undefined;
 export function createWindowsUpdater(options:{root?:()=>string; fetcher?:typeof fetch; now?:()=>Date; endpoint?:string} = {}) {
   const file = () => path.join((options.root || platform.standardDataRoot)(), 'standard-windows-update.json');
   const day = () => (options.now?.() || new Date()).toLocaleDateString('en-CA');
@@ -18,7 +19,7 @@ export function createWindowsUpdater(options:{root?:()=>string; fetcher?:typeof 
   const write = (state:State) => {fs.mkdirSync(path.dirname(file()),{recursive:true});atomicJsonSync(file(),state,{mode:0o600})};
   const identity = (r:WindowsRelease) => `${r.version}:${r.windowsBuild}`;
   function view(manual = false) {
-    const s = read(), release = windowsRelease(s.release), available = !!release && newerWindows(release,pkg.version,metadata.windowsBuild);
+    const s = read(), release = windowsRelease(s.release,testOrigin(options.endpoint)), available = !!release && newerWindows(release,pkg.version,metadata.windowsBuild);
     return {currentVersion:pkg.version,currentBuild:metadata.windowsBuild,mode:'manual' as const,release,available,notify:available && !s.error && (manual || (s.checkedDay===day() && s.skip!==identity(release!) && s.later!==day())),offline:!!s.error,message:s.error||''};
   }
   async function check(manual = false) {
@@ -32,7 +33,7 @@ export function createWindowsUpdater(options:{root?:()=>string; fetcher?:typeof 
       const reader = response.body?.getReader(); if (!reader) throw Error('Windows 更新清单为空');
       const chunks:Uint8Array[]=[];let bytes=0;
       try {for (;;) {const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>65536)throw Error('Windows 更新清单过大');chunks.push(value)}} finally {await reader.cancel().catch(()=>{})}
-      const release = windowsRelease(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      const release = windowsRelease(JSON.parse(Buffer.concat(chunks).toString('utf8')),testOrigin(options.endpoint));
       if (!release) throw Error('Windows 更新清单无效，请联系发布者检查安装包信息。');
       // Re-read to preserve preference/dismiss changes made while the request ran.
       const latest=read();latest.release=release;latest.checkedDay=day();delete latest.error;write(latest);
