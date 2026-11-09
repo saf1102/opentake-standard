@@ -3,7 +3,14 @@ common_mask + category=video are required; legacy materials.masks is ignored.
 """
 from pathlib import Path
 import shutil
+import os
+import sys
 import uuid
+
+def cache_root():
+    if sys.platform == 'win32':
+        return Path(os.environ.get('LOCALAPPDATA', str(Path.home() / 'AppData/Local'))) / 'JianyingPro/User Data/Cache'
+    return Path.home() / 'Movies/JianyingPro/User Data/Cache'
 
 RESOURCES = {
     'circle': ('82432977', '3ab1c47350d987c8ad415497e020a38b', '7356934080102928946', '圆形'),
@@ -14,7 +21,7 @@ def make_mask(resources, shape, config):
     effect, digest, rid, name = RESOURCES[shape]
     target = Path(resources) / ('native-mask-' + shape)
     if not target.exists():
-        source = Path.home() / 'Movies/JianyingPro/User Data/Cache/effect' / effect / digest
+        source = cache_root() / 'effect' / effect / digest
         if not (source / 'config.json').is_file():
             raise RuntimeError('请先在剪映中使用一次%s蒙版，下载本机蒙版资源后重新导出。' % name)
         shutil.copytree(source, target)
@@ -60,7 +67,7 @@ def make_stroke(resources, color, size=0.01):
     rid = '7563928939278765348'
     target = Path(resources) / 'native-mask-stroke'
     if not target.exists():
-        root = Path.home() / 'Movies/JianyingPro/User Data/Cache/artistEffect' / rid
+        root = cache_root() / 'artistEffect' / rid
         candidates = sorted(root.glob('*/config.json'))
         if not candidates:
             raise RuntimeError('请先在剪映中启用一次蒙版描边，下载本机描边资源后重新导出。')

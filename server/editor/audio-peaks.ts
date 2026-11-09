@@ -1,3 +1,5 @@
+import {trackChildProcess} from '../proc.ts';
+import {renameWithRetrySync} from '../file-ops.ts';
 import {cachePath as projectCachePath} from './cache-location.ts';
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -59,6 +61,7 @@ export async function decodeAudioPeaks(input: string, durationSec: number, ffmpe
     "-hide_banner", "-loglevel", "error", "-i", input,
     "-vn", "-ac", "1", "-ar", String(PCM_RATE), "-f", "s16le", "-",
   ], { stdio: ["ignore", "pipe", "pipe"] });
+  trackChildProcess(child);
 
   return new Promise<Float32Array>((resolve, reject) => {
     let stderr = "";
@@ -118,6 +121,6 @@ export async function getProjectMediaAudioPeaks(
   const buffer = Buffer.from(peaks.buffer, peaks.byteOffset, peaks.byteLength);
   const temporary = `${cachePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(temporary, buffer);
-  fs.renameSync(temporary, cachePath);
+  renameWithRetrySync(temporary, cachePath);
   return buffer;
 }

@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from './file-ops.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import {settingsDataRoot,defaultProjectsLocation} from './system-settings-location.ts';
@@ -32,7 +33,7 @@ export function writeSystemSettings(preferences:unknown,revision:unknown){
  if(!p.paths.backups)throw Error('备份目录不能为空');
  if(forcedRoot()&&p.paths.projects!==defaultProjectRoot())throw Error('当前运行环境固定了工程路径，请先移除环境覆盖');
  const file=settingsFile(),next:Stored={version:1,revision:current.revision+1,preferences:p,libraries:[...new Set([...projectRoots(),p.paths.projects])],cacheRoots:[...new Set([...current.cacheRoots,current.preferences.paths.cache,p.paths.cache].filter(Boolean))],backupRoots:[...new Set([...current.backupRoots,current.preferences.paths.backups,p.paths.backups].filter(Boolean))]};
- fs.mkdirSync(path.dirname(file),{recursive:true});const temp=file+'.'+crypto.randomUUID()+'.tmp';try{fs.writeFileSync(temp,JSON.stringify(next,null,2),{mode:0o600});fs.renameSync(temp,file);}finally{fs.rmSync(temp,{force:true});}return settingsView();
+ fs.mkdirSync(path.dirname(file),{recursive:true});const temp=file+'.'+crypto.randomUUID()+'.tmp';try{fs.writeFileSync(temp,JSON.stringify(next,null,2),{mode:0o600});renameWithRetrySync(temp,file);}finally{fs.rmSync(temp,{force:true});}return settingsView();
 }
 export function assertFreeSpace(folder:string){const reserve=readSystemSettings().preferences.reserveGB;if(reserve<=0)return;const p=pathStatus(folder);if(!p.writable)throw Error(p.error);if(p.freeBytes!==undefined&&p.freeBytes<reserve*1024**3)throw Error(`磁盘剩余空间低于设置的 ${reserve} GB，请清理缓存或选择其他目录：${folder}`);}
 
@@ -40,5 +41,5 @@ export function assertFreeSpace(folder:string){const reserve=readSystemSettings(
 export function registerProjectLibrary(folder:string){
  const target=validateDirectory(folder),current=readSystemSettings();if(current.libraries.includes(target))return;
  const next={...current,revision:current.revision+1,libraries:[...current.libraries,target]},file=settingsFile(),temp=file+'.'+crypto.randomUUID()+'.tmp';
- fs.mkdirSync(path.dirname(file),{recursive:true});try{fs.writeFileSync(temp,JSON.stringify(next,null,2),{mode:0o600});fs.renameSync(temp,file);}finally{fs.rmSync(temp,{force:true});}
+ fs.mkdirSync(path.dirname(file),{recursive:true});try{fs.writeFileSync(temp,JSON.stringify(next,null,2),{mode:0o600});renameWithRetrySync(temp,file);}finally{fs.rmSync(temp,{force:true});}
 }

@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 import crypto from "node:crypto";
 import {removeWithRetrySync} from '../file-ops.ts';
 import fs from "node:fs";
@@ -409,7 +410,7 @@ export async function runOpenScreenCodexTurn(input: {
       maxBuffer: 64 * 1024 * 1024,
       env: {
         ...process.env,
-        PATH: `${path.dirname(executable)}:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH || ""}`,
+        PATH: platform.runtimePath(process.env,[path.dirname(executable)]),
         NO_COLOR: "1",
       },
     });
@@ -565,7 +566,7 @@ export async function translateOpenScreenCaptions(input: {
       maxBuffer: 32 * 1024 * 1024,
       env: {
         ...process.env,
-        PATH: `${path.dirname(executable)}:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH || ""}`,
+        PATH: platform.runtimePath(process.env,[path.dirname(executable)]),
         NO_COLOR: "1",
       },
     });

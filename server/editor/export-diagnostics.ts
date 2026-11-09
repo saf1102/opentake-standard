@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -8,7 +9,7 @@ export function startExportDiagnostics(token:string,jobId:string,settings:unknow
  const marker=['export-diagnostics.json','emergency-patch.json'].map(f=>path.resolve(f)).find(f=>fs.existsSync(f));
  if(!marker)return;
  try{
-  const dir=path.join(process.env.LINKREADER_DESKTOP_PROFILE||path.join(os.homedir(),'Library/Application Support/linkreader-desktop'),'export-diagnostics',`${jobId}-${Date.now()}`);
+  const dir=path.join(process.env.LINKREADER_DESKTOP_PROFILE||path.join(platform.desktopDataRoot()),'export-diagnostics',`${jobId}-${Date.now()}`);
   fs.mkdirSync(dir,{recursive:true});
   const timer=setInterval(()=>exportDiagnostic('resources',{freeMemory:os.freemem(),loadAverage:os.loadavg(),nodeMemory:process.memoryUsage()},token),5000);timer.unref();
   sessions.set(token,{file:path.join(dir,'export.jsonl'),started:Date.now(),bytes:0,timer,lastProgress:0});

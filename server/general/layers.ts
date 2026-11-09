@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from '../file-ops.ts';
 import {autoBackup} from '../editor/project-backups.ts';
 import {removeWithRetrySync} from '../file-ops.ts';
 /**
@@ -224,7 +225,7 @@ function soundFile(dir: string, n: number, original: GeneralLayers, src: string)
   return file;
 }
 const readLayers = (file: string) => JSON.parse(fs.readFileSync(file, 'utf8')) as GeneralLayers;
-const writeJson = (target: string, value: unknown) => { const tmp = `${target}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(value, null, 1)); fs.renameSync(tmp, target); };
+const writeJson = (target: string, value: unknown) => { const tmp = `${target}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(value, null, 1)); renameWithRetrySync(tmp, target); };
 
 /**
  * 按声音切开 (S先生 10-31): where the separate sounds are in `duration` seconds of version n's sound file `src` from

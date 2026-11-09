@@ -8,7 +8,7 @@ import type {IncomingMessage,ServerResponse} from 'node:http';
 import {bodyJson,sendJson} from '../../http.ts';
 import {settingsView,writeSystemSettings,pathStatus,readSystemSettings,settingsFile,registerProjectLibrary} from '../../system-settings.ts';
 import {assertStorageIdle} from './storage.ts';
-import {backupProjectFile,listBackups,restoreBackup,backupFailures} from '../project-backups.ts';
+import {backupProjectFile, listBackups, restoreBackup, backupFailures} from '../project-backups.ts';
 import {scan} from '../store.ts';
 import {scanGeneral} from '../../general/store.ts';
 import {binary} from '../media-binary.ts';
@@ -34,6 +34,6 @@ export async function handleSystemSettingsApi(req:IncomingMessage,res:ServerResp
  if(req.method==='POST'&&parts[1]==='backup-now'){assertStorageIdle();let count=0;for(const {dir} of scan()){backupProjectFile(dir,true);count++;}for(const {dir} of scanGeneral()){backupProjectFile(dir,true,'general');count++;}return reply({count});}
  if(req.method==='POST'&&parts[1]==='restore-backup'){assertStorageIdle();const body=await bodyJson(req);return reply(await restoreBackup(String(body.id||'')));}
  if(req.method==='GET'&&parts[1]==='diagnostics'){return reply({platform:process.platform,architecture:process.arch,node:process.version,cpus:os.cpus().length,memoryGB:Math.round(os.totalmem()/1024**3),ffmpeg:hasBinary('ffmpeg'),ffprobe:hasBinary('ffprobe'),jianying:!!findJianyingApp(),jianyingDraft:!!findJianyingDraftDir(),backupErrors:backupFailures().length,settingsRevision:readSystemSettings().revision});}
- if(req.method==='GET'&&parts[1]==='development-storage'){const file=path.join(os.homedir(),'Library/Application Support/linkreader-desktop/build-storage.json');return reply(fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):null);}
+ if(req.method==='GET'&&parts[1]==='development-storage'){const file=path.join(platform.desktopDataRoot(),'build-storage.json');return reply(fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):null);}
  sendJson(res,404,{ok:false,error:'系统设置接口不存在'});return true;
 }

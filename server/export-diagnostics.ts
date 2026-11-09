@@ -21,7 +21,7 @@ export function exportDiagnostic(event:Record<string,unknown>,file=process.env.O
 export function runExportTool(file:string,args:string[],options:ExecFileOptions={}):Promise<{stdout:string;stderr:string}> {
  const started=Date.now();exportDiagnostic({event:'tool-start',file,args});
  return new Promise((resolve,reject)=>{
-  execFile(file,args,{...options,windowsHide:true,encoding:'buffer'},(error,stdout,stderr)=>{
+  execFile(file,args,{...options,env:{...process.env,...options.env,PYTHONUTF8:'1'},windowsHide:true,encoding:'buffer'},(error,stdout,stderr)=>{
    const out=decodeExportOutput(stdout),err=decodeExportOutput(stderr);
    exportDiagnostic({event:'tool-exit',file,args,milliseconds:Date.now()-started,code:error?.code??0,signal:error?.signal??null,stderr:err,stack:error?.stack});
    if(error){const failure=new Error(`${path.basename(file)} 执行失败（${error.code??error.signal??'unknown'}）：${err.trim()||error.message}`);Object.assign(failure,{code:error.code,signal:error.signal,stderr:err,stdout:out,cause:error});reject(failure)}

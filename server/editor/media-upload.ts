@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from '../file-ops.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import {Transform, type Readable} from 'node:stream';
@@ -20,7 +21,7 @@ export async function uploadMediaStream(req: Readable, destination: string): Pro
     await pipeline(req, count, output);
     // pipeline has finished and closed the output before promotion. A rename
     // failure rejects this promise instead of escaping an event callback.
-    fs.renameSync(temporary, destination);
+    renameWithRetrySync(temporary, destination);
     return size;
   } catch (error) {
     // A failed exclusive open does not own another upload's temporary file.

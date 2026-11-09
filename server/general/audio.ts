@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from '../file-ops.ts';
 /** 混音后统一响度。只处理声音，画面直接复制；失败留住原文件，不交给模型重做。 */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -52,7 +53,7 @@ async function renderNormalizedAudio(ffmpeg: string, video: string, sound: strin
       report.after = await measureAudio(ffmpeg, candidate); report.passes = pass;
       report.attempts!.push({ gainDb, ceilingDb, ...report.after });
       if ((report.silent && !Number.isFinite(report.after.peak)) || acceptable(report.after)) {
-        fs.renameSync(candidate, output); report.corrected = !report.silent;
+        renameWithRetrySync(candidate, output); report.corrected = !report.silent;
         saveReport(output, report); return report;
       }
       // 增益在限幅之前补偿响度损失；峰值超标则扩大 AAC 余量。

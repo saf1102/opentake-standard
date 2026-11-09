@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from './file-ops.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import {ExportSettingsSchema, type ExportSettings} from '../src/types/editor.ts';
@@ -15,5 +16,5 @@ export function writeExportPreferences(dir:string,value:unknown) {
   if(!isFilmExportPreset(settings.preset))return readExportPreferences(dir);
   const folder=path.join(dir,'exports');fs.mkdirSync(folder,{recursive:true});
   const file=path.join(folder,'.preferences.json'),tmp=`${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp,JSON.stringify(settings,null,2));fs.renameSync(tmp,file);return settings;
+  fs.writeFileSync(tmp,JSON.stringify(settings,null,2));renameWithRetrySync(tmp,file);return settings;
 }

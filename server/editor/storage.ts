@@ -1,8 +1,10 @@
-import {placements,excludedMigrationSource,relocatedReferences} from './migration-state.ts';
+import {jianyingCandidates} from './jianying/paths.ts';
+import platform from '../platform.ts';
+import {placements, excludedMigrationSource, relocatedReferences} from './migration-state.ts';
 import {readScreenLock} from './openscreen-lock.ts';
 import {listBackups} from './project-backups.ts';
 import {allProjectCacheRoots} from './cache-location.ts';
-import {projectRoots,legacyProjectsRoot,settingsFile,projectPathOverridden} from '../system-settings.ts';
+import {projectRoots, legacyProjectsRoot, settingsFile, projectPathOverridden} from '../system-settings.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -76,7 +78,7 @@ async function references(dirs:string[],targets:string[]){
   }
  }
  // Native Jianying drafts may refer directly to generated assets from our library.
- const draftRoots=process.env.LINKREADER_JIANYING_PROJECTS_DIR?[process.env.LINKREADER_JIANYING_PROJECTS_DIR]:[path.join(os.homedir(),'Movies/JianyingPro/User Data/Projects'),path.join(os.homedir(),'Library/Application Support/JianyingPro/User Data/Projects')];
+ const draftRoots=process.env.LINKREADER_JIANYING_PROJECTS_DIR?[process.env.LINKREADER_JIANYING_PROJECTS_DIR]:jianyingCandidates().drafts.map(dir=>path.dirname(dir));
  for(const draftRoot of draftRoots)for(const entry of await walk(draftRoot,{accept:file=>/(?:draft_content|draft_info|draft_meta_info)\.json$/.test(file)}))if(/(?:draft_content|draft_info|draft_meta_info)\.json$/.test(entry.file)){
   const text=await fs.promises.readFile(entry.file,'utf8');
   // Recent Jianying versions encrypt these files. They are not malformed project
@@ -95,7 +97,7 @@ export async function storageOverview(projectId?:string){
   projects.push({id:p.id,name:p.name,dir,archivedAt:p.archivedAt,deletedAt:p.deletedAt,total:bytes(entries),media:bytes(entries.filter(e=>category(dir,e.file)==='media')),cache:bytes(entries.filter(e=>category(dir,e.file)==='cache')),exports:bytes(entries.filter(e=>category(dir,e.file)==='exports')),project:bytes(entries.filter(e=>category(dir,e.file)==='project'))});
  }
  let available=0;try{const stat=fs.statfsSync(rootDir());available=stat.bavail*stat.bsize}catch{/* Disk availability is unknown; keep the existing zero fallback. */}
- const appData=process.env.LINKREADER_STORAGE_APP_DATA||path.join(os.homedir(),'Library/Application Support/linkreader-desktop');
+ const appData=process.env.LINKREADER_STORAGE_APP_DATA||path.join(platform.desktopDataRoot());
  const auxiliary=[];if(!projectId)for(const [name,folder]of [['更新包与解包文件','updates'],['工程备份','project-backups']]){
   const original=path.join(appData,folder);if(fs.existsSync(original)){const dir=fs.realpathSync(original);let occupied:number|null=null;
    try{if(process.platform==='darwin'){const result=await execFileAsync('/usr/bin/du',['-sk',dir],{timeout:30000,maxBuffer:1024*1024});const match=/^(\d+)\s/.exec(result.stdout);if(match)occupied=Number(match[1])*1024}else occupied=bytes(await walk(dir))}catch{/* Auxiliary size is unknown; retain null rather than invent a size. */}

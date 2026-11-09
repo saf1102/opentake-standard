@@ -1,3 +1,5 @@
+import {requireBinary} from '../media-binary.ts';
+import {renameWithRetrySync} from '../../file-ops.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -16,7 +18,7 @@ export function prepareJianyingAlpha(source:string, output:string, cacheDir:stri
   if(!fs.existsSync(cached) || fs.statSync(cached).size === 0) {
     const temporary=`${cached}.${process.pid}.tmp.mov`;
     try {
-      execFileSync('ffmpeg',['-v','error','-y','-i',source,'-an',
+      execFileSync(requireBinary('ffmpeg'),['-v','error','-y','-i',source,'-an',
         '-vf','format=gbrap,premultiply=inplace=1,scale=out_color_matrix=bt709,format=yuva444p10le',
         // Render caches originate in 8-bit RGBA. Keeping 16-bit alpha in the
         // Jianying-only copy adds no edge detail and inflates every frame.
@@ -24,7 +26,7 @@ export function prepareJianyingAlpha(source:string, output:string, cacheDir:stri
         '-bsf:v','prores_metadata=color_primaries=1:color_trc=13:colorspace=1',
         '-color_primaries','bt709','-color_trc','iec61966-2-1','-colorspace','bt709','-movflags','+write_colr',temporary],
         {timeout:3_600_000,stdio:'pipe'});
-      fs.renameSync(temporary,cached);
+      renameWithRetrySync(temporary,cached);
       // prores_ks resets MOV colour context. The local remux below must finish
       // before writing the marker; codec BSF flags alone are not sufficient.
     } finally {fs.rmSync(temporary,{force:true});}
@@ -35,11 +37,11 @@ export function prepareJianyingAlpha(source:string, output:string, cacheDir:stri
   if(!fs.existsSync(marker)) {
     const tagged=`${cached}.${process.pid}.tagged.mov`;
     try {
-      execFileSync('ffmpeg',['-v','error','-y','-i',cached,'-map','0:v:0','-c:v','copy',
+      execFileSync(requireBinary('ffmpeg'),['-v','error','-y','-i',cached,'-map','0:v:0','-c:v','copy',
         '-bsf:v','prores_metadata=color_primaries=1:color_trc=13:colorspace=1',
         '-color_primaries','bt709','-color_trc','iec61966-2-1','-colorspace','bt709',
         '-movflags','+write_colr',tagged],{timeout:300_000,stdio:'pipe'});
-      fs.renameSync(tagged,cached);
+      renameWithRetrySync(tagged,cached);
       fs.writeFileSync(marker,'sRGB / BT709');
     } finally {fs.rmSync(tagged,{force:true});}
   }

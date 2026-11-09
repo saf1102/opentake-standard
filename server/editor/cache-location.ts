@@ -1,4 +1,4 @@
-import os from 'node:os';
+import platform from '../platform.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import {readSystemSettings,validateDirectory} from '../system-settings.ts';
@@ -8,4 +8,4 @@ export function cachePath(dir:string,...parts:string[]){return path.join(project
 export function cacheRelative(dir:string,kind:string,file:string){const result=cachePath(dir,kind,file);fs.mkdirSync(path.dirname(result),{recursive:true});return path.relative(dir,result);}
 export function allProjectCacheRoots(dir:string){const settings=readSystemSettings();const roots=[...new Set([...settings.cacheRoots,settings.preferences.paths.cache].filter(Boolean))];return [path.join(dir,'cache'),...roots.map(root=>path.join(root,'creative-workspace-cache',projectKey(dir)))];}
 
-export function globalRenderCache(){const root=readSystemSettings().preferences.paths.cache;if(root){validateDirectory(root);return path.join(root,'creative-workspace-cache','renderer','frame-render');}return path.join(os.homedir(),process.platform==='darwin'?'Library/Caches':'.cache','LinkReader','frame-render');}
+export function globalRenderCache(){const root=readSystemSettings().preferences.paths.cache;if(root){validateDirectory(root);return path.join(root,'creative-workspace-cache','renderer','frame-render');}return path.join(platform.cacheRoot('LinkReader'),'frame-render');}

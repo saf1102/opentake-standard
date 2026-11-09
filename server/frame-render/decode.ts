@@ -1,3 +1,4 @@
+import {trackChildProcess} from '../proc.ts';
 import {ffmpegPath} from '../general/kit-env.ts';
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process';
 
@@ -30,6 +31,7 @@ export class VideoFrames {
       '-sws_flags', 'neighbor+accurate_rnd', '-f', 'image2pipe',
       '-c:v', 'png', '-pix_fmt', 'rgba', '-threads', '1', 'pipe:1',
     ]);
+    trackChildProcess(child);
     const stream: Stream = {child, iterator: child.stdout[Symbol.asyncIterator](),
       buffer: Buffer.alloc(0), next: 0, cache: new Map(), error: ''};
     child.stderr.on('data', b => {stream.error = (stream.error + b.toString()).slice(-4000);});

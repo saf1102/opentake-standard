@@ -1,6 +1,25 @@
 """Repair microsecond rounding at frame boundaries in older handoff manifests."""
 
 
+def media_tool(name):
+    import os
+    import shutil
+    from pathlib import Path
+    pinned = os.environ.get('CW_' + name.upper())
+    if pinned:
+        if Path(pinned).is_file():
+            return pinned
+        raise RuntimeError('已确认的媒体处理工具不可用：' + name)
+    root = os.environ.get('LINKREADER_BIN_DIR')
+    if root:
+        candidate = Path(root) / (name + ('.exe' if os.name == 'nt' else ''))
+        if candidate.is_file():
+            return str(candidate)
+    found = shutil.which(name)
+    if not found:
+        raise RuntimeError('未找到媒体处理工具：' + name)
+    return found
+
 def jianying_draft_fps(source_fps):
     """Use a stable preview clock while retaining the original source media.
 
@@ -19,7 +38,7 @@ def precise_audio_duration(filename):
     import subprocess
     from fractions import Fraction
     probe = json.loads(subprocess.check_output([
-        'ffprobe', '-v', 'error', '-select_streams', 'a:0',
+        media_tool('ffprobe'), '-v', 'error', '-select_streams', 'a:0',
         '-show_entries', 'stream=duration_ts,time_base', '-of', 'json', str(filename)
     ], timeout=30))['streams'][0]
     return round(int(probe['duration_ts']) * Fraction(probe['time_base']) * 1_000_000)

@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from '../file-ops.ts';
 import {exportDiagnostic} from './export-diagnostics.ts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +16,7 @@ export function publishRenderCache(output: string, cacheFile: string) {
   const temporary = `${cacheFile}.${process.pid}.${Date.now()}.tmp`;
   try {
     try {fs.linkSync(output, temporary);} catch {fs.copyFileSync(output, temporary);}
-    fs.renameSync(temporary, cacheFile);
+    renameWithRetrySync(temporary, cacheFile);
   } finally {fs.rmSync(temporary, {force:true});}
 }
 export function trimRenderCache(cacheDir: string, cacheFile: string) {

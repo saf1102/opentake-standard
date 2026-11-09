@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from '../file-ops.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -53,6 +54,6 @@ export function pruneMotionCache(folder:string,currentFiles:string[],historyBudg
   .map(name=>({name,stat:fs.lstatSync(path.join(folder,name))})).filter(x=>x.stat.isFile()).sort((a,b)=>b.stat.mtimeMs-a.stat.mtimeMs);
  let kept=0,removed=0;
  for(const {name,stat} of candidates){if(kept+stat.size<=historyBudget){kept+=stat.size;continue;}fs.rmSync(path.join(folder,name));removed+=stat.size;}
- const temp=index+'.'+crypto.randomUUID()+'.tmp';fs.writeFileSync(temp,JSON.stringify({current:[...current]}));fs.renameSync(temp,index);
+ const temp=index+'.'+crypto.randomUUID()+'.tmp';fs.writeFileSync(temp,JSON.stringify({current:[...current]}));renameWithRetrySync(temp,index);
  return removed;
 }
