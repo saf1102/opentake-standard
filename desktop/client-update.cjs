@@ -7,6 +7,14 @@ function receiptMatches(root,version,testMode=false){
   for(const [rel,expected] of Object.entries(receipt.files)){if(!/^(src|server|shared|desktop)\//.test(rel)||unpackaged(rel))continue;const file=path.resolve(root,rel);if(!file.startsWith(root+path.sep))return false;const b=fs.readFileSync(file);if(crypto.createHash('sha1').update(Buffer.from(`blob ${b.length}\0`)).update(b).digest('hex')!==expected)return false;}
   return true}catch{return false}
 }
+/**
+ * After the Windows installer relaunches the app, the old run's state still says "installing" and its downloaded
+ * installer is still on disk. If this app is that version (or newer), the update finished: mark it and clean up.
+ */
+function reconcileAfterInstall(state,version,newer){
+ if(!state||state.status!=='installing'||typeof state.version!=='string')return null;
+ return state.version===version||newer(version,state.version)?{...state,status:'completed',step:3,installer:undefined}:null;
+}
 const testOrigin=()=>{const feed=process.env.OPENTAKE_MAC_UPDATE_TEST_URL,win=process.env.OPENTAKE_WINDOWS_UPDATE_TEST_URL,legacy=process.env.OPENTAKE_UPGRADE_TEST_URL;for(const value of [feed,win])if(value&&/^http:\/\/127\.0\.0\.1:\d+\//.test(value))return new URL(value).origin;return /^http:\/\/127\.0\.0\.1:\d+$/.test(legacy||'')?legacy:undefined};
 function installUpdateIPC({app,ipcMain,trusted,root,getOrigin}){
  const profile=app.getPath('userData'),updates=path.join(profile,'updates');fs.mkdirSync(updates,{recursive:true});
@@ -22,6 +30,8 @@ function installUpdateIPC({app,ipcMain,trusted,root,getOrigin}){
   return {supported:true,modified:!receiptMatches(root,app.getVersion(),Boolean(testOrigin()))};
  }
  const readState=()=>{try{return JSON.parse(fs.readFileSync(state))}catch{return {step:0,status:'idle'}}};
+ {const done=reconcileAfterInstall(readState(),app.getVersion(),(a,b)=>{const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]>y[i];return false});
+  if(done){fs.writeFileSync(state,JSON.stringify(done));for(const name of fs.readdirSync(updates))if(/^[0-9a-f-]{36}$/.test(name))fs.rmSync(path.join(updates,name),{recursive:true,force:true})}}
  ipcMain.handle('standard:update-status',event=>{if(!trusted(event))throw Error('无效窗口');return {...readState(),...capability()}});
  ipcMain.handle('standard:update-cancel',event=>{if(!trusted(event))throw Error('无效窗口');fs.writeFileSync(cancel,'cancel')});
  ipcMain.handle('standard:update-restart',event=>{
@@ -52,4 +62,4 @@ function installUpdateIPC({app,ipcMain,trusted,root,getOrigin}){
   const timer=setInterval(()=>{const s=readState();if(['prepared','completed','failed','cancelled'].includes(s.status)){running=s.status==='prepared'&&process.platform==='darwin';clearInterval(timer)}},500);timer.unref();
  });
 }
-module.exports={installUpdateIPC,receiptMatches};
+module.exports={installUpdateIPC,receiptMatches,reconcileAfterInstall};
