@@ -9,7 +9,7 @@ import type { GeneralAgentChoice, GeneralInputKind, GeneralSettings } from '@/ge
 import { AgentControls } from '@/general/AgentPicker'
 import {
   ASPECT_LABELS, ASPECT_OPTIONS, DEFAULT_GENERAL_SETTINGS, LENGTH_OPTIONS, clipDuration, inputKindForStyle,
-  intakeTitle, lengthLabel, startBlocker, styleHint, textCount,
+  intakeTitle, lengthLabel, mediaKindOf, MEDIA_ACCEPT, startBlocker, styleHint, textCount,
 } from '@/general/general-logic'
 import { useGeneralStart } from '@/general/general-start'
 import { GeneralEntrance, type EntryKey } from '@/general/GeneralEntrance'
@@ -21,8 +21,8 @@ import '@/general/general.css'
 type DraftFile = { key: string; file: File; url: string; image: boolean; duration?: number; poster?: string }
 type Draft = { files: DraftFile[]; text: string; note: string; settings: GeneralSettings; agent?: GeneralAgentChoice; network: boolean }
 
-const ACCEPT = 'video/*,image/*'
-const accepted = (file: File) => file.type.startsWith('video/') || file.type.startsWith('image/')
+const ACCEPT = `${MEDIA_ACCEPT.video},${MEDIA_ACCEPT.image}`
+const accepted = (file: File) => mediaKindOf(file) === 'video' || mediaKindOf(file) === 'image'
 
 /** The length and a poster frame of a dropped video, read in the page (nothing is uploaded yet). */
 function probeVideo(url: string): Promise<{ duration?: number; poster?: string }> {
@@ -87,7 +87,7 @@ function IntakeStep({ style, kind, draft, setDraft, onChangeStyle }: {
     if (!files.length) return
     const added = files.map((file): DraftFile => {
       const url = URL.createObjectURL(file)
-      return { key: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`, file, url, image: file.type.startsWith('image/'), duration: file.type.startsWith('image/') ? 0 : undefined }
+      return { key: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`, file, url, image: mediaKindOf(file) === 'image', duration: mediaKindOf(file) === 'image' ? 0 : undefined }
     })
     setDraft(current => ({ ...current, files: [...current.files, ...added] }))
     for (const item of added) {
@@ -184,7 +184,7 @@ function IntakeStep({ style, kind, draft, setDraft, onChangeStyle }: {
 export default function GeneralEdit() {
   const [params, setParams] = useSearchParams()
   const entryParam = params.get('entry'), catParam = params.get('cat')
-  const entry: EntryKey | undefined = entryParam === 'footage' || entryParam === 'topic' ? entryParam : undefined
+  const entry: EntryKey | undefined = entryParam === 'free' || entryParam === 'footage' || entryParam === 'topic' ? entryParam : undefined
   const cat = catParam !== null && /^\d+$/.test(catParam) ? Number(catParam) : undefined
   const picked = styleById(LIBRARY_STYLES, params.get('style'))
   // 上传视频 takes every style (a data style is cut from the person's footage too); elsewhere the pickable ones

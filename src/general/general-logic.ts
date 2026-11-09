@@ -491,3 +491,21 @@ export function feedItems(project: Pick<GeneralProject, 'messages' | 'run' | 've
   placeLoose(Infinity)
   return items
 }
+
+/** 素材格式按扩展名判断，和后端收素材的名单一致。Windows 上不少视频格式（.mov、.mkv、.avi 等）的 file.type 是空的，只看 MIME 会被悄悄丢掉。 */
+const MEDIA_EXTS = {
+  video: ['.mp4', '.mov', '.m4v', '.webm', '.mkv', '.avi'],
+  image: ['.jpg', '.jpeg', '.png', '.webp'],
+  audio: ['.mp3', '.wav', '.m4a', '.aac', '.flac'],
+} as const
+export type MediaFileKind = keyof typeof MEDIA_EXTS
+export function mediaKindOf(file: { name: string }): MediaFileKind | undefined {
+  const dot = file.name.lastIndexOf('.'), ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : ''
+  return (Object.keys(MEDIA_EXTS) as MediaFileKind[]).find(kind => (MEDIA_EXTS[kind] as readonly string[]).includes(ext))
+}
+/** 选择文件框的过滤：MIME 加扩展名，Windows 认不出的格式也列得出来。 */
+export const MEDIA_ACCEPT: Record<MediaFileKind, string> = {
+  video: ['video/*', ...MEDIA_EXTS.video].join(','),
+  image: ['image/*', ...MEDIA_EXTS.image].join(','),
+  audio: ['audio/*', ...MEDIA_EXTS.audio].join(','),
+}

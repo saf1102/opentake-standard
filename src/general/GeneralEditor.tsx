@@ -18,7 +18,7 @@ import type { LibraryStyle } from '@/workspace/style-library/style-library'
 import { errorText, generalApi, generalEditorApi, type TextPresets } from './general-api'
 import type { GeneralLayers, GeneralMedia, GeneralProject, GeneralSegment, GeneralVersion } from './general-contract'
 import { editProjectFor, mediaFileName, soundAssetId } from './general-editor-model'
-import { styleNameOf } from './general-logic'
+import { mediaKindOf, styleNameOf } from './general-logic'
 import { GeneralPreview } from './GeneralPreview'
 import { type StageReference } from './GeneralStage'
 import { grabArea } from './frame-grab'
@@ -450,7 +450,7 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
   }
 
   const upload = async (files: FileList | null) => {
-    const list = [...(files ?? [])].filter(file => file.type.startsWith('video/') || file.type.startsWith('image/'))
+    const list = [...(files ?? [])].filter(file => mediaKindOf(file) === 'video' || mediaKindOf(file) === 'image')
     for (const [index, file] of list.entries()) {
       try { await generalApi.upload(project.id, file, ratio => setUploadProgress(Math.round((index + ratio) / list.length * 100))) }
       catch (failure) { toast.error(`素材没传上去：${errorText(failure)}`); break }

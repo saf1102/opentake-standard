@@ -91,6 +91,7 @@ html[data-ui-theme=frost] .ge-en {
 /* the box shows focus with its own thin border (the theme's field focus, an amber border and glow, stays off) */
 html[data-ui-theme] .ge-en .ge-en-compose textarea:not([disabled]):focus,.ge-en-compose textarea:focus { border-color:color-mix(in srgb,var(--en-accent) 55%,transparent);box-shadow:none;outline:none; }
 .ge-en-compose textarea::placeholder { color:var(--en-muted); }
+.ge-en-compose[data-over] { border-color:var(--en-accent); }
 .ge-en-row { display:flex;gap:10px;margin-top:14px;align-items:center; }
 .ge-en-row button { display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:var(--en-pill);border:1px solid var(--en-chip-line);font-size:13px;cursor:pointer; }
 .ge-en-row button:hover:not(:disabled) { border-color:var(--en-accent); }
