@@ -1,4 +1,4 @@
-import {clientHeaders,updateView,dismissUpdate} from './client-update.ts';
+import {clientHeaders,updateView,dismissUpdate,macFeed} from './client-update.ts';
 import {windowsUpdateApi} from './windows-update.ts';
 import platform from '../platform.ts';
 import {atomicJsonSync} from '../file-ops.ts';
@@ -24,7 +24,7 @@ export async function upgradeApi(req:IncomingMessage,res:ServerResponse){const r
  if(req.method==='POST'&&route==='/dismiss'){const b=await bodyJson(req) as {action:string};return sendJson(res,200,dismissUpdate(b.action))}
  if(req.method==='GET'&&route==='/preferences')return sendJson(res,200,{daily:saved.daily!==false});
  if(req.method==='PUT'&&route==='/preferences'){const b=await bodyJson(req) as {daily?:boolean};saved.daily=b.daily!==false;save();return sendJson(res,200,{daily:saved.daily})}
- if(req.method==='GET'&&(route==='/state'||route==='/daily')){const day=new Date().toLocaleDateString('en-CA');if(route==='/daily'&&(saved.daily===false||saved.checkedDay===day))return sendJson(res,200,{skipped:true});const upgrade=await config();let account=null,error='';if(saved.token&&route!=='/daily')try{account=publicView(await remote('/api/me'))}catch(e){error=e instanceof Error?e.message:'状态检查失败'}saved.checkedDay=day;save();return sendJson(res,200,{upgrade,account,error,clientUpdate:upgrade.offline?{...updateView(),notify:false,offline:true}:updateView(upgrade.standard??null,route==='/state')})}
+ if(req.method==='GET'&&(route==='/state'||route==='/daily')){const day=new Date().toLocaleDateString('en-CA');if(route==='/daily'&&(saved.daily===false||saved.checkedDay===day))return sendJson(res,200,{skipped:true});const upgrade=await config();let account=null,error='';if(saved.token&&route!=='/daily')try{account=publicView(await remote('/api/me'))}catch(e){error=e instanceof Error?e.message:'状态检查失败'}const release=await macFeed(upgrade.offline?undefined:(upgrade.standard??null));saved.checkedDay=day;save();return sendJson(res,200,{upgrade,account,error,clientUpdate:release===undefined?{...updateView(),notify:false,offline:true}:updateView(release,route==='/state')})}
  if(req.method==='POST'&&(route==='/apply'||route==='/login')){const input=await bodyJson(req);const result=await remote(route==='/apply'?'/api/standard/apply':'/api/login','POST',{...input,...(route==='/login'?{scope:'standard'}:{}),device:'电脑 · '+(process.platform==='darwin'?'macOS':process.platform)});saved.token=result.token;save();return sendJson(res,200,publicView(result))}
  if(req.method==='PUT'&&route==='/intent')return sendJson(res,200,await remote('/api/pro/intent','PUT',await bodyJson(req)));
  if(req.method==='POST'&&route==='/logout'){try{await remote('/api/logout','POST')}finally{delete saved.token;save()}return sendJson(res,200,{ok:true})}

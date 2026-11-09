@@ -80,11 +80,4 @@ function macBuildArch({arch=process.arch,env=process.env,translated=macTranslate
  return target;
 }
 function macAppDirectory(arch){validateMacArch(arch);return arch==='arm64'?'mac-arm64':'mac';}
-function validateUpdateNode(info,appArch){
- validateMacArch(info.arch);
- if(info.arch!==appArch)throw Error('更新所用 Node 与 Standard App 芯片架构不同，请安装匹配本机的 Node；Apple 芯片请使用 arm64 Node，不要使用 Rosetta。');
- const [major,minor]=String(info.version).replace(/^v/,'').split('.').map(Number);
- if(major!==24 || !(minor>=15))throw Error('更新需要 Node.js 24.15.0 或更新的 24.x。');
- return info.arch;
-}
-module.exports={validateUpdateNode,macTranslated,validateMacArch,macBuildArch,macAppDirectory,environmentPath,environmentWithPath,appDataRoot,standardDataRoot,projectsRoot,termination,killTree,revealCommand,revealPath,buildTarget};
+module.exports={macTranslated,validateMacArch,macBuildArch,macAppDirectory,environmentPath,environmentWithPath,appDataRoot,standardDataRoot,projectsRoot,termination,killTree,revealCommand,revealPath,buildTarget};

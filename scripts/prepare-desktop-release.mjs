@@ -5,6 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import release from '../desktop/release-contract.cjs';
 import windows from '../desktop/windows-update-manifest.cjs';
+import mac from '../desktop/mac-update-manifest.cjs';
 export async function prepareDesktopRelease({source,artifacts,out,commit}){
  if(!/^[a-f0-9]{40}$/.test(commit||''))throw Error('A full reviewed main commit is required');
  const manifest=JSON.parse(fs.readFileSync(path.join(source,'source-release.json'),'utf8'));
@@ -30,13 +31,19 @@ export async function prepareDesktopRelease({source,artifacts,out,commit}){
  const copy=(from,name)=>fs.copyFileSync(from,path.join(out,name),fs.constants.COPYFILE_EXCL);
  for(const name of [manifest.filename,manifest.filename+'.sha256','source-release.json','upgrade.json'])copy(path.join(source,name),name);
  for(const receipt of receipts){copy(path.join(artifacts,receipt.filename),receipt.filename);copy(path.join(artifacts,receipt.filename+'.build.json'),receipt.filename+'.build.json');}
- const notes=fs.readFileSync(new URL('../RELEASE-NOTES-1.1.2.md',import.meta.url),'utf8');
+ const notes=fs.readFileSync(new URL('../RELEASE-NOTES-1.1.3.md',import.meta.url),'utf8');
  fs.writeFileSync(path.join(out,'release-notes.md'),notes+`\n\n源码提交：${commit}\n发布标签：${tag}\n构建号：${win.desktopBuild}\n`);
  const handoff=fileURLToPath(new URL('../RELEASE-HANDOFF-1.1.0.md',import.meta.url));
  copy(handoff,'RELEASE-HANDOFF-1.1.0.md');
  const windowsManifest=windows.windowsRelease({schemaVersion:1,product:'opentake-standard',platform:'win32',arch:'x64',channel:'stable',version,windowsBuild:win.desktopBuild,revision:metadata.windowsRevision,notes:notes.slice(0,16000),url:`https://github.com/${release.REPOSITORY}/releases/download/${tag}/${win.filename}`,sha256:win.sha256,size:win.bytes});
  if(!windowsManifest)throw Error('Windows update manifest is invalid');
  fs.writeFileSync(path.join(out,'windows-update.json'),JSON.stringify(windowsManifest,null,2)+'\n');
+ // Mac clients read this from the latest release; both chips must be present and match their receipts.
+ const macInstallers=Object.fromEntries(receipts.filter(receipt=>receipt.platform==='darwin').map(receipt=>[receipt.arch,{url:`https://github.com/${release.REPOSITORY}/releases/download/${tag}/${receipt.filename}`,sha256:receipt.sha256,size:receipt.bytes}]));
+ const macManifest=mac.macRelease({schemaVersion:1,product:'opentake-standard',platform:'darwin',channel:'stable',version,desktopBuild:win.desktopBuild,notes:notes.slice(0,16000),installers:macInstallers});
+ if(!macManifest)throw Error('Mac update manifest is invalid');
+ const {tag:_tag,...macFeed}=macManifest;
+ fs.writeFileSync(path.join(out,'mac-update.json'),JSON.stringify(macFeed,null,2)+'\n');
  fs.writeFileSync(path.join(out,'desktop-release.json'),JSON.stringify({schemaVersion:1,repository:release.REPOSITORY,version,tag,commit,desktopBuild:win.desktopBuild,installers:receipts,publicationStatus:'prepared-not-published'},null,2)+'\n');
  const lines=[];for(const name of fs.readdirSync(out).sort())lines.push(`${await release.fileSha256(path.join(out,name))}  ${name}`);
  fs.writeFileSync(path.join(out,'SHA256SUMS.txt'),lines.join('\n')+'\n');

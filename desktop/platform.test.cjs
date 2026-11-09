@@ -93,7 +93,7 @@ test('Windows Explorer uses the system directory independently of PATH and envir
 });
 
 test('Mac 架构区分原生 Intel、Apple 芯片及 Rosetta，交叉构建必须显式指定',()=>{
- const {validateMacArch,macBuildArch,macAppDirectory,macTranslated,validateUpdateNode}=require('./platform.cjs');
+ const {validateMacArch,macBuildArch,macAppDirectory,macTranslated}=require('./platform.cjs');
  assert.equal(buildTarget('darwin','x64','24.0'),'mac');
  assert.throws(()=>buildTarget('darwin','ia32','24.0'));
  assert.equal(validateMacArch('x64',false),'x64');
@@ -107,7 +107,4 @@ test('Mac 架构区分原生 Intel、Apple 芯片及 Rosetta，交叉构建必�
  assert.equal(macTranslated(()=>({status:0,stdout:''})),false);
  assert.equal(macTranslated(()=>({status:0,stdout:'0\n'})),false);
  assert.throws(()=>macTranslated(()=>({error:Error('missing')})));
- assert.equal(validateUpdateNode({arch:'x64',version:'v24.15.0'},'x64'),'x64');
- assert.throws(()=>validateUpdateNode({arch:'x64',version:'v24.15.0'},'arm64'),/架构不同/);
- assert.throws(()=>validateUpdateNode({arch:'x64',version:'v22.0.0'},'x64'),/24.15/);
 });

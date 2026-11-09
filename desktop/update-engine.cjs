@@ -11,7 +11,7 @@ async function install({target,candidate,backups,signal,launch,healthy,stop,prog
  let moved=false,started;
  try{
   check();fs.cpSync(target,backup,{recursive:true,errorOnExist:true,force:false,verbatimSymlinks:true});check();
-  fs.renameSync(target,rollback);moved=true;fs.renameSync(staged,target);progress(4);
+  fs.renameSync(target,rollback);moved=true;fs.renameSync(staged,target);progress(3);
   started=await launch(target);if(!await healthy(started))throw Error('新版启动自检失败');check();
   fs.rmSync(rollback,{recursive:true,force:true});moved=false;
   const entries=fs.readdirSync(backups).filter(n=>/^standard-[a-f0-9-]{36}\.app$/.test(n)).map(n=>({n,t:fs.statSync(path.join(backups,n)).mtimeMs})).sort((a,b)=>b.t-a.t);
@@ -19,13 +19,23 @@ async function install({target,candidate,backups,signal,launch,healthy,stop,prog
  }catch(e){if(started)await stop(started);if(moved){fs.rmSync(target,{recursive:true,force:true});fs.renameSync(rollback,target);await launch(target,true)}else if(fs.existsSync(target))await launch(target,true);throw e}
  finally{fs.rmSync(staged,{recursive:true,force:true})}
 }
-async function prepare({release,work,signal,testOrigin,fetcher=fetch,extract,build,progress=()=>{}}){
- if(!allowedSource(release.url,testOrigin)||!/^[a-f0-9]{64}$/i.test(release.sha256))throw Error('无效更新清单');
- fs.mkdirSync(work,{recursive:true});progress(0);const r=await fetcher(release.url,{signal,credentials:'omit',referrerPolicy:'no-referrer',redirect:'error'});if(!r.ok)throw Error('下载失败');
- const parts=[];let size=0;for await(const b of r.body){size+=b.length;if(size>512*1024*1024)throw Error('源码包过大');if(signal?.aborted)throw Error('更新已取消');parts.push(b);progress(0,{downloadedBytes:size})}
- const bytes=Buffer.concat(parts);progress(1,{downloadedBytes:size});if(hash(bytes).toLowerCase()!==release.sha256.toLowerCase())throw Error('SHA-256 不一致，旧版未改动');
- const zip=path.join(work,'source.zip');fs.writeFileSync(zip,bytes);const source=await extract(zip,path.join(work,'source'));
- const pkg=JSON.parse(fs.readFileSync(path.join(source,'package.json')));if(pkg.name!=='opentake-standard'||pkg.version!==release.version)throw Error('源码版本或产品不匹配');
- if(signal?.aborted)throw Error('更新已取消');return build(source,progress,signal);
+/** Streams one installer to disk while hashing; size and SHA-256 must both match before anything is opened. */
+async function download({release,dest,signal,testOrigin,fetcher=fetch,progress=()=>{}}){
+ if(!allowedSource(release.url,testOrigin)||!/^[a-f0-9]{64}$/i.test(release.sha256)||!Number.isSafeInteger(release.size)||release.size<1)throw Error('无效更新清单');
+ const r=await fetcher(release.url,{signal,credentials:'omit',referrerPolicy:'no-referrer'});if(!r.ok||!r.body)throw Error('下载失败（HTTP '+r.status+'），旧版未改动');
+ const digest=crypto.createHash('sha256');const fd=fs.openSync(dest,'wx',0o600);let size=0;
+ try{for await(const chunk of r.body){if(signal?.aborted)throw Error('更新已取消');const b=Buffer.from(chunk);size+=b.length;if(size>release.size)throw Error('下载大小不符，旧版未改动');digest.update(b);fs.writeSync(fd,b);progress(0,{downloadedBytes:size,totalBytes:release.size})}}
+ finally{fs.closeSync(fd)}
+ progress(1,{downloadedBytes:size,totalBytes:release.size});
+ if(size!==release.size)throw Error('下载大小不符，旧版未改动');
+ if(digest.digest('hex')!==release.sha256.toLowerCase())throw Error('SHA-256 不一致，旧版未改动');
+ return dest;
 }
-module.exports={prepare,install,hash};
+/** Download, verify, then let the platform unpack/inspect the installer. Never touches the running app. */
+async function prepare({release,work,signal,testOrigin,fetcher=fetch,unpack,progress=()=>{}}){
+ fs.mkdirSync(work,{recursive:true});progress(0);
+ const name=path.basename(new URL(release.url).pathname);if(!/^OpenTake-Standard-[\w.-]+\.(dmg|exe)$/.test(name))throw Error('无效更新清单');
+ const file=await download({release,dest:path.join(work,name),signal,testOrigin,fetcher,progress});
+ if(signal?.aborted)throw Error('更新已取消');progress(2);return unpack(file,signal);
+}
+module.exports={prepare,download,install,hash};

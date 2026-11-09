@@ -44,6 +44,8 @@ run('iconutil',['-c','icns',icons,'-o','release/OpenTake.icns']);
 run(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/builder.config.cjs','--mac','dir','--'+macArch,'--publish','never']);
 const app=path.join(root,'release',platform.macAppDirectory(macArch),'OpenTake Standard.app');
 run('/usr/bin/lipo',[path.join(app,'Contents/MacOS/OpenTake Standard'),'-verify_arch',macArch==='x64'?'x86_64':'arm64']);
+// The receipt must still match what was packaged, or the next one-click update would report the app as modified.
+if(fs.existsSync(receiptFile)){const {receiptMatches}=await import('./client-update.cjs');const version=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version;if(!receiptMatches(path.join(app,'Contents/Resources/app'),version,true))throw Error('打包后的 App 与源码来源记录对不上，停止构建');}
 try{await localSignature.signLocalApp(app);}catch(error){console.error(error.message);process.exit(1);}
 }else{
 run(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/builder.config.cjs','--win','dir','--x64','--publish','never','--config.directories.output=release/'+target]);

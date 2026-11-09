@@ -14,6 +14,8 @@ OpenScreen 由用户从官方发布页 https://github.com/getopenscreen/openscre
 
 ## 更新到最新版
 
+从 1.1.3 起，用安装包（Mac DMG、Windows EXE）装的用户在软件里点「现在更新」即可：Mac 下载官方 DMG 核对校验码后替换 App，启动失败自动换回；Windows 下载安装程序核对后静默安装。以下步骤用于源码安装、或用户要求智能体代为更新的情况。
+
 1. 读 README、package.json 和 upgrade.json。先读其中 endpoint 的 `/standard/upgrade.json`，失败再读 `https://raw.githubusercontent.com/saf1102/opentake-standard/main/upgrade.json`。从 `standard` 取得 version、notes、url、sha256；无可用清单则停止，不猜版本或下载地址。
 2. 只下载 HTTPS 源码 ZIP；核对 SHA-256 与清单完全一致，失败不安装。不读取登录令牌或私钥，不把用户身份附在下载请求中。
 3. 保留正在用的旧 App 和源码，先检查 git status。工作区有改动必须保留 diff，在新目录处理，绝不 reset/clean 或覆盖用户更改。不要写工程、素材、agent-settings.json、system-settings.json、upgrade-session.json。

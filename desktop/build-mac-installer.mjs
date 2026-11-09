@@ -22,7 +22,8 @@ export async function buildMacInstaller(root=path.resolve(path.dirname(fileURLTo
  // ditto retains Electron framework links and extended attributes.
  run('/usr/bin/ditto',['--rsrc',app,path.join(stage,'OpenTake Standard.app')]);
  fs.symlinkSync('/Applications',path.join(stage,'Applications'));
- run('/usr/bin/hdiutil',['create','-volname','OpenTake Standard','-srcfolder',stage,'-format','UDZO',installer]);
+ // GitHub's macOS runners sometimes report "Resource busy" right after the copy; retry the same create a few times.
+ for(let attempt=1;;attempt++){const r=spawnSync('/usr/bin/hdiutil',['create','-volname','OpenTake Standard','-srcfolder',stage,'-format','UDZO',installer],{cwd:root,stdio:'inherit'});if(!r.error&&r.status===0)break;fs.rmSync(installer,{force:true});if(attempt>=4)throw Error('hdiutil 构建失败');console.warn(`hdiutil create 第 ${attempt} 次失败，${attempt*10} 秒后重试`);spawnSync('/bin/sleep',[String(attempt*10)])}
  run('/usr/bin/hdiutil',['verify',installer]);
  await release.writeInstallerReceipt(root,installer,'darwin',arch);
  console.log('macOS DMG 已生成并校验；沿用本机临时签名，未公证：'+installer);
