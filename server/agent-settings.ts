@@ -4,16 +4,14 @@ import platform from './platform.ts';
 import {atomicJsonSync} from './file-ops.ts';
 import installations from './agent-installation.ts';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
-import { createInterface } from 'node:readline';
-import { z } from 'zod';
-import { AGENT_MODULES, defaultAgentSettings, effectiveChoice, type AgentCatalog, type AgentModule, type AgentSettings, type AgentRun, type AgentSettingsView } from '../src/studio/agent-settings.ts';
-import { execFileAsync } from './proc.ts';
 
-export const agentSettingsFile = () => process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(platform.standardDataRoot(),'agent-settings.json');
+import {createInterface} from 'node:readline';
+import {z} from 'zod';
+import {AGENT_MODULES, defaultAgentSettings, effectiveChoice, type AgentCatalog, type AgentModule, type AgentSettings, type AgentRun, type AgentSettingsView} from '../src/studio/agent-settings.ts';
+import {execFileAsync} from './proc.ts';
+
+export const agentSettingsFile = () => process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(platform.standardDataRoot(), 'agent-settings.json');
 export function atomicAgentJson(file: string, value: unknown) {
   atomicJsonSync(file, value, {mode:0o600});
 }
@@ -68,12 +66,13 @@ export async function getAgentCatalog(configured: string, refresh = false): Prom
     const { cliVersion } = await checkCliPath(executable);
     const models = await new Promise<AgentCatalog['models']>((resolve, reject) => {
       const child = spawnAgentProcess(executable, ['app-server', '--stdio'], { stdio: ['pipe','pipe','ignore'], env: installations.loginEnvironment() });
+      const stop=(signal:NodeJS.Signals)=>{if(process.platform==='win32'&&child.pid)platform.killTree(child.pid,signal);else child.kill(signal)};
       const lines = createInterface({ input: child.stdout });
       let settled = false, bytes = 0;
       const all: AgentCatalog['models'] = [];
       const finish = (error?: Error) => {
-        if (settled) return; settled = true; clearTimeout(timer); lines.close(); child.stdin.end(); child.kill('SIGTERM');
-        const kill = setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); }, 1000); kill.unref();
+        if (settled) return; settled = true; clearTimeout(timer); lines.close(); child.stdin.end(); stop('SIGTERM');
+        const kill = setTimeout(() => { if (child.exitCode === null && child.signalCode === null) stop('SIGKILL'); }, 1000); kill.unref();
         if (error) reject(error); else resolve(all);
       };
       const timer = setTimeout(() => finish(new Error('读取 Codex 模型列表超时，请检查 CLI 登录与连接')), 25_000);
@@ -105,6 +104,8 @@ export async function getAgentCatalog(configured: string, refresh = false): Prom
   pending.set(key, request);
   try { return await request; } finally { pending.delete(key); }
 }
+/** Accounts get different model lists, so a choice this Codex lacks runs on its default model instead of stopping;
+ * the change is recorded on the run and shown in settings. Only an empty catalog is an error. */
 export function validateAgentChoice(module: AgentModule, settings: AgentSettings, catalog: AgentCatalog) {
   const name = AGENT_MODULES.find(m => m.id === module)!.name;
   if (!catalog.models.length) throw new Error(`${name}：Codex 没有返回可选模型`);

@@ -1,11 +1,22 @@
 declare const platform: {
+ trackWorker<T extends import('node:child_process').ChildProcess>(child:T):T;
+ stopWorkers():void;
+ windowsVolumeIdentity(target:string,env?:NodeJS.ProcessEnv):string;
  environmentPath(env?:NodeJS.ProcessEnv,platform?:string):string;
  environmentWithPath(env:NodeJS.ProcessEnv,value:string,platform?:string):NodeJS.ProcessEnv;
  appDataRoot(platform?:string,env?:NodeJS.ProcessEnv,home?:string):string;
- standardDataRoot():string;projectsRoot():string;
+ proDataRoot(platform?:string,env?:NodeJS.ProcessEnv,home?:string):string;
+ desktopDataRoot(platform?:string,env?:NodeJS.ProcessEnv,home?:string):string;
+ cacheRoot(name?:string,platform?:string,env?:NodeJS.ProcessEnv,home?:string):string;
+ runtimePath(env?:NodeJS.ProcessEnv,front?:string[],platform?:string,home?:string):string;
+ pythonEnv(env?:NodeJS.ProcessEnv):NodeJS.ProcessEnv;
+ runtimeBinaryCandidates(name:string,options?:{platform?:string;env?:NodeJS.ProcessEnv;override?:string;exists?:(file:string)=>boolean}):string[];
+ runtimeBinaryPath(name:string,options?:{platform?:string;env?:NodeJS.ProcessEnv;override?:string;exists?:(file:string)=>boolean}):string;
+ unsupportedWindows(feature:string,platform?:string):void;
+ standardDataRoot():string;projectsRoot(platform?:string,env?:NodeJS.ProcessEnv,home?:string):string;
  killTree(pid:number,signal?:NodeJS.Signals):void;
  revealCommand(target:string,platform?:string,env?:NodeJS.ProcessEnv):{command:string;args:string[]};
- revealPath(target:string,platform?:string):Promise<void>;
+ revealPath(target:string,platform?:string,options?:{select?:boolean}):Promise<void>;
  buildTarget(platform?:string,arch?:string,release?:string):string;
 };
 export = platform;

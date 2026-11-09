@@ -8,8 +8,8 @@ import {killProcessGroup} from './edition.ts';
  * - 审片：只读沙盒、临时会话（--ephemeral），把抽出的画面用 -i 附上，用 --output-schema 要结构化结论。
  */
 import fs from 'node:fs';
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { createInterface } from 'node:readline';
+import {execFileSync, type ChildProcess} from 'node:child_process';
+import {createInterface} from 'node:readline';
 
 export const DISABLED_FEATURES = ['image_generation', 'multi_agent', 'multi_agent_v2', 'memories', 'computer_use', 'browser_use', 'browser_use_external', 'in_app_browser', 'apps', 'plugins', 'remote_plugin', 'tool_suggest'];
 
@@ -87,6 +87,7 @@ export function startCodex(executable: string, args: string[], options: { cwd: s
 
 /** Every process below `root` (pid, ppid from ps), deepest last. */
 export function descendants(root: number): number[] {
+  if(process.platform==='win32')return []; // taskkill /T owns descendants on Windows.
   let table: string;
   try { table = execFileSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', timeout: 3000 }); } catch { return []; }
   const children = new Map<number, number[]>();

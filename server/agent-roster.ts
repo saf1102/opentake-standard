@@ -51,6 +51,7 @@ const askVersion=async(file:string,env:NodeJS.ProcessEnv)=>{
 const plistString=(xml:string,key:string)=>xml.match(new RegExp(`<key>${key}</key>\\s*<string>\\s*([^<\\s]{1,40})\\s*</string>`))?.[1];
 /** An app's version from its Info.plist, only read (a binary plist is turned into text by plutil): the app is never run. */
 export async function bundleVersion(app:string){
+ if(process.platform!=='darwin')return undefined;
  const file=path.join(app,'Contents','Info.plist');
  try{
   const bytes=fs.readFileSync(file);
@@ -62,14 +63,14 @@ export async function bundleVersion(app:string){
 const appsMatching=(match:RegExp,apps:string[])=>apps.flatMap(dir=>{try{return fs.readdirSync(dir).filter(name=>match.test(name)).map(name=>path.join(dir,name))}catch{return []}});
 /** Shared with the diagnostic API; listing candidates never runs a command. */
 export function rosterExecutableCandidates(agent:RosterAgent,options:RosterOptions={}):string[]{
- const home=options.home??os.homedir(),apps=options.applicationDirs??['/Applications',path.join(home,'Applications')];
+ const home=options.home??os.homedir(),apps=options.applicationDirs??(process.platform==='darwin'?['/Applications',path.join(home,'Applications')]:[]);
  const env=options.env??tools.loginEnvironment();
  const dirs=[...new Set([...String(env.PATH||env.Path||'').split(path.delimiter),...(process.platform==='win32'?[env.APPDATA&&path.join(env.APPDATA,'npm'),env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'Programs')].filter((dir):dir is string=>!!dir):[]),path.join(home,'.local','bin'),path.join(home,'.npm-global','bin'),'/opt/homebrew/bin','/usr/local/bin',...(agent.dirs?.(home,apps)??[])].filter(dir=>path.isAbsolute(dir)))];
  return dirs.flatMap(dir=>agent.names.flatMap(name=>(process.platform==='win32'?['.exe','.cmd','.bat'].map(ext=>name+ext):[name]).map(name=>path.join(dir,name))));
 }
 /** One agent: its program on the login shell's PATH, in the folders installers use, or inside its maker's app. */
 export async function rosterAgentStatus(agent:RosterAgent,options:RosterOptions={}):Promise<RosterStatus>{
- const home=options.home??os.homedir(),apps=options.applicationDirs??['/Applications',path.join(home,'Applications')];
+ const home=options.home??os.homedir(),apps=options.applicationDirs??(process.platform==='darwin'?['/Applications',path.join(home,'Applications')]:[]);
  const base={id:agent.id,name:agent.name,kind:agent.kind??'agent' as const,page:agent.page};
  if(agent.kind==='tool'){
   // the recording module's lookup, in this server's own environment as the module sees it

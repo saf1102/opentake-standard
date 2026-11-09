@@ -6,11 +6,11 @@ const crypto=require('node:crypto');
 // sharing-violation retries without yielding between reading and replacing JSON.
 const waits=[15,30,50,90,140,220];
 const sleeper=new Int32Array(new SharedArrayBuffer(4));
-function retrySync(operation){
+function retrySync(operation,platform=process.platform,sleep=ms=>Atomics.wait(sleeper,0,0,ms)){
  for(let attempt=0;;attempt++){
   try{return operation()}catch(error){
-   if(process.platform!=='win32'||!['EBUSY','EPERM','EACCES','ENOTEMPTY'].includes(error.code)||attempt>=waits.length)throw error;
-   Atomics.wait(sleeper,0,0,waits[attempt]);
+   if(platform!=='win32'||!['EBUSY','EPERM','EACCES','ENOTEMPTY'].includes(error.code)||attempt>=waits.length)throw error;
+   sleep(waits[attempt]);
   }
  }
 }

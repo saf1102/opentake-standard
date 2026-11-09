@@ -1,3 +1,4 @@
+import platform from '../platform.ts';
 import {spawnAgentProcess} from '../agent-launch.ts';
 /** ACP v1 stdio transport. Provider programs retain their own login; no credentials are read here.
  * https://agentclientprotocol.com/protocol/v1/tool-calls
@@ -5,13 +6,13 @@ import {spawnAgentProcess} from '../agent-launch.ts';
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import {spawn} from 'node:child_process';
-import {agentAcpArgs,connectionDefinition,CONNECTION_DEFINITIONS,type AgentConnectionId} from '../../shared/agent-connections.ts';
+
+import {agentAcpArgs, connectionDefinition, CONNECTION_DEFINITIONS, type AgentConnectionId} from '../../shared/agent-connections.ts';
 import type {GeneralStep,GeneralAgentErrorKind} from '../../src/general/general-contract.ts';
-import {assertAgentExecutionAllowed,getConnectionConfig} from '../agent-connections.ts';
+import {assertAgentExecutionAllowed, getConnectionConfig} from '../agent-connections.ts';
 import {isClaudeExecutable} from '../agent-roster.ts';
-import {descendants,type CodexProcess} from './codex.ts';
-import {advance,applyCodexEvent,type EventOutcome,type Usage} from './events.ts';
+import {descendants, type CodexProcess} from './codex.ts';
+import {advance, applyCodexEvent, type EventOutcome, type Usage} from './events.ts';
 
 type Obj=Record<string,unknown>;
 const object=(v:unknown):Obj=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Obj:{};
@@ -136,7 +137,7 @@ export function startAcpAgent(executable:string,args:readonly string[],options:A
  const emit=(event:Obj)=>{const payload=JSON.stringify(event);log?.write(safe(payload)+'\n');options.onEvent(JSON.parse(secretSafe(payload)) as Obj)};
  const send=(data:unknown)=>{if(!closed&&!child.stdin!.destroyed)child.stdin!.write(JSON.stringify(data)+'\n')};
  const rpc=(method:string,params:Obj,timeout=30000)=>new Promise<Obj>((resolve,reject)=>{const id=++sequence;const timer=setTimeout(()=>{pending.delete(id);reject(Error('ACP 请求超时'))},timeout);pending.set(id,{resolve,reject,timer});send({jsonrpc:'2.0',id,method,params});});
- const kill=(signal:NodeJS.Signals,pids:number[]=[])=>{try{if(child.pid&&process.platform!=='win32')process.kill(-child.pid,signal);else child.kill(signal)}catch{/* gone */}for(const pid of pids)try{process.kill(pid,signal)}catch{/* gone */}};
+ const kill=(signal:NodeJS.Signals,pids:number[]=[])=>{try{if(child.pid)platform.killTree(child.pid,signal);else child.kill(signal)}catch{/* gone */}for(const pid of pids)try{process.kill(pid,signal)}catch{/* gone */}};
  const shutdown=()=>{shutdownTree=child.pid?descendants(child.pid):[];kill('SIGTERM',shutdownTree);killTimer=setTimeout(()=>kill('SIGKILL',shutdownTree),500);};
  const stop=()=>{if(stopping||closed)return;stopping=true;if(sessionId)send({jsonrpc:'2.0',method:'session/cancel',params:{sessionId}});setTimeout(shutdown,50);};
  const fail=(error:unknown)=>{if(completed||stopping)return;const failure=classifyAgentFailure(error);stderr=failure.message;emit({type:'acp.error',...failure});stop();};

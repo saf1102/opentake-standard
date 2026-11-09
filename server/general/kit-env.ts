@@ -1,6 +1,6 @@
 import platform from '../platform.ts';
-import type {CreationTools} from '../../shared/creation-tools.ts';
 import {standardEdition} from './edition.ts';
+import type {CreationTools} from '../../shared/creation-tools.ts';
 import {supportBin,ffmpegPath,ffprobePath,chromePath,pythonPath,fontDirs} from './runtime-tools.ts';
 export {supportBin,ffmpegPath,ffprobePath,chromePath,pythonPath,fontDirs};
 /**
@@ -35,7 +35,7 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   const bin = path.join(work, '.opentake', 'bin');
   const tmp = path.join(work, '.tmp');
   fs.mkdirSync(bin, { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'zsh'), { recursive: true });
+  fs.mkdirSync(process.platform==='win32'?tmp:path.join(tmp, 'zsh'), { recursive: true });
   const python = verified?.python ?? pythonPath();
   const ffmpeg = verified?.ffmpeg ?? ffmpegPath();
   const ffprobe = verified?.ffprobe ?? ffprobePath();
@@ -50,7 +50,7 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
     ffmpeg: `#!/bin/sh\nexec ${shellQuote(ffmpeg)} "$@"\n`,
     ffprobe: `#!/bin/sh\nexec ${shellQuote(ffprobe)} "$@"\n`,
   };
-  if(standardEdition && process.platform==='win32'){
+  if(process.platform==='win32'){
     // Batch paths are quoted and percent expansion escaped; never turn an arbitrary path into a shell command.
     const quote=(value:string)=>{if(/["\r\n]/.test(value))throw Error('工具路径含不支持的字符');return '"'+value.replaceAll('%','%%')+'"';};
     const command=(exe:string,args:string[]=[])=>'@echo off\r\n'+quote(path.join(process.env.SystemRoot||'C:\\Windows','System32','chcp.com'))+' 65001 >nul\r\nsetlocal DisableDelayedExpansion\r\n'+(electron?'set "ELECTRON_RUN_AS_NODE=1"\r\n':'')+[exe,...args].map(quote).join(' ')+' %*\r\n';
@@ -62,9 +62,9 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   }
   wrappers.python = wrappers.python3;
   // no installing or fetching software, 联网 or not (net-guard.ts)
-  for (const name of REFUSED_COMMANDS) wrappers[name] = standardEdition && process.platform==='win32'?'@echo off\r\necho Installing software is disabled in this workspace. 1>&2\r\nexit /b 1\r\n':refusal(name);
+  for (const name of REFUSED_COMMANDS) wrappers[name] = process.platform==='win32'?'@echo off\r\necho Installing software is disabled in this workspace. 1>&2\r\nexit /b 1\r\n':refusal(name);
   for (const [name, body] of Object.entries(wrappers)) {
-    const file = path.join(bin, name+(standardEdition && process.platform==='win32'?'.cmd':''));
+    const file = path.join(bin, name+(process.platform==='win32'?'.cmd':''));
     if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== body) fs.writeFileSync(file, body, { mode: 0o755 });
     // ZIP/project transfers can strip executable bits even when wrapper text is current.
     fs.chmodSync(file, 0o755);
@@ -72,9 +72,9 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
   // Codex runs commands in a login zsh: /etc/zprofile (path_helper) puts system folders first and the person's own
   // ~/.zprofile may put an old ffmpeg or python ahead of ours. A private ZDOTDIR puts .opentake/bin back in front.
   const zdot = path.join(work, '.opentake', 'zsh');
-  fs.mkdirSync(zdot, { recursive: true });
+  if(process.platform!=='win32')fs.mkdirSync(zdot, { recursive: true });
   const front = `export PATH=${shellQuote(bin)}:"$PATH"\n`;
-  for (const name of ['.zshenv', '.zprofile']) { const file = path.join(zdot, name); if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== front) fs.writeFileSync(file, front); }
+  if(process.platform!=='win32')for (const name of ['.zshenv', '.zprofile']) { const file = path.join(zdot, name); if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== front) fs.writeFileSync(file, front); }
   const env: NodeJS.ProcessEnv = {
     ...base,
     ...(standardEdition && process.platform==='win32'?{TEMP:tmp,TMP:tmp}:{ZDOTDIR:zdot}),
@@ -84,7 +84,7 @@ export function prepareWork(projectDir: string, base: NodeJS.ProcessEnv, network
     CW_FFMPEG: ffmpeg, CW_FFPROBE: ffprobe, CW_CHROME: chrome, ...(verified?.chromium?{CW_HFX_CHROME:chrome,PLAYWRIGHT_CHROMIUM_EXECUTABLE:chrome}:{}), CW_PYTHON: python, CW_NODE_MODULES: nodeModulesPath(),
     CW_FONT_DIRS: fontDirs().join(path.delimiter), LINKREADER_BIN_DIR: verified?.ffmpeg?path.dirname(ffmpeg):supportBin(),
     ...(iconsDir() ? { CW_ICONS_DIR: iconsDir() } : {}),
-    PYTHONPATH: path.join(KIT_DIR, 'audio'), PYTHONDONTWRITEBYTECODE: '1', PYTHONNOUSERSITE: '1', ...(process.env.PYTHONPYCACHEPREFIX ? { PYTHONPYCACHEPREFIX: process.env.PYTHONPYCACHEPREFIX } : {}),
+    PYTHONUTF8: '1', PYTHONPATH: path.join(KIT_DIR, 'audio'), PYTHONDONTWRITEBYTECODE: '1', PYTHONNOUSERSITE: '1', ...(process.env.PYTHONPYCACHEPREFIX ? { PYTHONPYCACHEPREFIX: process.env.PYTHONPYCACHEPREFIX } : {}),
     ...(network ? { CW_NETWORK: '1' } : {}),
     ...OFFLINE_PACKAGES,
     // the style's own text presets and finishes (kit/styles/<id>/text-presets.json), read by the layered film tools

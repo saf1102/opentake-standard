@@ -1,10 +1,11 @@
+import platform from './platform.ts';
 import {execFileAsync} from './proc.ts';
 import {spawnAgentProcess} from './agent-launch.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawn,execFile} from 'node:child_process';
-import {promisify} from 'node:util';
+import {spawn} from 'node:child_process';
+
 import type {CliAuthState,ConnectionModel} from '../shared/agent-connections.ts';
 
 export type AuthProbeResult={state:CliAuthState;message:string;checkedAt?:string;models?:ConnectionModel[];acpModelSelection?:boolean};
@@ -42,7 +43,7 @@ export async function probeAcpAuthentication(executable:string,args:readonly str
   let child:ReturnType<typeof spawn>;
   try{child=spawnAgentProcess(executable,[...args],{cwd,env:options.env,stdio:['pipe','pipe','ignore'],detached:process.platform!=='win32'});}catch{resolve({state:'unknown',message:'没查到，命令行未能启动'});return;}
   let buffer='',bytes=0,finished=false,phase:'initialize'|'session'='initialize',answer:AuthProbeResult|undefined,killTimer:ReturnType<typeof setTimeout>|undefined;
-  const terminate=(signal:NodeJS.Signals)=>{try{if(child.pid&&process.platform!=='win32')process.kill(-child.pid,signal);else child.kill(signal)}catch{/* already exited */}};
+  const terminate=(signal:NodeJS.Signals)=>{try{if(child.pid)platform.killTree(child.pid,signal);else child.kill(signal)}catch{/* already exited */}};
   const clean=()=>{clearTimeout(timeout);if(killTimer)clearTimeout(killTimer);options.signal?.removeEventListener('abort',abort);resolve(answer??{state:'unknown',message:'没查到，命令行提前退出'});};
   const finish=(result:AuthProbeResult)=>{if(finished)return;finished=true;answer=result;clearTimeout(timeout);child.stdin?.end();terminate('SIGTERM');killTimer=setTimeout(()=>terminate('SIGKILL'),500);};
   const abort=()=>finish({state:'unknown',message:'检查已取消'});

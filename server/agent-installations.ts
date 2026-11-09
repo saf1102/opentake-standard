@@ -1,3 +1,4 @@
+import {startWindowsAgentTerminal} from './windows-agent-terminal.ts';
 import tools from './agent-installation.ts';
 import {execFileAsync} from './proc.ts';
 import fs from 'node:fs';
@@ -5,7 +6,7 @@ import os from 'node:os';
 import {readAgentSettings,atomicAgentJson,agentSettingsFile,forgetStaleCliPath} from './agent-settings.ts';
 import path from 'node:path';
 /** Codex's standalone installer, as its official CLI page gives it first (learn.chatgpt.com/docs/codex/cli). It puts `codex` in ~/.local/bin, which detection searches. */
-export const CODEX_INSTALL_COMMAND='curl -fsSL https://chatgpt.com/codex/install.sh | sh';
+export const CODEX_INSTALL_COMMAND=process.platform==='win32'?'npm install -g @openai/codex':'curl -fsSL https://chatgpt.com/codex/install.sh | sh';
 type DetectOptions={home?:string;env?:NodeJS.ProcessEnv;applicationDirs?:string[]};
 /** What the settings page shows: detection plus, for Codex, the exact commands its one-click actions run and an app found without its CLI. */
 export type InstallationStatus=ReturnType<typeof tools.detectAgent>&{error?:string;notice?:string;loginCommand?:string;installCommand?:string;app?:{name:string;path:string}};
@@ -14,7 +15,7 @@ const shq=(s:string)=>`'${s.replace(/'/g,`'\\''`)}'`;
 /** AppleScript that has Terminal run one command line, as it is, in a new window the person sees. */
 export const terminalScript=(command:string)=>`tell application "Terminal"\nactivate\ndo script "${command.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"\nend tell`;
 /** The Codex or ChatGPT app, told from its bundle alone (nothing started): shown when it is here but no usable Codex CLI is. */
-export function codexDesktopApp(applicationDirs=[path.join(os.homedir(),'Applications'),'/Applications']){
+export function codexDesktopApp(applicationDirs=process.platform==='darwin'?[path.join(os.homedir(),'Applications'),'/Applications']:[]){
  for(const dir of applicationDirs)for(const name of ['Codex','ChatGPT']){const file=path.join(dir,`${name}.app`);try{if(fs.statSync(file).isDirectory())return {name,path:file}}catch{/* Not installed here. */}}
 }
 /**
@@ -67,6 +68,11 @@ export async function openCodexTerminal(action:'login'|'install',body:{command?:
   if(detected.executable)throw Error(`已找到可用的 Codex，无需安装：${detected.executable}`);
   if(detected.mode==='manual')throw Error('当前是手动指定路径，请先恢复自动检测再安装');
   if(body.command!==CODEX_INSTALL_COMMAND)throw Error('安装命令未经确认或已变化，请重新确认后再运行');
+ }
+ if(platform==='win32'){
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-terminal-'));
+  await startWindowsAgentTerminal(action==='login'?detected.executable!:'npm.cmd',action==='login'?['login']:['install','-g','@openai/codex'],dir);
+  return {command};
  }
  return openTerminal(command,{platform,run});
 }

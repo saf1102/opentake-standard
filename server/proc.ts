@@ -43,14 +43,8 @@ export function isProcessOwnerCancelled() {
  * Export chains like 服务→准备 worker→FFmpeg must die as a tree, not one link.
  */
 function signalProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
-  if(child.pid && process.platform==='win32'){platform.killTree(child.pid,signal);return;}
-  try {
-    if (child.pid && process.platform !== 'win32') {
-      process.kill(-child.pid, signal)
-      return
-    }
-  } catch { /* group gone or not a leader — signal the direct child */ }
-  try { child.kill(signal) } catch { /* already gone */ }
+  if(child.pid){platform.killTree(child.pid,signal);return;}
+  try {child.kill(signal)} catch {/* already gone */}
 }
 
 /** SIGTERM every live child owned by `owner`, escalating to SIGKILL. Returns count. */
@@ -80,6 +74,7 @@ export function resetProcessOwnerKill(owner: string): void {
  * owner are SIGTERMed immediately instead of being tracked.
  */
 export function trackChildProcess(child: ChildProcess): void {
+  platform.trackWorker(child)
   const owner = processOwner.getStore()
   if (!owner) return
   if (killedOwners.has(owner)) {
@@ -127,7 +122,7 @@ export function execFileAsync(
   const detach = processOwner.getStore() !== undefined && process.platform !== 'win32'
   // detached is honoured at runtime (execFile forwards options to spawn) but is
   // missing from the ExecFileOptions type — hence the cast.
-  const execOptions = { encoding: 'utf8', ...options, detached: detach } as unknown as ExecFileOptionsWithStringEncoding
+  const execOptions = { encoding: 'utf8', ...options, env:platform.pythonEnv(options.env||process.env), detached: detach } as unknown as ExecFileOptionsWithStringEncoding
   return new Promise((resolve, reject) => {
     const launch = agentLaunch(file, args, execOptions)
     const child = execFile(launch.file, launch.args, launch.options, (error, stdout, stderr) => {
@@ -135,6 +130,7 @@ export function execFileAsync(
       if (error) reject(error)
       else resolve({ stdout, stderr })
     })
+    platform.trackWorker(child)
     const owner = trackOwned(child)
   })
 }
@@ -167,7 +163,7 @@ export function runWithClosedStdin(
   return new Promise((resolve, reject) => {
     const child = spawnAgentProcess(executable, args, {
       cwd: options.cwd,
-      env: options.env,
+      env: platform.pythonEnv(options.env||process.env),
       stdio: ["ignore", "pipe", "pipe"],
       // Owned children lead their own process group so cancellation kills the tree.
       detached: processOwner.getStore() !== undefined && process.platform !== 'win32',

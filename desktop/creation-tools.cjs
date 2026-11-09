@@ -7,9 +7,10 @@ const {promisify} = require('node:util');
 const installations = require('./agent-installation.cjs');
 const {browserDiagnostic}=require('./browser-diagnostic.cjs');
 
-const exec = promisify(execFile);
+const {agentLaunch}=require('./agent-launch.cjs');
+const exec=(file,args,options={})=>{const launch=agentLaunch(file,args,{...options,env:{...(options.env||process.env),PYTHONUTF8:'1'}});return promisify(execFile)(launch.file,launch.args,launch.options)};
 const executable = file => { try { fs.accessSync(file, fs.constants.X_OK); return path.isAbsolute(file) && fs.statSync(file).isFile(); } catch { return false; } };
-const PYTHON_ENV = {PYTHONNOUSERSITE:'1', PYTHONDONTWRITEBYTECODE:'1', PYTHONPATH:''};
+const PYTHON_ENV = {PYTHONUTF8:'1',PYTHONNOUSERSITE:'1', PYTHONDONTWRITEBYTECODE:'1', PYTHONPATH:''};
 const {SAMPLE_ARGS, sampleArgs, renderArgs} = require('../shared/browser-launch.cjs');
 const fixes = {
  python: 'macOS：brew install python；然后 python3 -m venv "$HOME/.opentake-venv" && "$HOME/.opentake-venv/bin/python3" -m pip install numpy。启动 OpenTake 前设置 LINKREADER_PYTHON 为该解释器的绝对路径。',

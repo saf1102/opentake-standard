@@ -13,7 +13,7 @@ syncBuiltinESMExports();
 // Register ownership shutdown before loading Vite/config. A timed-out desktop
 // must not leave a service that later opens a listener without its owner.
 let server,stopping=false;
-async function stop(){if(stopping)return;stopping=true;for(const pid of groups){try{platform.killTree(pid,'SIGTERM')}catch{}}try{if(server?.close)await server.close();else server?.httpServer.close()}catch{}setTimeout(()=>{for(const pid of groups){try{platform.killTree(pid,'SIGKILL')}catch{}}process.exit(0)},1000)}
+async function stop(){if(stopping)return;stopping=true;platform.stopWorkers();for(const pid of groups){try{platform.killTree(pid,'SIGTERM')}catch{}}try{if(server?.close)await server.close();else server?.httpServer.close()}catch{}setTimeout(()=>{for(const pid of groups){try{platform.killTree(pid,'SIGKILL')}catch{}}process.exit(0)},1000)}
 process.on('disconnect',stop);process.on('SIGTERM',stop);process.on('SIGINT',stop);
 if(typeof process.send==='function'&&!process.connected)process.exit(0);
 const send=value=>{if(process.connected)process.send?.(value,()=>{});};

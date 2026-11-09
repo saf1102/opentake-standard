@@ -1,3 +1,4 @@
+import {renameWithRetrySync} from './file-ops.ts';
 /** 第二部分只提供后端数据；没有提供用量的智能体保留未知，不把未知记为零。 */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,7 +40,7 @@ export function recordFilmOutcome(projectId:string,runId:string,agent:AgentConne
  const filename=Buffer.from(`${projectId}\0${runId}\0${agent}`).toString('base64url');
  if(filename.length>240)return;
  fs.mkdirSync(folder,{recursive:true});const file=path.join(folder,`${filename}.json`),tmp=`${file}.tmp`;
- fs.writeFileSync(tmp,JSON.stringify({projectId,runId,agent,state,endedAt}));fs.renameSync(tmp,file);
+ fs.writeFileSync(tmp,JSON.stringify({projectId,runId,agent,state,endedAt}));renameWithRetrySync(tmp,file);
 }
 function readRows(folder:string):Record<string,unknown>[]{
  if(!fs.existsSync(folder))return [];

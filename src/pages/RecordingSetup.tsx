@@ -46,7 +46,7 @@ export default function RecordingSetup({projectId,clientId,onStarted,onClose}:{
   </select></label>
   <div className="recording-setup-options"><label><input type="checkbox" checked={systemAudio} disabled={starting} onChange={e=>setSystemAudio(e.target.checked)}/>系统声音</label>
    <label><input type="checkbox" checked={microphone} disabled={starting} onChange={e=>setMicrophone(e.target.checked)}/>麦克风</label></div>
-  <p>已启用可编辑鼠标。遇到系统授权提示时，请自行确认。</p>
+  <p>已启用可编辑鼠标。Windows 无需设置 macOS 屏幕录制权限；录制麦克风时请允许 Windows 麦克风访问。</p>
   {source?.type==='display'&&<p className="recording-setup-warning">录制整个屏幕时，可见控制栏也可能入镜。可隐藏控制栏后用快捷键停止，或改为只录制一个窗口。</p>}
   {error&&<p role="alert" className="recording-setup-warning">{error}</p>}
   <footer><button type="button" disabled={starting} onClick={onClose}>取消</button><button type="button" disabled={!source||loading||starting} onClick={()=>void begin()}>{starting?'正在准备…':'开始录制'}</button></footer>

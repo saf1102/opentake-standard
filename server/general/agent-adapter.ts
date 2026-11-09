@@ -18,7 +18,7 @@ export type ResolvedFilmAgent = {
 export function filmAgentId(choice?: {agent?:string}): FilmAgentId {
   const id=choice?.agent || 'codex';
   if(id!=='codex' && id!=='claude' && (!agentAcpArgs(id as AgentConnectionId) || !connectionDefinition(id as AgentConnectionId).heavySupported)) throw Object.assign(Error('这个智能体的出片适配还没完成，请选择已适配的智能体'),{status:412});
-  if(id==='claude' && process.platform==='win32') throw Object.assign(Error('Windows 的 Claude Code 出片暂未适配'),{status:412});
+  if(id==='claude' && process.platform==='win32') throw Object.assign(Error('Windows 版暂未支持：Claude Code 出片'),{status:412});
   return id as FilmAgentId;
 }
 export function claudeTurnArgs(a:TurnArgs & {method?:'cli'|'api'}):string[] {

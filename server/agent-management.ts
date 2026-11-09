@@ -37,9 +37,9 @@ export function getAgentDiagnostics(id:ConnectionId,options:{home?:string;env?:N
  let candidates=roster?rosterExecutableCandidates(roster,{home,env}):rosterExecutableCandidates({id:'kimi',name:definition.name,names:definition.cliNames,page:definition.page},{home,env});
  if(id==='codex'){
   candidates.unshift(...[env.LINKREADER_CODEX_EXECUTABLE].filter((value):value is string=>!!value));
-  for(const apps of [path.join(home,'Applications'),'/Applications'])for(const app of ['Codex.app','ChatGPT.app'])for(const relative of ['Contents/Resources/codex','Contents/Resources/codex-cli/bin/codex','Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex'])candidates.push(path.join(apps,app,relative));
+  if(process.platform==='darwin')for(const apps of [path.join(home,'Applications'),'/Applications'])for(const app of ['Codex.app','ChatGPT.app'])for(const relative of ['Contents/Resources/codex','Contents/Resources/codex-cli/bin/codex','Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex'])candidates.push(path.join(apps,app,relative));
  }
- if(id==='claude'){
+ if(id==='claude'&&process.platform==='darwin'){
   candidates.unshift(...[env.LINKREADER_CLAUDE_EXECUTABLE].filter((value):value is string=>!!value));
   const dir=path.join(home,'Library/Application Support/Claude/claude-code');
   try{for(const version of fs.readdirSync(dir).filter(value=>/^\d+\.\d+\.\d+/.test(value))){

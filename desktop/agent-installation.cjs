@@ -94,7 +94,7 @@ function detectAgent(kind,options={}){
    const npm=env.APPDATA&&path.join(env.APPDATA,'npm','node_modules','@openai','codex');
    if(npm)for(const base of [path.join(npm,'vendor'),path.join(npm,'node_modules','@openai','codex-win32-x64','vendor')])add(path.join(base,'x86_64-pc-windows-msvc','codex','codex.exe'),'npm');
   }
-  if(kind==='claude'){
+  if(kind==='claude'&&process.platform==='darwin'){
    const dir=path.join(home,'Library/Application Support/Claude/claude-code');
    try{for(const version of fs.readdirSync(dir).filter(v=>/^\d+\.\d+\.\d+/.test(v)).sort((a,b)=>compareVersions(b,a)).slice(0,8)){
     for(const relative of ['claude','bin/claude','claude-code','claude.app/Contents/MacOS/claude'])add(path.join(dir,version,relative),'app');
@@ -107,7 +107,7 @@ function detectAgent(kind,options={}){
  for(const item of candidates){
   item.status='missing';if(!executable(item.path))continue;
   const real=fs.realpathSync(item.path);
-  if(process.platform!=='win32'&&kind==='codex'&&(/(?:^|[\\/])claude(?:-code)?(?:\.exe)?$/i.test(item.path)||/(?:^|[\\/])claude(?:-code)?(?:\.exe)?$/i.test(real)||/[\\/]@anthropic-ai[\\/]claude-code[\\/]|[\\/]claude[\\/]versions[\\/]/.test(real))){item.status='invalid';continue;}
+  if(kind==='codex'&&(/(?:^|[\\/])claude(?:-code)?(?:\.(?:exe|cmd|bat))?$/i.test(item.path)||/(?:^|[\\/])claude(?:-code)?(?:\.(?:exe|cmd|bat))?$/i.test(real)||/[\\/]@anthropic-ai[\\/]claude-code[\\/]|[\\/]claude[\\/]versions[\\/]/.test(real))){item.status='invalid';continue;}
   if(seen.has(real)){item.status='duplicate';continue}seen.add(real);
   // Claude Code: found when the file is there and executable; it is never started, so its version comes from files.
   if(kind==='claude'){const semver=claudeVersionFromFiles(item.path);Object.assign(item,{status:'valid',semver:semver||'0.0.0'},semver?{version:semver}:{});continue}
