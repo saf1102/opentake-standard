@@ -167,3 +167,28 @@ test('filesystem publication preserves raw/cursor bytes and refuses to overwrite
     fs.rmSync(dir,{recursive:true,force:true});
   }
 });
+test('W11 录制校时发布失败清理本次副产物，保留原片并允许重试',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'standard-clock-test-'));
+ try{
+  const f=fixture({tfdt:true}),video=path.join(dir,'take.mp4');
+  fs.writeFileSync(video,f.data);fs.writeFileSync(video+'.clock.json',JSON.stringify(f.clock));
+  fs.writeFileSync(video+'.cursor.json','{"samples":[]}');
+  const before=fs.readdirSync(dir).sort();
+  const link=t.mock.method(fs,'linkSync',()=>{throw Object.assign(Error('fixture EPERM'),{code:'EPERM'})});
+  assert.throws(()=>correctNativeRecordingTime(video),/EPERM/);
+  assert.deepEqual(fs.readdirSync(dir).sort(),before);
+  assert.deepEqual(fs.readFileSync(video),f.data);
+  link.mock.restore();
+  assert.ok(fs.existsSync(correctNativeRecordingTime(video).video));
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('W11 校时不能删除其他尝试已占用的输出或回执',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'standard-clock-test-'));
+ try{
+  const f=fixture({tfdt:true}),video=path.join(dir,'take.mp4'),receipt=path.join(dir,'take.clock-fixed.mp4.sync.json');
+  fs.writeFileSync(video,f.data);fs.writeFileSync(video+'.clock.json',JSON.stringify(f.clock));
+  fs.writeFileSync(video+'.cursor.json','{"samples":[]}');fs.writeFileSync(receipt,'existing-receipt');
+  const before=fs.readdirSync(dir).sort();assert.throws(()=>correctNativeRecordingTime(video),/EEXIST/);
+  assert.deepEqual(fs.readdirSync(dir).sort(),before);assert.equal(fs.readFileSync(receipt,'utf8'),'existing-receipt');
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

@@ -203,18 +203,29 @@ export function correctNativeRecordingTime(video:string){
   const output=video.slice(0,-4)+'.clock-fixed.mp4';
   const temporary=output+'.'+crypto.randomUUID()+'.tmp';
   if(fs.existsSync(output)||fs.existsSync(output+'.cursor.json'))fail('本次校时输出已存在，未覆盖文件');
-  fs.copyFileSync(video,temporary,fs.constants.COPYFILE_EXCL);
-  const after=fs.statSync(video);if(after.size!==before.size||after.mtimeMs!==before.mtimeMs)fail('原始视频在校验期间发生变化');
-  const handle=fs.openSync(temporary,'r+');
-  try{for(const p of plan.patches){if(fs.writeSync(handle,p.bytes,0,p.bytes.length,p.at)!==p.bytes.length)fail('写入视频元数据失败');}fs.fsyncSync(handle);}
-  finally{fs.closeSync(handle);}
-  // A hard link publishes exclusively: even a racing retry cannot overwrite
-  // an earlier result. Raw video and the exact cursor file stay untouched.
-  fs.copyFileSync(video+'.cursor.json',output+'.cursor.json',fs.constants.COPYFILE_EXCL);
-  fs.linkSync(temporary,output);cleanupPathSync(temporary);
-  const result={video:output,sourceVideo:video,samples:plan.samples,fragments:plan.fragments,
-    originalDurationSec:plan.originalDurationSec,durationSec:plan.durationSec,mode:plan.mode,
-    method:'Exact per-sample recording clock; container metadata only; cursor timestamps unchanged'};
-  fs.writeFileSync(output+'.sync.json',JSON.stringify(result,null,2)+'\n',{flag:'wx'});
-  return result;
+  let cursorCreated=false,videoCreated=false,receiptCreated=false,committed=false;
+  try{
+    fs.copyFileSync(video,temporary,fs.constants.COPYFILE_EXCL);
+    const after=fs.statSync(video);if(after.size!==before.size||after.mtimeMs!==before.mtimeMs)fail('原始视频在校验期间发生变化');
+    const handle=fs.openSync(temporary,'r+');
+    try{for(const p of plan.patches){if(fs.writeSync(handle,p.bytes,0,p.bytes.length,p.at)!==p.bytes.length)fail('写入视频元数据失败');}fs.fsyncSync(handle);}
+    finally{fs.closeSync(handle);}
+    // Publish exclusively and roll back only files owned by this attempt.
+    fs.copyFileSync(video+'.cursor.json',output+'.cursor.json',fs.constants.COPYFILE_EXCL);cursorCreated=true;
+    fs.linkSync(temporary,output);videoCreated=true;
+    const result={video:output,sourceVideo:video,samples:plan.samples,fragments:plan.fragments,
+      originalDurationSec:plan.originalDurationSec,durationSec:plan.durationSec,mode:plan.mode,
+      method:'Exact per-sample recording clock; container metadata only; cursor timestamps unchanged'};
+    const receipt=fs.openSync(output+'.sync.json','wx');receiptCreated=true;
+    try{fs.writeFileSync(receipt,JSON.stringify(result,null,2)+'\n');}finally{fs.closeSync(receipt);}
+    committed=true;
+    return result;
+  }finally{
+    cleanupPathSync(temporary);
+    if(!committed){
+      if(receiptCreated)cleanupPathSync(output+'.sync.json');
+      if(videoCreated)cleanupPathSync(output);
+      if(cursorCreated)cleanupPathSync(output+'.cursor.json');
+    }
+  }
 }
