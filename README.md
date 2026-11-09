@@ -29,7 +29,7 @@ npx --yes playwright-core@1.63.0 install chromium
 
 软件里如果提示「在 Standard 源码目录运行」安装 Chromium，用上面第三条命令即可，不需要源码目录。智能体在「设置 → 智能体接入」里接通。录屏运镜还需要安装官方 OpenScreen，见[从源码安装](#从源码安装macos--apple-芯片与-intel)里的说明。
 
-想自己构建，或者想看源码：[下载官方源码 ZIP](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip) · [核对 SHA-256](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip.sha256)，步骤见[从源码安装](#从源码安装macos--apple-芯片与-intel)。
+想自己构建或看源码，见文末[从源码安装](#从源码安装macos--apple-芯片与-intel)。
 
 [每日下载统计](https://github.com/saf1102/opentake-standard/tree/repository-stats)显示的是请求次数，不是用户人数或安装成功数，App 不上报使用遥测。[统计口径](DOWNLOAD-STATS.md)
 
@@ -152,6 +152,8 @@ The Intel build passes the full automated tests and packaging on GitHub's Intel 
 
 对你的智能体说：**按这个仓库的 AGENTS.md 帮我装好 OpenTake Standard。**
 
+源码包：每个正式版本都附带同一提交的源码 ZIP。[下载最新版源码 ZIP](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip) · [核对 SHA-256](https://github.com/saf1102/opentake-standard/releases/latest/download/OpenTake-Standard-source.zip.sha256)
+
 先安装 Node.js 24.15.0 或更新的 24.x（含 npm）、Python 3 和 FFmpeg / ffprobe；setup 会准备独立 numpy 环境。生成视频还需要安装支持出片的智能体命令行，并在设置中完成接入。录屏运镜的录制和导出需要另外安装官方 OpenScreen 2.1.2 或兼容版本，见下节。不要用 sudo，也不要关闭系统安全保护。
 
 ```sh
@@ -265,4 +267,4 @@ node desktop/sign-local-app.cjs "$PWD/release/mac-arm64/OpenTake Standard.app"
 
 Windows 10 22H2 x64 与 Windows 11 x64 使用同一安装器。本分支重建 OpenScreen 原生 compositor，在 D3D11 硬件解码初始化失败（hwdevice_ctx_init）时使用软件解码，继续通过原生合成器预览和导出；源码补丁、原始组件和构建回执随包保留。Win10、Win11 的实际录制、预览与导出结果见随包验收报告，不能仅据构建通过推断兼容性。H.264 是 Windows 验证编码；HEVC 在 Windows 返回明确未适配提示。Windows ARM64、32 位和 macOS 本轮不作为实测通过平台。
 
-升级使用新安装包，保留旧版安装包、工程与设置；没有实现 Windows 一键自动更新或数字签名。源码身份见 desktop/windows-version.json、release-source.json 及安装包旁的 .build.json。官方出包从已合并 main 的同一提交构建，流程见 RELEASE-HANDOFF-1.1.0.md。
+从 1.1.3 起，Windows 可在软件内一键更新：下载新安装程序、核对校验码后静默安装到原位置并自动打开新版，工程与设置保留。安装包尚未做数字签名。源码身份见 desktop/windows-version.json、release-source.json 及安装包旁的 .build.json。官方出包从已合并 main 的同一提交构建，流程见 RELEASE-HANDOFF-1.1.0.md。

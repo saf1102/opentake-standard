@@ -33,15 +33,11 @@ OpenTake Standard 不向我们上传安装、启动或使用遥测。维护工�
 
 该只读 secret 只用于 clone 查询；公开 ZIP 和统计写入仍用 GitHub 临时令牌。secret 缺失、过期或被拒绝时，clone 标为未知并保留旧历史，ZIP 仍正常采集。不能把“能 push Git”当作“已获得 Traffic API 权限”。停止定时采集可在 Actions 中 Disable workflow，历史不删除。
 
-## 发布新的官方源码快照（维护者手动）
+## 官方源码 ZIP
 
-在 Actions 选择 **Publish source ZIP snapshot**，分支使用 main，`source_ref` 输入 `main` 或一个完整的 40 位、main 可达的提交 SHA。
+从 1.1.3 起不再单独发布源码快照。每次正式发布（Actions 的 **Build desktop installers and prepare release draft**）都会用安装包的同一提交生成 `OpenTake-Standard-source.zip` 和 `.sha256`，附在同一个 Release 里。README 的 `releases/latest/download/OpenTake-Standard-source.zip` 因此始终指向最新正式版本的源码。
 
-工作流先验证来源必须是公开 Standard 仓库，再用 `git archive` 导出指定提交的已跟踪源码。不会将本机脏文件、未跟踪文件、依赖缓存或用户工程装进去。非 main 提交和私有/生成路径会被拒绝。它不是安装包构建，不打包 Electron、FFmpeg 或私有 Pro 代码。
-
-每个提交使用独立的 `source-<完整提交SHA>` tag；附件名固定为 `OpenTake-Standard-source.zip`，另附 `.sha256`。创建草稿并上传后检查文件大小及 GitHub 返回的 SHA-256（若提供），通过才公开并设为 Latest。**已有已发布 Release 一律拒绝覆盖**，避免重置附件 ID 和下载计数。中途失败保留草稿供检查，不自动删除或覆盖。仅恢复同一次失败草稿时，重新选择原来的完整 source_ref，并勾选 `resume_draft`；脚本通过分页 releases 列表匹配 tag_name，以数字 release ID 读取和发布（草稿的 untagged URL 不影响）。仅 commit、ZIP 和校验附件的名称/大小/SHA-256 全部相同且无额外资产时才继续；未提供 API digest 时按 asset ID 下载核对哈希。不会重传、删除或重建附件，原 asset ID 和下载计数保持。新版本选择新的 main commit；不会借用 Pro 的版本号。
-
-发布后，README 的 `releases/latest/download/OpenTake-Standard-source.zip` 指向最新快照。首次发布前此链接尚不可用；部署者必须手动运行并确认附件可下载后，才可声称 ZIP 入口交付。Latest 的更新是手动发布行为，日常统计不创建 Release。
+早先单独发布的 `source-<提交SHA>`、`v1.0.x` 等源码 Release 保留不删，下载计数照常统计。
 
 ## 本机验证
 
