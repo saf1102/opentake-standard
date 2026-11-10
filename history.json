@@ -6,11 +6,11 @@
     "status": "unavailable",
     "lastSuccessAt": null,
     "history": null,
-    "attemptedAt": "2026-11-10T17:47:40.378Z"
+    "attemptedAt": "2026-11-10T23:16:19.299Z"
   },
   "sourceZip": {
     "status": "ok",
-    "lastSuccessAt": "2026-11-10T17:47:40.378Z",
+    "lastSuccessAt": "2026-11-10T23:16:19.299Z",
     "assets": [
       {
         "id": 681972658,
@@ -19,7 +19,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-10-27T15:18:36.452Z",
         "firstObservedCount": 0,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 143,
         "active": true,
         "absentSince": null
@@ -31,7 +31,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-10-29T02:25:47.190Z",
         "firstObservedCount": 10,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 92,
         "active": true,
         "absentSince": null
@@ -43,7 +43,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-10-30T08:36:20.445Z",
         "firstObservedCount": 21,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 175,
         "active": true,
         "absentSince": null
@@ -55,7 +55,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-11-01T16:00:44.585Z",
         "firstObservedCount": 247,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 402,
         "active": true,
         "absentSince": null
@@ -67,7 +67,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-11-03T17:49:30.878Z",
         "firstObservedCount": 8,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 17,
         "active": true,
         "absentSince": null
@@ -79,7 +79,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-11-04T06:13:05.322Z",
         "firstObservedCount": 3,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 159,
         "active": true,
         "absentSince": null
@@ -91,7 +91,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-11-06T06:37:30.006Z",
         "firstObservedCount": 18,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 242,
         "active": true,
         "absentSince": null
@@ -103,7 +103,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-11-09T18:44:30.458Z",
         "firstObservedCount": 4,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 4,
         "active": true,
         "absentSince": null
@@ -115,7 +115,7 @@
         "name": "OpenTake-Standard-source.zip",
         "firstObservedAt": "2026-11-10T02:04:06.626Z",
         "firstObservedCount": 4,
-        "lastObservedAt": "2026-11-10T17:47:40.378Z",
+        "lastObservedAt": "2026-11-10T23:16:19.299Z",
         "lastCount": 60,
         "active": true,
         "absentSince": null
@@ -2798,11 +2798,94 @@
             "correction": 0
           }
         ]
+      },
+      {
+        "from": "2026-11-10T17:47:40.378Z",
+        "to": "2026-11-10T23:16:19.299Z",
+        "increase": 0,
+        "firstSeenBaseline": 0,
+        "correction": 0,
+        "kind": "within-utc-day",
+        "utcDate": "2026-11-10",
+        "changes": [
+          {
+            "assetId": 681972658,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 686727336,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 690996729,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 698130702,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 705086773,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 708337793,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 715822420,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 727632198,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          },
+          {
+            "assetId": 729389110,
+            "from": "2026-11-10T17:47:40.378Z",
+            "to": "2026-11-10T23:16:19.299Z",
+            "increase": 0,
+            "baseline": 0,
+            "correction": 0
+          }
+        ]
       }
     ],
-    "attemptedAt": "2026-11-10T17:47:40.378Z",
+    "attemptedAt": "2026-11-10T23:16:19.299Z",
     "lastSnapshot": "[{\"id\":681972658,\"releaseId\":425627379,\"tag\":\"source-0a414ba6be7d62ddfe065186479353af8e779c71\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":143},{\"id\":686727336,\"releaseId\":427312102,\"tag\":\"v1.0.1\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":92},{\"id\":690996729,\"releaseId\":428671773,\"tag\":\"v1.0.2\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":175},{\"id\":698130702,\"releaseId\":430534739,\"tag\":\"v1.1.0\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":402},{\"id\":705086773,\"releaseId\":432510771,\"tag\":\"desktop-v1.1.0-2026110306\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":17},{\"id\":708337793,\"releaseId\":433542475,\"tag\":\"desktop-v1.1.0-2026110401\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":159},{\"id\":715822420,\"releaseId\":436081386,\"tag\":\"desktop-v1.1.1-2026110601\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":242},{\"id\":727632198,\"releaseId\":439181395,\"tag\":\"desktop-v1.1.2-2026110901\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":4},{\"id\":729389110,\"releaseId\":439769558,\"tag\":\"desktop-v1.1.3-2026111001\",\"name\":\"OpenTake-Standard-source.zip\",\"downloadCount\":60}]"
   },
-  "lastCollectedAt": "2026-11-10T17:47:40.378Z",
+  "lastCollectedAt": "2026-11-10T23:16:19.299Z",
   "automaticSourceArchiveDownloads": null
 }
