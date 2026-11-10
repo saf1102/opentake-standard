@@ -6,9 +6,9 @@
 
 | 系统 | 安装包 |
 | --- | --- |
-| **Windows 10 / 11（64 位）** | **[下载 EXE（628 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.2-2026110901/OpenTake-Standard-Setup-1.1.2-x64.exe)** |
-| **Mac（Apple 芯片，M1 及以后）** | **[下载 DMG（434 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.2-2026110901/OpenTake-Standard-1.1.2-mac-arm64.dmg)** |
-| **Mac（Intel 芯片）** | **[下载 DMG（395 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.2-2026110901/OpenTake-Standard-1.1.2-mac-x64.dmg)**（[测试范围](#intel-mac-测试范围)） |
+| **Windows 10 / 11（64 位）** | **[下载 EXE（628 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.3-2026111001/OpenTake-Standard-Setup-1.1.3-x64.exe)** |
+| **Mac（Apple 芯片，M1 及以后）** | **[下载 DMG（446 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.3-2026111001/OpenTake-Standard-1.1.3-mac-arm64.dmg)** |
+| **Mac（Intel 芯片）** | **[下载 DMG（400 MB）](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.3-2026111001/OpenTake-Standard-1.1.3-mac-x64.dmg)**（[测试范围](#intel-mac-测试范围)） |
 
 下载后直接安装，不用自己编译。其他版本和校验值见 [Releases](https://github.com/saf1102/opentake-standard/releases)。
 
@@ -136,7 +136,7 @@ Claude Code 默认关闭。订阅账号方式开启前有风险确认，推荐 A
 
 ## English
 
-OpenTake Standard is a local video editor for general creation and screen-recording motion. Download the [Windows installer](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.2-2026110901/OpenTake-Standard-Setup-1.1.2-x64.exe), the [Intel Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.2-2026110901/OpenTake-Standard-1.1.2-mac-x64.dmg), or the [Apple Silicon Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.2-2026110901/OpenTake-Standard-1.1.2-mac-arm64.dmg), or use the [Intel Mac DMG placeholder](#intel-mac-测试范围) pending acceptance. Build from source on an Apple Silicon or Intel Mac with `npm run setup` and open with `npm start`. Agent connections support CLI accounts and API keys; film generation requires a supported CLI. Claude Code is off by default. Pro-only publishing, talking-head and analytics modules are not included.
+OpenTake Standard is a local video editor for general creation and screen-recording motion. Download the [Windows installer](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.3-2026111001/OpenTake-Standard-Setup-1.1.3-x64.exe), the [Intel Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.3-2026111001/OpenTake-Standard-1.1.3-mac-x64.dmg), or the [Apple Silicon Mac DMG](https://github.com/saf1102/opentake-standard/releases/download/desktop-v1.1.3-2026111001/OpenTake-Standard-1.1.3-mac-arm64.dmg), or use the [Intel Mac DMG placeholder](#intel-mac-测试范围) pending acceptance. Build from source on an Apple Silicon or Intel Mac with `npm run setup` and open with `npm start`. Agent connections support CLI accounts and API keys; film generation requires a supported CLI. Claude Code is off by default. Pro-only publishing, talking-head and analytics modules are not included.
 
 ### Intel Mac 测试范围
 
