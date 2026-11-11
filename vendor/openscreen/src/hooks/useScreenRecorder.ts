@@ -1,7 +1,8 @@
 import { fixWebmDuration } from "@fix-webm-duration/fix";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useScopedT } from "@/contexts/I18nContext";
+import { useI18n, useScopedT } from "@/contexts/I18nContext";
+import { recordingErrorMessage } from "@/i18n/recordingError";
 import { MIC_GAIN_BOOST, mixAudioTracks } from "@/lib/audioMix";
 import {
 	type NativeLinuxRecordingRequest,
@@ -188,6 +189,13 @@ export async function finalizeWebcamAsset(
 
 export function useScreenRecorder(): UseScreenRecorderReturn {
 	const t = useScopedT("editor");
+	const { locale } = useI18n();
+	const commonT = useScopedT("common");
+	const errorTextRef = useRef((detail: unknown, fallback: Parameters<typeof recordingErrorMessage>[3]) =>
+		recordingErrorMessage(locale, commonT, detail, fallback));
+	useEffect(() => {
+		errorTextRef.current = (detail, fallback) => recordingErrorMessage(locale, commonT, detail, fallback);
+	}, [locale, commonT]);
 	/**
 	 * `t` through a ref, for the callbacks that must not be rebuilt when it
 	 * changes identity.
@@ -621,7 +629,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			}
 			if (!result.success) {
 				console.error("Failed to stop native Windows recording:", result.error);
-				toast.error(result.error ?? "Failed to stop native Windows recording");
+				toast.error(errorTextRef.current(result.error, "stopFailed"));
 				// Clear anyway. The main process releases its helper handle
 				// unconditionally, so holding on here left the two sides
 				// disagreeing about whether anything was recording: the HUD kept
@@ -656,7 +664,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		} catch (error) {
 			console.error("Error saving native Windows recording:", error);
 			toast.error(
-				error instanceof Error ? error.message : "Failed to save native Windows recording",
+				errorTextRef.current(error, "saveFailed"),
 			);
 			clearNativeRecordingState();
 			return true;
@@ -721,7 +729,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 				}
 				if (!result.success) {
 					console.error("Failed to stop native macOS recording:", result.error);
-					toast.error(result.error ?? "Failed to stop native macOS recording");
+					toast.error(errorTextRef.current(result.error, "stopFailed"));
 					// See the Windows finalizer: the main process has already
 					// released its helper handle, so keeping ours leaves the HUD
 					// stuck in a recording state the app can never be stopped out
@@ -746,12 +754,13 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 						webcamSaved = true;
 					} else {
 						console.error("Failed to attach native macOS webcam recording:", attachResult.error);
-						toast.error(attachResult.error ?? "Failed to store webcam recording");
+						toast.error(errorTextRef.current(attachResult.error, "webcamNotSaved"));
 					}
 				} else if (webcamResult.error) {
 					// The screen recording still saves, so without this the editor just
 					// opens with the camera missing and nothing said about it (#253).
-					toast.error(`Webcam not saved (${webcamResult.error}). The screen recording was kept.`);
+					console.error("Webcam not saved:", webcamResult.error);
+					toast.error(errorTextRef.current(webcamResult.error, "webcamNotSaved"));
 				}
 
 				clearNativeRecordingState();
@@ -766,7 +775,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			} catch (error) {
 				console.error("Error saving native macOS recording:", error);
 				toast.error(
-					error instanceof Error ? error.message : "Failed to save native macOS recording",
+					errorTextRef.current(error, "saveFailed"),
 				);
 				clearNativeRecordingState();
 				return true;
@@ -839,7 +848,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 				}
 				if (!result.success) {
 					console.error("Failed to stop native Linux recording:", result.error);
-					toast.error(result.error ?? "Failed to stop native Linux recording");
+					toast.error(errorTextRef.current(result.error, "stopFailed"));
 					// See the Windows finalizer: the main process has already
 					// released its helper handle, so keeping ours leaves the HUD
 					// stuck in a recording state the app can never be stopped out
@@ -864,12 +873,13 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 						webcamSaved = true;
 					} else {
 						console.error("Failed to attach native Linux webcam recording:", attachResult.error);
-						toast.error(attachResult.error ?? "Failed to store webcam recording");
+						toast.error(errorTextRef.current(attachResult.error, "webcamNotSaved"));
 					}
 				} else if (webcamResult.error) {
 					// The screen recording still saves, so without this the editor just
 					// opens with the camera missing and nothing said about it (#253).
-					toast.error(`Webcam not saved (${webcamResult.error}). The screen recording was kept.`);
+					console.error("Webcam not saved:", webcamResult.error);
+					toast.error(errorTextRef.current(webcamResult.error, "webcamNotSaved"));
 				}
 
 				clearNativeRecordingState();
@@ -884,7 +894,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			} catch (error) {
 				console.error("Error saving native Linux recording:", error);
 				toast.error(
-					error instanceof Error ? error.message : "Failed to save native Linux recording",
+					errorTextRef.current(error, "saveFailed"),
 				);
 				clearNativeRecordingState();
 				return true;
@@ -1947,7 +1957,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			if (errorMsg.includes("Permission denied") || errorMsg.includes("NotAllowedError")) {
 				toast.error(t("recording.permissionDenied"));
 			} else {
-				toast.error(errorMsg);
+				toast.error(errorTextRef.current(errorMsg, "startFailed"));
 			}
 			setRecording(false);
 			setPaused(false);
@@ -1988,7 +1998,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 					setPaused(true);
 				} catch (error) {
 					console.error("Failed to toggle native Windows pause state:", error);
-					toast.error(error instanceof Error ? error.message : "Failed to toggle pause state");
+					toast.error(errorTextRef.current(error, "pauseFailed"));
 				}
 			})();
 			return;
@@ -2028,7 +2038,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 					setPaused(true);
 				} catch (error) {
 					console.error("Failed to toggle native macOS pause state:", error);
-					toast.error(error instanceof Error ? error.message : "Failed to toggle pause state");
+					toast.error(errorTextRef.current(error, "pauseFailed"));
 				}
 			})();
 			return;
@@ -2068,7 +2078,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 					setPaused(true);
 				} catch (error) {
 					console.error("Failed to toggle native Linux pause state:", error);
-					toast.error(error instanceof Error ? error.message : "Failed to toggle pause state");
+					toast.error(errorTextRef.current(error, "pauseFailed"));
 				}
 			})();
 			return;

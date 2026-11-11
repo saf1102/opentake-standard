@@ -168,7 +168,7 @@ export const HudDeviceSettings = memo(function HudDeviceSettings({
 							onClick={() => onSelectMic(device)}
 							className={`${styles.languageMenuItem} ${isActive ? styles.languageMenuItemActive : ""}`}
 						>
-							<span className="truncate">{device.label}</span>
+							<span className="truncate">{device.label === `Microphone ${device.deviceId.slice(0, 8)}` ? `${labels.microphone} ${device.deviceId.slice(0, 8)}` : device.label}</span>
 							{isActive ? <Check size={11} className="text-white/85" /> : null}
 						</button>
 					);
@@ -199,7 +199,7 @@ export const HudDeviceSettings = memo(function HudDeviceSettings({
 							onClick={() => onSelectCamera(device)}
 							className={`${styles.languageMenuItem} ${isActive ? styles.languageMenuItemActive : ""}`}
 						>
-							<span className="truncate">{device.label}</span>
+							<span className="truncate">{device.label === `Camera ${device.deviceId.slice(0, 8)}` ? `${labels.camera} ${device.deviceId.slice(0, 8)}` : device.label}</span>
 							{isActive ? <Check size={11} className="text-white/85" /> : null}
 						</button>
 					);

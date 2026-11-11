@@ -75,18 +75,26 @@ function getSupportedSystemLocale(): Locale | null {
 	return null;
 }
 
-function getInitialLocale(): Locale {
+function getInitialLocale(defaultLocale: Locale): Locale {
 	try {
 		const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
 		if (stored && isSupportedLocale(stored)) return stored;
 	} catch {
 		// localStorage may be unavailable
 	}
-	return DEFAULT_LOCALE;
+	return defaultLocale;
 }
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-	const [locale, setLocaleState] = useState<Locale>(getInitialLocale);
+export function I18nProvider({
+	children,
+	defaultLocale = DEFAULT_LOCALE,
+	suggestSystemLocale = true,
+}: {
+	children: ReactNode;
+	defaultLocale?: Locale;
+	suggestSystemLocale?: boolean;
+}) {
+	const [locale, setLocaleState] = useState<Locale>(() => getInitialLocale(defaultLocale));
 	const [systemLocaleSuggestion, setSystemLocaleSuggestion] = useState<Locale | null>(null);
 	const hasRunSystemLocaleCheckRef = useRef(false);
 
@@ -115,7 +123,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 	}, [locale]);
 
 	useEffect(() => {
-		if (hasRunSystemLocaleCheckRef.current) return;
+		if (!suggestSystemLocale || hasRunSystemLocaleCheckRef.current) return;
 		hasRunSystemLocaleCheckRef.current = true;
 
 		let hasStoredLocale = false;
@@ -137,7 +145,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 		}
 
 		setSystemLocaleSuggestion(detectedSystemLocale);
-	}, [markPromptAsHandled]);
+	}, [markPromptAsHandled, suggestSystemLocale]);
 
 	const acceptSystemLocaleSuggestion = useCallback(() => {
 		if (!systemLocaleSuggestion) return;

@@ -1,11 +1,17 @@
 const {randomUUID}=require('node:crypto');
 const SOURCE_OPTIONS=Object.freeze({types:['window','screen'],thumbnailSize:{width:0,height:0},fetchWindowIcons:false});
+function displaySourceName(name,type){
+ if(type!=='display')return name;
+ if(/^Entire Screen$/i.test(name))return '整个屏幕';
+ const numbered=/^(?:Screen|Display) (\d+)$/i.exec(name);
+ return numbered?`屏幕 ${numbered[1]}`:name;
+}
 function captureSources(sources,displayIds){
  return sources.map(source=>{
   const type=source.id.startsWith('screen:')?'display':'window';
   const displayIndex=type==='display'?displayIds.indexOf(String(source.display_id)):undefined;
   if(type==='display'&&displayIndex<0)throw Error('屏幕列表已变化，请刷新录制来源。');
-  return {id:source.id,type,name:source.name,captureValue:type==='display'?String(displayIndex):source.name,
+  return {id:source.id,type,name:displaySourceName(source.name,type),captureValue:type==='display'?String(displayIndex):source.name,
    ...(type==='display'?{displayIndex}:{}),...(source.display_id?{displayId:String(source.display_id)}:{})};
  });
 }

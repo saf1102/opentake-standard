@@ -27,3 +27,10 @@ test('source bridge reports provider failures, disconnected services and malform
 test('source bridge bounds a nonresponsive desktop and clears request listeners',async()=>{
  const {client}=channels();await assert.rejects(requestCaptureSources(client,5),/来源超时/);assert.equal(client.listenerCount('message'),0);
 });
+
+test('自动生成的屏幕名称显示中文，不修改窗口身份或屏幕采集参数',()=>{
+ const sources=captureSources([{id:'screen:2:0',name:'Screen 2',display_id:'22'},{id:'screen:1:0',name:'Entire Screen',display_id:'11'},{id:'window:55:0',name:'Screen 2'}],['11','22']);
+ assert.equal(sources[0].name,'屏幕 2');assert.equal(sources[0].captureValue,'1');
+ assert.equal(sources[1].name,'整个屏幕');assert.equal(sources[1].captureValue,'0');
+ assert.equal(sources[2].name,'Screen 2');assert.equal(sources[2].captureValue,'Screen 2');
+});

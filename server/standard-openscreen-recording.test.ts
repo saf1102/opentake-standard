@@ -10,6 +10,7 @@ const script = `const fs=require('node:fs'),readline=require('node:readline');
 const [output,mode]=process.argv.slice(2);
 fs.writeFileSync(output+'.env.json',JSON.stringify({runAsNode:process.env.ELECTRON_RUN_AS_NODE,compositor:process.env.OPENSCREEN_COMPOSITOR_VIEW_NODE,pid:process.pid}));
 const emit=value=>process.stdout.write(JSON.stringify(value)+'\\n');
+if(mode==='english-error-chinese-path'){emit({event:'done',success:false,error:'Cannot write file /录屏工程/output.mp4'});process.exit(2)}
 if(mode==='early-error'){emit({event:'done',success:false,error:'fixture capture failed'});process.exit(2)}
 if(mode==='native-init-failure')process.stderr.write('ERROR: SetInputMediaType failed (hr=0xc00d36b4)\\nERROR: Failed to initialize Media Foundation encoder\\n');
 if(mode==='native-init-retry')process.stderr.write('ERROR: SetInputMediaType failed (hr=0xc00d36b4)\\nWARNING: Default Media Foundation H.264 encoder setup failed; retrying\\n');
@@ -70,7 +71,9 @@ test('stop requested during startup waits for actual recording readiness then sa
 test('early recorder failure is reported without a successful saved take',async()=>{
  const f=fixture('early-error');try{
   f.start();await until(()=>!f.recorder.busy);
-  assert.equal(f.recorder.state?.phase,'failed');assert.match(f.recorder.state?.error||'',/fixture capture failed/);
+  assert.equal(f.recorder.state?.phase,'failed');assert.match(f.recorder.state?.error||'',/录制失败/);
+  assert.doesNotMatch(f.recorder.state?.error||'',/fixture capture failed/);
+  assert.equal(JSON.parse(fs.readFileSync(f.projectFile+'.diagnostic.json','utf8')).rawError,'fixture capture failed');
   assert.equal(fs.existsSync(f.projectFile),false);
  }finally{await cleanup(f)}
 });
@@ -169,4 +172,13 @@ test('invalid primitive protocol events do not crash the recorder controller',as
 });
 test('split UTF-8 and a final event without newline preserve the original recorder error',async()=>{
  const f=fixture('split-error');try{f.start();await until(()=>!f.recorder.busy);assert.equal(f.recorder.state?.phase,'failed');assert.equal(f.recorder.state?.error,'中文录制错误')}finally{await cleanup(f)}
+});
+
+test('English failure containing a Chinese project path stays out of the control bar and remains in diagnostics',async()=>{
+ const f=fixture('english-error-chinese-path');try{
+  f.start();await until(()=>!f.recorder.busy);
+  assert.match(f.recorder.state?.error||'',/录制失败/);
+  assert.doesNotMatch(f.recorder.state?.error||'',/Cannot write file/);
+  assert.equal(JSON.parse(fs.readFileSync(f.projectFile+'.diagnostic.json','utf8')).rawError,'Cannot write file /录屏工程/output.mp4');
+ }finally{await cleanup(f)}
 });

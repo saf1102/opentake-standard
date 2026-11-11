@@ -20,6 +20,15 @@ type Active = {
   startupTimer?: ReturnType<typeof setTimeout>; stopTimer?: ReturnType<typeof setTimeout>;
 };
 
+/** The CLI's raw English diagnostics stay in the per-take receipt. User-facing
+ * errors are Chinese; already-localized failures retain their specific advice. */
+function recordingFailureText(detail: string, code: number | null): string {
+  if (/^(?:录制|录屏|无法|保存|读取|本次|原生|磁盘|屏幕|摄像头|麦克风|请|已有|当前|未|缺少|没有|中文录制错误|OpenScreen (?:保存超时|未能在时限内开始|录制退出))/.test(detail)) return detail;
+  if (/permission|access denied|notallowed/i.test(detail)) return '录屏权限不足，请允许屏幕录制后重试；工程及原始录制文件已保留。';
+  if (/disk full|no space|ENOSPC/i.test(detail)) return '磁盘空间不足，无法保存录屏；请释放空间后重试，工程及原始录制文件已保留。';
+  return `录制失败（退出代码：${code ?? '未知'}），工程及原始录制文件已保留。请查看本次录制诊断。`;
+}
+
 /** The installed recorder owns capture, cursor telemetry and project creation.
  * Stopping is its documented stdin protocol, never a process kill on success. */
 export class NativeRecordingController {
@@ -153,11 +162,11 @@ export class NativeRecordingController {
       if(recording.stateError){saved=false;recording.error=recording.stateError;}
       recording.state.phase = saved ? 'saved' : 'failed';
       recording.state.finishedAt = Date.now();
-      if (!saved) recording.state.error = recording.fatalError || recording.error.trim().slice(-1_200) || `OpenScreen 录制退出（${code ?? '未知'}），工程及原始文件已保留。`;
+      if (!saved) recording.state.error = recordingFailureText(recording.fatalError || recording.error.trim().slice(-1_200), code);
       this.publish(recording);
       if(input.diagnosticFile){
         try{atomicJsonSync(input.diagnosticFile,{schemaVersion:1,projectId:input.projectId,id:input.id,
-          exit:{code,signal},state:recording.state,events:recording.events,stderr:recording.stderr})}
+          exit:{code,signal},state:recording.state,events:recording.events,stderr:recording.stderr,rawError:recording.fatalError || recording.error})}
         catch(error){console.warn('无法保存本次录制诊断：',error instanceof Error?error.message:String(error))}
       }
     });

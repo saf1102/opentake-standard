@@ -123,6 +123,21 @@
 			"noScreensFound": "未找到屏幕",
 			"noWindowsFound": "未找到窗口",
 			"cancel": "取消"
+		},
+		"host": {
+			"eyebrow": "OpenTake 录屏",
+			"title": "在运行 OpenTake 的电脑上录制",
+			"description": "选择这台电脑的屏幕或窗口进行录制；录制结束后，视频会导入当前工程。",
+			"step1Title": "打开录制控制",
+			"step1Body": "OpenTake 会在运行它的电脑上打开录制控制。",
+			"step2Title": "选择范围并录制",
+			"step2Body": "选择屏幕或窗口及声音选项，然后开始并停止录制。",
+			"step3Title": "回到当前工程",
+			"step3Body": "保持本页面打开，录制完成后会自动导入这里。",
+			"notice": "录制对象是运行 OpenTake 的电脑，不是通过局域网查看本页面的手机或另一台电脑。",
+			"launch": "打开录制控制",
+			"launchHint": "录制控制会在运行 OpenTake 的电脑上打开，本编辑器会保留并等待录制结果。",
+			"readOnlyHint": "当前工程为只读，请先点击 OpenTake 顶栏的“接管编辑”。"
 		}
 	},
 	"mediaStage": {

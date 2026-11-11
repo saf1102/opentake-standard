@@ -54,6 +54,7 @@ import { DocumentService } from "../ai-edition/document-service";
 import { LlmConfigStore } from "../ai-edition/llm-config-store";
 import { isDiagnosticModeEnabled, mainLogBuffer } from "../diagnostics/main-log-buffer";
 import { mainT } from "../i18n";
+import { recordingSourceName } from "../../src/i18n/recordingSourceName";
 import { getInstallChannel } from "../install-channel";
 import { RECORDINGS_DIR } from "../main";
 import { type AudioPeaksResult, getAudioPeaks } from "../media/audioPeaks";
@@ -1679,7 +1680,7 @@ export async function exportDiagnosticFile(payload: {
 	logs: string[];
 }) {
 	const { filePath, canceled } = await dialog.showSaveDialog({
-		title: "Save Diagnostic File",
+		title: mainT("common", "actions.saveDiagnostics"),
 		defaultPath: `openscreen-diagnostic-${Date.now()}.json`,
 		filters: [{ name: "JSON", extensions: ["json"] }],
 	});
@@ -1819,7 +1820,7 @@ export function registerIpcHandlers(
 		lastEnumeratedSources = new Map(sources.map((source) => [source.id, source]));
 		return sources.map((source) => ({
 			id: source.id,
-			name: source.name,
+			name: recordingSourceName(source.name, source.id, (key, vars) => mainT("common", key, vars)),
 			display_id: source.display_id,
 			thumbnail: source.thumbnail ? source.thumbnail.toDataURL() : null,
 			appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
@@ -1919,14 +1920,14 @@ export function registerIpcHandlers(
 			const mainWin = getMainWindow();
 			const detail =
 				access.status === "missing-helper"
-					? "The cursor helper couldn't be found in this build, so the editable cursor can't be enabled. Rebuild the native helper (npm run build:native:mac) or switch the HUD cursor mode to system."
-					: "Allow OpenScreen under System Settings → Privacy & Security → Accessibility, then press record again to start the countdown.";
+					? mainT("common", "recordingPermissions.cursorHelperMissing")
+					: mainT("common", "recordingPermissions.accessibilityDetail");
 			const messageOptions = {
 				type: "warning",
-				buttons: ["Open Accessibility Settings", "Cancel"],
+				buttons: [mainT("common", "recordingPermissions.accessibilitySettings"), mainT("common", "actions.cancel")],
 				defaultId: 0,
 				cancelId: 1,
-				message: "Accessibility access is required for the editable cursor",
+				message: mainT("common", "recordingPermissions.accessibilityTitle"),
 				detail,
 			} satisfies Electron.MessageBoxOptions;
 			const result =
@@ -1963,12 +1964,12 @@ export function registerIpcHandlers(
 				const mainWin = getMainWindow();
 				const messageOptions = {
 					type: "warning",
-					buttons: ["Open System Settings", "Cancel"],
+					buttons: [mainT("common", "recordingPermissions.systemSettings"), mainT("common", "actions.cancel")],
 					defaultId: 0,
 					cancelId: 1,
-					message: "Screen Recording permission is required",
+					message: mainT("common", "recordingPermissions.screenTitle"),
 					detail:
-						"Allow OpenScreen in macOS System Settings, then come back and choose a screen or window.",
+						mainT("common", "recordingPermissions.screenDetail"),
 				} satisfies Electron.MessageBoxOptions;
 				const result =
 					mainWin && !mainWin.isDestroyed()
@@ -2198,13 +2199,13 @@ export function registerIpcHandlers(
 		async (_, request: NativeLinuxRecordingRequest) => {
 			try {
 				if (process.platform !== "linux") {
-					return { success: false, error: "Native Linux capture requires Linux." };
+					return { success: false, error: mainT("common", "recordingErrors.linuxRequired") };
 				}
 				if (linuxNativeCaptureSession) {
-					return { success: false, error: "Native Linux capture is already running." };
+					return { success: false, error: mainT("common", "recordingErrors.linuxRunning") };
 				}
 				if (!findPipeWireCursorHelperPath()) {
-					return { success: false, error: "Native Linux capture helper is not available." };
+					return { success: false, error: mainT("common", "recordingErrors.linuxHelperMissing") };
 				}
 
 				const recordingId =
@@ -2287,7 +2288,7 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("pause-native-linux-recording", async () => {
 		if (!linuxNativeCaptureSession) {
-			return { success: false, error: "Native Linux capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.linuxNotRunning") };
 		}
 		linuxNativeCaptureSession.pause();
 		return { success: true };
@@ -2295,7 +2296,7 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("resume-native-linux-recording", async () => {
 		if (!linuxNativeCaptureSession) {
-			return { success: false, error: "Native Linux capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.linuxNotRunning") };
 		}
 		linuxNativeCaptureSession.resume();
 		return { success: true };
@@ -2307,7 +2308,7 @@ export function registerIpcHandlers(
 		const cursorCaptureMode = linuxNativeCaptureCursorMode;
 
 		if (!session) {
-			return { success: false, error: "Native Linux capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.linuxNotRunning") };
 		}
 
 		try {
@@ -2386,22 +2387,22 @@ export function registerIpcHandlers(
 				if (!isWindowsGraphicsCaptureOsSupported()) {
 					return {
 						success: false,
-						error: "Windows Graphics Capture requires Windows 10 build 19041 or newer.",
+						error: mainT("common", "recordingErrors.windowsUnsupported"),
 					};
 				}
 				if (nativeWindowsCaptureProcess) {
-					return { success: false, error: "Native Windows capture is already running." };
+					return { success: false, error: mainT("common", "recordingErrors.windowsRunning") };
 				}
 
 				const helperPath = await findNativeWindowsCaptureHelperPath();
 				if (!helperPath) {
-					return { success: false, error: "Native Windows capture helper is not available." };
+					return { success: false, error: mainT("common", "recordingErrors.windowsHelperMissing") };
 				}
 
 				if (!request?.source?.sourceId) {
 					return {
 						success: false,
-						error: "Native Windows capture request is missing a source.",
+						error: mainT("common", "recordingErrors.windowsSourceMissing"),
 					};
 				}
 
@@ -2615,19 +2616,19 @@ export function registerIpcHandlers(
 	ipcMain.handle("start-native-mac-recording", async (_, request: NativeMacRecordingRequest) => {
 		try {
 			if (process.platform !== "darwin") {
-				return { success: false, error: "Native macOS capture requires macOS." };
+				return { success: false, error: mainT("common", "recordingErrors.macRequired") };
 			}
 			if (nativeMacCaptureProcess) {
-				return { success: false, error: "Native macOS capture is already running." };
+				return { success: false, error: mainT("common", "recordingErrors.macRunning") };
 			}
 
 			const helperPath = await findNativeMacCaptureHelperPath();
 			if (!helperPath) {
-				return { success: false, error: "Native macOS capture helper is not available." };
+				return { success: false, error: mainT("common", "recordingErrors.macHelperMissing") };
 			}
 
 			if (!request?.source?.sourceId) {
-				return { success: false, error: "Native macOS capture request is missing a source." };
+				return { success: false, error: mainT("common", "recordingErrors.macSourceMissing") };
 			}
 
 			const recordingId =
@@ -2758,18 +2759,18 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("pause-native-mac-recording", async () => {
 		if (process.platform !== "darwin") {
-			return { success: false, error: "Native macOS capture requires macOS." };
+			return { success: false, error: mainT("common", "recordingErrors.macRequired") };
 		}
 
 		const proc = nativeMacCaptureProcess;
 		if (!proc) {
-			return { success: false, error: "Native macOS capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.macNotRunning") };
 		}
 		if (nativeMacIsPaused) {
 			return { success: true };
 		}
 		if (!proc.stdin.writable) {
-			return { success: false, error: "Native macOS capture command channel is closed." };
+			return { success: false, error: mainT("common", "recordingErrors.macChannelClosed") };
 		}
 
 		try {
@@ -2784,18 +2785,18 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("resume-native-mac-recording", async () => {
 		if (process.platform !== "darwin") {
-			return { success: false, error: "Native macOS capture requires macOS." };
+			return { success: false, error: mainT("common", "recordingErrors.macRequired") };
 		}
 
 		const proc = nativeMacCaptureProcess;
 		if (!proc) {
-			return { success: false, error: "Native macOS capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.macNotRunning") };
 		}
 		if (!nativeMacIsPaused) {
 			return { success: true };
 		}
 		if (!proc.stdin.writable) {
-			return { success: false, error: "Native macOS capture command channel is closed." };
+			return { success: false, error: mainT("common", "recordingErrors.macChannelClosed") };
 		}
 
 		try {
@@ -2811,13 +2812,13 @@ export function registerIpcHandlers(
 	ipcMain.handle("pause-native-windows-recording", async () => {
 		const proc = nativeWindowsCaptureProcess;
 		if (!proc) {
-			return { success: false, error: "Native Windows capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.windowsNotRunning") };
 		}
 		if (nativeWindowsIsPaused) {
 			return { success: true };
 		}
 		if (!proc.stdin.writable) {
-			return { success: false, error: "Native Windows capture command channel is closed." };
+			return { success: false, error: mainT("common", "recordingErrors.windowsChannelClosed") };
 		}
 
 		try {
@@ -2833,13 +2834,13 @@ export function registerIpcHandlers(
 	ipcMain.handle("resume-native-windows-recording", async () => {
 		const proc = nativeWindowsCaptureProcess;
 		if (!proc) {
-			return { success: false, error: "Native Windows capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.windowsNotRunning") };
 		}
 		if (!nativeWindowsIsPaused) {
 			return { success: true };
 		}
 		if (!proc.stdin.writable) {
-			return { success: false, error: "Native Windows capture command channel is closed." };
+			return { success: false, error: mainT("common", "recordingErrors.windowsChannelClosed") };
 		}
 
 		try {
@@ -2860,7 +2861,7 @@ export function registerIpcHandlers(
 		const cursorCaptureMode = nativeWindowsCursorCaptureMode;
 
 		if (!proc) {
-			return { success: false, error: "Native Windows capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.windowsNotRunning") };
 		}
 
 		// Discarding does not need a finalized file, so it must not wait for one.
@@ -3055,7 +3056,7 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("stop-native-mac-recording", async (_, discard?: boolean) => {
 		if (process.platform !== "darwin") {
-			return { success: false, error: "Native macOS capture requires macOS." };
+			return { success: false, error: mainT("common", "recordingErrors.macRequired") };
 		}
 
 		const proc = nativeMacCaptureProcess;
@@ -3064,7 +3065,7 @@ export function registerIpcHandlers(
 		const cursorCaptureMode = nativeMacCursorCaptureMode;
 
 		if (!proc) {
-			return { success: false, error: "Native macOS capture is not running." };
+			return { success: false, error: mainT("common", "recordingErrors.macNotRunning") };
 		}
 
 		try {
@@ -3259,7 +3260,7 @@ export function registerIpcHandlers(
 		"attach-native-mac-webcam-recording",
 		async (_, payload: AttachNativeMacWebcamRecordingInput) => {
 			if (process.platform !== "darwin") {
-				return { success: false, error: "Native macOS webcam attachment requires macOS." };
+				return { success: false, error: mainT("common", "recordingErrors.macWebcamRequired") };
 			}
 			return attachNativeWebcamRecording("macOS", payload);
 		},
@@ -3269,7 +3270,7 @@ export function registerIpcHandlers(
 		"attach-native-linux-webcam-recording",
 		async (_, payload: AttachNativeMacWebcamRecordingInput) => {
 			if (process.platform !== "linux") {
-				return { success: false, error: "Native Linux webcam attachment requires Linux." };
+				return { success: false, error: mainT("common", "recordingErrors.linuxWebcamRequired") };
 			}
 			return attachNativeWebcamRecording("Linux", payload);
 		},
@@ -3282,7 +3283,7 @@ export function registerIpcHandlers(
 			console.error("Failed to store recording session:", error);
 			return {
 				success: false,
-				message: "Failed to store recording session",
+				message: mainT("common", "recordingErrors.storeFailed"),
 				error: String(error),
 			};
 		}
@@ -3330,7 +3331,7 @@ export function registerIpcHandlers(
 				}
 				return {
 					success: false,
-					message: `Screen recording is empty (${screenStat.size} bytes). The screen capture did not produce any frames — this can happen on Windows when the display source changes during recording. Try recording again.`,
+					message: mainT("common", "recordingErrors.emptyFile", { bytes: screenStat.size }),
 				};
 			}
 		} catch (statError) {
@@ -3339,7 +3340,7 @@ export function registerIpcHandlers(
 			if ((statError as NodeJS.ErrnoException).code === "ENOENT") {
 				return {
 					success: false,
-					message: "Screen recording file is missing on disk.",
+					message: mainT("common", "recordingErrors.fileMissing"),
 				};
 			}
 		}
@@ -3405,7 +3406,7 @@ export function registerIpcHandlers(
 			console.error("Failed to store recorded video:", error);
 			return {
 				success: false,
-				message: "Failed to store recorded video",
+				message: mainT("common", "recordingErrors.storeVideoFailed"),
 				error: String(error),
 			};
 		}
@@ -3423,7 +3424,7 @@ export function registerIpcHandlers(
 			);
 
 			if (videoFiles.length === 0) {
-				return { success: false, message: "No recorded video found" };
+				return { success: false, message: mainT("common", "recordingErrors.noRecordedVideo") };
 			}
 
 			const latestVideo = videoFiles.sort().reverse()[0];
@@ -3432,7 +3433,7 @@ export function registerIpcHandlers(
 			return { success: true, path: videoPath };
 		} catch (error) {
 			console.error("Failed to get video path:", error);
-			return { success: false, message: "Failed to get video path", error: String(error) };
+			return { success: false, message: mainT("common", "recordingErrors.videoPathFailed"), error: String(error) };
 		}
 	});
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useScopedT } from "@/contexts/I18nContext";
+import { recordingSourceName } from "@/i18n/recordingSourceName";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import styles from "./SourceSelector.module.css";
@@ -107,6 +108,7 @@ export function SourceSelector() {
 
 	const renderSourceCard = (source: DesktopSource) => {
 		const isSelected = selectedSource?.id === source.id;
+		const name = recordingSourceName(source.name, source.id, tc);
 		const sourceKind = source.id.startsWith("screen:") ? "screen" : "window";
 		return (
 			<button
@@ -120,7 +122,7 @@ export function SourceSelector() {
 				<div className={styles.thumb}>
 					<img
 						src={source.thumbnail || ""}
-						alt={source.name}
+						alt={name}
 						className="w-full h-full object-cover"
 					/>
 				</div>
@@ -134,7 +136,7 @@ export function SourceSelector() {
 							</svg>
 						</span>
 					)}
-					<div className={`${styles.name} truncate`}>{source.name}</div>
+					<div className={`${styles.name} truncate`}>{name}</div>
 				</div>
 			</button>
 		);

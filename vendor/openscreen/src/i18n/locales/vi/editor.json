@@ -123,6 +123,21 @@
 			"noScreensFound": "Không tìm thấy màn hình",
 			"noWindowsFound": "Không tìm thấy cửa sổ",
 			"cancel": "Hủy"
+		},
+		"host": {
+			"eyebrow": "OpenTake recording",
+			"title": "Record on the computer running OpenTake",
+			"description": "Choose a screen or window on that computer to record. The video will be imported into this project when recording finishes.",
+			"step1Title": "Open recording controls",
+			"step1Body": "OpenTake opens the recording controls on that computer.",
+			"step2Title": "Choose and record",
+			"step2Body": "Choose a screen or window and audio options, then start and stop recording.",
+			"step3Title": "Return to the project",
+			"step3Body": "Keep this page open. The finished recording will be imported here automatically.",
+			"notice": "Recording captures the computer running OpenTake, not a phone or another computer viewing this page over the local network.",
+			"launch": "Open recording controls",
+			"launchHint": "The recording controls open on that computer. This editor stays open to receive the result.",
+			"readOnlyHint": "This project is read-only. Choose Take over editing in the OpenTake top bar first."
 		}
 	},
 	"mediaStage": {

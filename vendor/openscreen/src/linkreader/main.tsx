@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { I18nProvider } from "../contexts/I18nContext";
+import { LinkReaderI18nProvider } from "./I18nProvider";
 import { installBrowserShims } from "../native/browserShim";
 import { installLinkReaderBridge } from "./bridge";
 import "../index.css";
@@ -36,9 +36,9 @@ async function boot() {
 	const { default: App } = await import("../App.tsx");
 	ReactDOM.createRoot(document.getElementById("root")!).render(
 		<React.StrictMode>
-			<I18nProvider>
+			<LinkReaderI18nProvider>
 				<App />
-			</I18nProvider>
+			</LinkReaderI18nProvider>
 		</React.StrictMode>,
 	);
 }

@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AudioLevelMeter } from "@/components/ui/audio-level-meter";
-import { useI18n, useScopedT } from "@/contexts/I18nContext";
+import { useScopedT } from "@/contexts/I18nContext";
+import { recordingSourceName } from "@/i18n/recordingSourceName";
 import { useAudioLevelMeter } from "@/hooks/useAudioLevelMeter";
 import { useCameraDevices } from "@/hooks/useCameraDevices";
 import { useCameraPreviewStream } from "@/hooks/useCameraPreviewStream";
@@ -45,46 +46,6 @@ const DEFAULT_PREFS: RecordingPrefsState = {
 	cursorCaptureMode: "editable-overlay",
 };
 
-const LINKREADER_RECORDING_COPY = {
-	en: {
-		eyebrow: "LinkReader host recording",
-		title: "Record with OpenScreen on the host Mac",
-		description:
-			"Screen capture runs in the native OpenScreen recorder on the Mac hosting port 3010. This browser does not show a live screen preview before recording, so the old black tile was only a placeholder.",
-		step1Title: "Open the native recorder",
-		step1Body:
-			"LinkReader launches OpenScreen on the host Mac and starts listening for the new recording.",
-		step2Title: "Choose and record",
-		step2Body:
-			"In OpenScreen, choose a screen or window, microphone and camera, then start and stop the recording.",
-		step3Title: "Return to LinkReader",
-		step3Body:
-			"Keep this page open. The finished .openscreen project is detected and imported here automatically.",
-		notice:
-			"Recording captures the host Mac, not another phone or computer viewing this page over the local network.",
-		launch: "Open native recorder",
-		launchHint:
-			"OpenScreen will appear on the host Mac; this editor stays open to receive the result.",
-		readOnlyHint:
-			"This project is read-only. Choose Take over editing in the LinkReader top bar first.",
-	},
-	zh: {
-		eyebrow: "LinkReader 宿主机录制",
-		title: "在宿主 Mac 上使用 OpenScreen 录制",
-		description:
-			"屏幕采集由运行 3010 服务的宿主 Mac 上的 OpenScreen 原生录制器完成。浏览器在录制前不会显示屏幕实时预览，原来的黑色画面只是占位区。",
-		step1Title: "打开原生录制器",
-		step1Body: "LinkReader 会在宿主 Mac 上启动 OpenScreen，并开始等待本次新录制。",
-		step2Title: "选择来源并录制",
-		step2Body: "在 OpenScreen 中选择屏幕或窗口、麦克风和摄像头，然后开始并停止录制。",
-		step3Title: "回到 LinkReader",
-		step3Body: "保持本页面打开；录制完成后，新的 .openscreen 工程会被检测并导入这里。",
-		notice: "录制对象是宿主 Mac，不是通过局域网打开此页面的手机或另一台电脑。",
-		launch: "打开原生录制器",
-		launchHint: "OpenScreen 将出现在宿主 Mac 上；本编辑器会保持打开并等待录制结果。",
-		readOnlyHint: "当前工程为只读，请先点击 LinkReader 顶栏的“接管编辑”。",
-	},
-} as const;
 
 /**
  * Rec-mode stage. The real capture pipeline lives in the standalone recorder
@@ -118,47 +79,43 @@ function LinkReaderRecordingGuide({
 	writable,
 }: RecStageProps & { writable: boolean }) {
 	const t = useScopedT("editor");
-	const { locale } = useI18n();
-	const copy = locale.toLowerCase().startsWith("zh")
-		? LINKREADER_RECORDING_COPY.zh
-		: LINKREADER_RECORDING_COPY.en;
 	return (
 		<div className={`${styles.recStage} ${styles.recHostStage}`}>
 			<section className={styles.recHostCard} aria-labelledby="linkreader-recording-title">
 				<div className={styles.recHostEyebrow}>
 					<MonitorSmartphone size={16} />
-					{copy.eyebrow}
+					{t("rec.host.eyebrow")}
 				</div>
 				<h1 id="linkreader-recording-title" className={styles.recHostTitle}>
-					{copy.title}
+					{t("rec.host.title")}
 				</h1>
-				<p className={styles.recHostDescription}>{copy.description}</p>
+				<p className={styles.recHostDescription}>{t("rec.host.description")}</p>
 
 				<ol className={styles.recHostSteps}>
 					<li>
 						<b>1</b>
 						<div>
-							<strong>{copy.step1Title}</strong>
-							<span>{copy.step1Body}</span>
+							<strong>{t("rec.host.step1Title")}</strong>
+							<span>{t("rec.host.step1Body")}</span>
 						</div>
 					</li>
 					<li>
 						<b>2</b>
 						<div>
-							<strong>{copy.step2Title}</strong>
-							<span>{copy.step2Body}</span>
+							<strong>{t("rec.host.step2Title")}</strong>
+							<span>{t("rec.host.step2Body")}</span>
 						</div>
 					</li>
 					<li>
 						<b>3</b>
 						<div>
-							<strong>{copy.step3Title}</strong>
-							<span>{copy.step3Body}</span>
+							<strong>{t("rec.host.step3Title")}</strong>
+							<span>{t("rec.host.step3Body")}</span>
 						</div>
 					</li>
 				</ol>
 
-				<div className={styles.recHostNotice}>{copy.notice}</div>
+				<div className={styles.recHostNotice}>{t("rec.host.notice")}</div>
 				<div className={styles.recActions}>
 					{onClose ? (
 						<button type="button" className={styles.recCancelBtn} onClick={onClose}>
@@ -172,11 +129,11 @@ function LinkReaderRecordingGuide({
 						disabled={!writable}
 					>
 						<span className={styles.bigRecDot} aria-hidden />
-						{copy.launch}
+						{t("rec.host.launch")}
 					</button>
 				</div>
 				<p className={styles.recActionsHint}>
-					{writable ? copy.launchHint : copy.readOnlyHint}
+					{writable ? t("rec.host.launchHint") : t("rec.host.readOnlyHint")}
 				</p>
 			</section>
 		</div>
@@ -185,6 +142,7 @@ function LinkReaderRecordingGuide({
 
 function DesktopRecordingSetup({ onStartRecording, onClose }: RecStageProps) {
 	const t = useScopedT("editor");
+	const tc = useScopedT("common");
 	const [prefs, setPrefsState] = useState<RecordingPrefsState>(DEFAULT_PREFS);
 	useEffect(() => {
 		let cancelled = false;
@@ -288,7 +246,7 @@ function DesktopRecordingSetup({ onStartRecording, onClose }: RecStageProps) {
 	const portalOwnsSource = usePortalOwnsSource();
 	const sourceLabel = portalOwnsSource
 		? t("rec.systemPicker")
-		: (source?.name ?? t("rec.entireScreen"));
+		: (source ? recordingSourceName(source.name, source.id, tc) : t("rec.entireScreen"));
 
 	return (
 		<div className={styles.recStage}>
@@ -412,7 +370,7 @@ function DesktopRecordingSetup({ onStartRecording, onClose }: RecStageProps) {
 										>
 											{micDevices.devices.map((d) => (
 												<option key={d.deviceId} value={d.deviceId}>
-													{d.label}
+													{d.label === `Microphone ${d.deviceId.slice(0, 8)}` ? `${t("rec.microphone")} ${d.deviceId.slice(0, 8)}` : d.label}
 												</option>
 											))}
 										</select>
@@ -456,7 +414,7 @@ function DesktopRecordingSetup({ onStartRecording, onClose }: RecStageProps) {
 									>
 										{camDevices.devices.map((d) => (
 											<option key={d.deviceId} value={d.deviceId}>
-												{d.label}
+												{d.label === `Camera ${d.deviceId.slice(0, 8)}` ? `${t("rec.camera")} ${d.deviceId.slice(0, 8)}` : d.label}
 											</option>
 										))}
 									</select>
@@ -546,6 +504,7 @@ function SourceModal({
 	onClose: () => void;
 }) {
 	const t = useScopedT("editor");
+	const tc = useScopedT("common");
 	return (
 		<div className={styles.sourceModalOverlay} onClick={onClose}>
 			<div className={styles.sourceModalCard} onClick={(e) => e.stopPropagation()}>
@@ -588,7 +547,7 @@ function SourceModal({
 								<div className={styles.sourceCardThumb}>
 									{s.thumbnail ? <img src={s.thumbnail} alt="" /> : <MonitorSmartphone size={22} />}
 								</div>
-								<span className={styles.sourceCardName}>{s.name}</span>
+								<span className={styles.sourceCardName}>{recordingSourceName(s.name, s.id, tc)}</span>
 							</button>
 						))
 					)}
