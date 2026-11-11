@@ -1,12 +1,14 @@
 diff --git a/crates/compositor/src/pipeline_windows.rs b/crates/compositor/src/pipeline_windows.rs
-index 28bcc4f..658b340 100644
+index 28bcc4f..5fa02c7 100644
 --- a/crates/compositor/src/pipeline_windows.rs
 +++ b/crates/compositor/src/pipeline_windows.rs
-@@ -38,10 +38,20 @@ enum DecodeFrameTestFault {
+@@ -38,10 +38,22 @@ enum DecodeFrameTestFault {
      CloneNull,
      EofSendError,
      AttachBufferRefNull,
 +    HardwareDeviceInit,
++    FirstFrameGetFormat,
++    FirstReceiveError,
 +}
 +
 +#[cfg(test)]
@@ -23,7 +25,7 @@ index 28bcc4f..658b340 100644
      static DECODE_FRAME_TEST_FAULT: std::cell::Cell<Option<DecodeFrameTestFault>> =
          const { std::cell::Cell::new(None) };
      static DECODE_FRAME_TEST_PACKET_RELEASED: std::cell::RefCell<
-@@ -407,6 +417,11 @@ unsafe fn attach_d3d11va(dctx: *mut AVCodecContext, gpu: &Gpu) -> Result<*mut AV
+@@ -407,6 +419,21 @@ unsafe fn attach_d3d11va(dctx: *mut AVCodecContext, gpu: &Gpu) -> Result<*mut AV
      if hwdev.is_null() {
          bail!("av_hwdevice_ctx_alloc");
      }
@@ -32,15 +34,50 @@ index 28bcc4f..658b340 100644
 +        av_buffer_unref(&mut hwdev);
 +        bail!("injected hwdevice_ctx_init failure");
 +    }
++    #[cfg(test)]
++    if decode_frame_test_fault_is(DecodeFrameTestFault::FirstFrameGetFormat)
++        || decode_frame_test_fault_is(DecodeFrameTestFault::FirstReceiveError) {
++        // Deterministic on CI/WARP too: model a device accepted by attach/open,
++        // then fail the real FFmpeg get_format callback on its first packet.
++        (*dctx).hw_device_ctx = av_buffer_ref(hwdev);
++        (*dctx).get_format = Some(get_hw_format);
++        (*dctx).thread_count = 1;
++        return Ok(hwdev);
++    }
      let hwdc = (*hwdev).data as *mut AVHWDeviceContext;
      let d3dctx = (*hwdc).hwctx as *mut AVD3D11VADeviceContext;
      let dev_clone = gpu.device.clone();
-@@ -850,20 +865,34 @@ impl Decoder {
+@@ -437,6 +464,11 @@ unsafe extern "C" fn get_hw_format(
+     ctx: *mut AVCodecContext,
+     mut fmts: *const AVPixelFormat::Type,
+ ) -> AVPixelFormat::Type {
++    #[cfg(test)]
++    if decode_frame_test_fault_is(DecodeFrameTestFault::FirstFrameGetFormat) {
++        eprintln!("[decode] injected first-frame get_format failure");
++        return AVPixelFormat::AV_PIX_FMT_NONE;
++    }
+     while *fmts != AVPixelFormat::AV_PIX_FMT_NONE {
+         if *fmts == AVPixelFormat::AV_PIX_FMT_D3D11 {
+             // frames-context manuel : impose BindFlags (sinon ffmpeg met BIND_DECODER seul,
+@@ -755,6 +787,9 @@ pub(crate) struct Decoder {
+     /// sous le même contrat que D3D11VA (voir `cpu_frames`). `None` en matériel — le
+     /// décodeur rend alors directement la texture du pool D3D11VA, sans copie.
+     cpu: Option<CpuFrames>,
++    /// Held only until the first successful hardware frame. Taking it permanently
++    /// disables retry, including when reopening the software decoder itself fails.
++    first_frame_fallback: Option<CpuFrames>,
+     /// Buffer de lookahead pour `peek_next_time_sec` : symétrique de
+     /// `pipeline_macos::Decoder::peek_frame`. Cf. là-bas pour la justification.
+     peek_frame: *mut AVFrame,
+@@ -850,20 +885,38 @@ impl Decoder {
          // (`tests/warp_device_cannot_decode.rs`). AV1/VP9 (legacy WebMs, #554)
          // take the same software CpuFrames axis as Backend::Cpu.
          let want_hw = gpu.backend != Backend::Cpu && d3d11va_for_codec(codec_id);
 -        let cpu = if want_hw {
 -            None
++        #[cfg(test)]
++        let want_hw = want_hw || matches!(DECODE_FRAME_TEST_FAULT.with(|fault| fault.get()),
++            Some(DecodeFrameTestFault::HardwareDeviceInit | DecodeFrameTestFault::FirstFrameGetFormat | DecodeFrameTestFault::FirstReceiveError));
 +        let hardware = if want_hw {
 +            let opened = attach_d3d11va(resources.dctx, gpu).and_then(|hwdev| {
 +                resources.hwdev = hwdev;
@@ -78,10 +115,75 @@ index 28bcc4f..658b340 100644
 -            "avcodec_open2",
 -        )?;
 +        let cpu = if hardware { None } else { Some(CpuFrames::new(gpu)?) };
++        let first_frame_fallback = if hardware { Some(CpuFrames::new(gpu)?) } else { None };
          let (fmt, dctx, hwdev) = resources.into_raw();
  
          Ok(Decoder {
-@@ -1175,16 +1204,26 @@ impl Drop for Decoder {
+@@ -876,6 +929,7 @@ impl Decoder {
+             sent_eof: false,
+             cur_pts: None,
+             cpu,
++            first_frame_fallback,
+             peek_frame: av_frame_alloc(),
+             has_peek: false,
+         })
+@@ -1086,9 +1140,46 @@ impl Decoder {
+     /// Décode dans `into` (buffer courant ou de lookahead) jusqu'à obtenir une frame ou
+     /// l'EOF — cf. `pipeline_macos::Decoder::receive_into` pour la justification.
+     unsafe fn receive_into(&mut self, into: *mut AVFrame) -> Result<bool> {
++        match self.receive_into_inner(into) {
++            Err(error) if self.first_frame_fallback.is_some() => {
++                // get_format / hwaccel initialization can fail only when the first
++                // packet is sent, even though attach/open both succeeded (VM/RDP).
++                eprintln!("[decode] D3D11VA unavailable before first frame ({error:#}); using software decoding");
++                self.cpu = self.first_frame_fallback.take();
++                av_packet_unref(self.pkt);
++                av_frame_unref(self.frame);
++                av_frame_unref(self.peek_frame);
++                avcodec_free_context(&mut self.dctx);
++                av_buffer_unref(&mut self.hwdev);
++                self.has_peek = false;
++                self.cur_pts = None;
++                self.sent_eof = false;
++                let stream = sn_fmt_stream(self.fmt, self.vidx);
++                let codecpar = (*stream).codecpar;
++                let (decoder, dctx) = require_decoder(codecpar)?;
++                self.dctx = dctx;
++                averr(avcodec_parameters_to_context(dctx, codecpar), "software params_to_ctx")?;
++                (*dctx).thread_count = 0;
++                averr(avcodec_open2(dctx, decoder, ptr::null_mut()), "software avcodec_open2")?;
++                let start = if (*stream).start_time == i64::MIN { 0 } else { (*stream).start_time };
++                averr(av_seek_frame(self.fmt, self.vidx, start, AVSEEK_FLAG_BACKWARD), "software restart from beginning")?;
++                // No recursion: a software error is returned, never another retry.
++                self.receive_into_inner(into)
++            }
++            result => result,
++        }
++    }
++
++    unsafe fn receive_into_inner(&mut self, into: *mut AVFrame) -> Result<bool> {
++        #[cfg(test)]
++        if self.first_frame_fallback.is_some()
++            && decode_frame_test_fault_is(DecodeFrameTestFault::FirstReceiveError) {
++            bail!("injected first receive_frame failure");
++        }
+         loop {
+             let r = avcodec_receive_frame(self.dctx, into);
+             if r == 0 {
++                self.first_frame_fallback = None;
+                 return Ok(true);
+             }
+             if r == AVERROR_EOF {
+@@ -1102,7 +1193,7 @@ impl Decoder {
+             }
+             let rr = av_read_frame(self.fmt, self.pkt);
+             if rr == AVERROR_EOF {
+-                avcodec_send_packet(self.dctx, ptr::null_mut());
++                averr(avcodec_send_packet(self.dctx, ptr::null_mut()), "send EOF packet")?;
+                 self.sent_eof = true;
+             } else {
+                 averr(rr, "read_frame")?;
+@@ -1175,16 +1266,26 @@ impl Drop for Decoder {
  const SEEK_FORWARD_MAX_SEC: f64 = 0.5;
  
  unsafe fn make_enc_frames(gpu: &Gpu, w: i32, h: i32) -> Result<(*mut AVBufferRef, *mut AVBufferRef)> {
@@ -113,7 +215,7 @@ index 28bcc4f..658b340 100644
      (*fc).format = AVPixelFormat::AV_PIX_FMT_D3D11;
      (*fc).sw_format = AVPixelFormat::AV_PIX_FMT_NV12;
      (*fc).width = w;
-@@ -1195,8 +1234,27 @@ unsafe fn make_enc_frames(gpu: &Gpu, w: i32, h: i32) -> Result<(*mut AVBufferRef
+@@ -1195,8 +1296,27 @@ unsafe fn make_enc_frames(gpu: &Gpu, w: i32, h: i32) -> Result<(*mut AVBufferRef
      // notre propre NV12 simple (RT) puis CopySubresourceRegion vers ce pool. GPU->GPU.
      let d3dfc = (*fc).hwctx as *mut AVD3D11VAFramesContext;
      (*d3dfc).BindFlags = D3D11_BIND_DECODER | D3D11_BIND_SHADER_RESOURCE;
@@ -143,7 +245,7 @@ index 28bcc4f..658b340 100644
  }
  
  /// C1..C8 (§9) : composite 2 sources → encode, effets gatés par `cfg`. Mesuré au plus extérieur (§10).
-@@ -1593,7 +1651,7 @@ impl VideoEncoder {
+@@ -1593,7 +1713,7 @@ impl VideoEncoder {
          h: u32,
          pts: i64,
      ) -> Result<()> {
@@ -152,7 +254,7 @@ index 28bcc4f..658b340 100644
          averr(av_frame_make_writable(self.sw), "frame_make_writable")?;
          let landing = if self.nv12.is_null() { self.sw } else { self.nv12 };
          comp.read_nv12_scaled(
-@@ -1723,16 +1781,10 @@ unsafe fn run_multi_inner(
+@@ -1723,16 +1843,10 @@ unsafe fn run_multi_inner(
          .unwrap_or_default();
  
      // ---- encodeur (choisi à l'exécution, cf. ExportCodec::candidates) + mux ----
@@ -173,7 +275,7 @@ index 28bcc4f..658b340 100644
      // Libérés en fin de portée sur toutes les sorties : une annulation qui les laisserait fuir
      // coûterait 32 surfaces NV12 à chaque fois. `enc` garde sa propre référence sur le pool.
      let _enc_pool = (BufferGuard(enc_frames), BufferGuard(enc_hwdev));
-@@ -1884,6 +1936,14 @@ unsafe fn run_multi_inner(
+@@ -1884,6 +1998,14 @@ unsafe fn run_multi_inner(
  mod tests {
      use super::*;
  
@@ -188,13 +290,13 @@ index 28bcc4f..658b340 100644
      struct DecodeFrameFaultReset;
  
      impl Drop for DecodeFrameFaultReset {
-@@ -2866,6 +2926,73 @@ mod tests {
+@@ -2866,6 +2988,129 @@ mod tests {
          println!("CORE_ASSERTIONS_COMPLETED:h264_opens_on_d3d11va");
      }
  
 +    #[test]
 +    fn h264_device_init_failure_falls_back_to_software_and_keeps_seek_clock() {
-+        let gpu = Gpu::create(false).expect("hardware device for injected failure test");
++        let gpu = Gpu::create_auto(false).expect("D3D11 device for injected failure test");
 +        let path = encode_color(&["-c:v", "libopenh264", "-b:v", "200k"], "software-fallback.mp4");
 +        {
 +            let _fault = install_simple_decode_frame_fault(DecodeFrameTestFault::HardwareDeviceInit);
@@ -211,13 +313,69 @@ index 28bcc4f..658b340 100644
 +        }
 +        let decoder = unsafe { Decoder::open(path.to_str().unwrap(), &gpu) }
 +            .expect("ordinary hardware decoder");
-+        assert!(decoder.cpu.is_none(), "healthy hardware remains the default");
++        assert_eq!(decoder.cpu.is_none(), gpu.backend != Backend::Cpu, "healthy backend remains the default");
 +        println!("CORE_ASSERTIONS_COMPLETED:h264_device_init_failure_falls_back_to_software_and_keeps_seek_clock");
 +    }
 +
 +    #[test]
++    fn h264_first_frame_failure_falls_back_once_and_exports_decodable_frames() {
++        let gpu = Gpu::create_backend(Backend::Cpu, false).expect("WARP device for deterministic first-frame fault injection");
++        let path = encode_color_for_duration(
++            &["-c:v", "libopenh264", "-b:v", "200k"], "first-frame-fallback-source.mp4", "0.5",
++        );
++        let params = ExportParams {
++            width: 64, height: 64, fps: Some(24), codec: ExportCodec::H264,
++            bit_rate: Some(200_000),
++        };
++        let comp = Compositor::new_sized(&gpu, 64, 64).expect("compositor");
++        for fault in [DecodeFrameTestFault::FirstFrameGetFormat, DecodeFrameTestFault::FirstReceiveError] {
++            let out = path.with_file_name(format!("first-frame-fallback-{fault:?}.mp4"));
++            {
++                let _fault = install_simple_decode_frame_fault(fault);
++                let mut decoder = unsafe { Decoder::open(path.to_str().unwrap(), &gpu) }.expect("hardware open");
++                assert!(decoder.cpu.is_none(), "fault must occur after attach/open succeeded");
++                assert!(!decoder.hwdev.is_null());
++                let frame = unsafe { first_decoded_frame(&mut decoder) };
++                assert_eq!(unsafe { (*frame).width }, 64);
++                assert!(decoder.cpu.is_some());
++                assert!(decoder.hwdev.is_null(), "failed hardware context released");
++                assert!(decoder.first_frame_fallback.is_none(), "retry consumed permanently");
++                assert_eq!(unsafe { decoder.cur_time_sec() }, 0.0, "first packet must be replayed");
++                let frame = unsafe { decoder.seek_to(0.2) }.expect("software seek after recovery");
++                assert!(!frame.is_null());
++                assert!(unsafe { decoder.cur_time_sec() } >= 0.2);
++                // Fault stays installed: software reopen must not choose hardware again.
++                unsafe { decoder.rewind() }.expect("rewind");
++                assert!(!unsafe { decoder.next() }.expect("software replay").is_null());
++                let stats = run_composited_multi(
++                    &[ClipSource {
++                        screen: path.to_string_lossy().into_owned(), webcam: String::new(),
++                        source_start_sec: 0.0, source_end_sec: 0.5, webcam_offset_sec: 0.0,
++                        has_audio: false,
++                    }], &out.to_string_lossy(), &gpu, &comp, &Cfg::c8(), &params, &mut |_| {},
++                ).expect("first-frame failure must still export");
++                assert_eq!(stats.frames, 12);
++            }
++            assert_eq!(probe_frame_count(&out.to_string_lossy()).expect("muxed frame count"), 12);
++            let decoded = std::process::Command::new(ffmpeg_exe())
++                .args(["-v", "error", "-xerror", "-i"]).arg(&out)
++                .args(["-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
++                .output().expect("strict decode exported MP4");
++            assert!(decoded.status.success(), "{}", String::from_utf8_lossy(&decoded.stderr));
++            assert_eq!(decoded.stdout.len(), 12 * 64 * 64 * 3);
++            assert!(decoded.stdout.chunks_exact(3).any(|p| p[0] > p[2].saturating_add(50)),
++                "export must contain the red source, not blank frames");
++        }
++        let mut healthy = unsafe { Decoder::open(path.to_str().unwrap(), &gpu) }.expect("healthy hardware decoder");
++        unsafe { first_decoded_frame(&mut healthy) };
++        assert!(healthy.cpu.is_some(), "ordinary WARP remains on software without injection");
++        assert!(healthy.first_frame_fallback.is_none(), "no fallback after a valid hardware frame");
++        println!("CORE_ASSERTIONS_COMPLETED:h264_first_frame_failure_falls_back_once_and_exports_decodable_frames");
++    }
++
++    #[test]
 +    fn h264_encoder_pool_failure_falls_back_and_exports_decodable_frames() {
-+        let gpu = Gpu::create(false).expect("hardware device for encoder fault injection");
++        let gpu = Gpu::create_auto(false).expect("D3D11 device for encoder fault injection");
 +        let path = encode_color_for_duration(
 +            &["-c:v", "libopenh264", "-b:v", "200k"], "encoder-fallback-source.mp4", "0.5",
 +        );
@@ -255,7 +413,7 @@ index 28bcc4f..658b340 100644
 +        }
 +        let (device, frames) = unsafe { make_export_frames(&gpu, 64, 64) };
 +        let _healthy_pool = (BufferGuard(frames), BufferGuard(device));
-+        assert!(!frames.is_null(), "healthy encoder pool remains enabled");
++        assert_eq!(frames.is_null(), gpu.backend == Backend::Cpu, "healthy encoder policy unchanged");
 +        println!("CORE_ASSERTIONS_COMPLETED:h264_encoder_pool_failure_falls_back_and_exports_decodable_frames");
 +    }
 +
