@@ -16,7 +16,7 @@ export function compositorBuildInputs(root=defaultRoot){
 export function verifyWindowsCompositor(root=defaultRoot){
  const input=compositorBuildInputs(root),out=path.join(root,'native/windows/compositor');
  const receipt=JSON.parse(fs.readFileSync(path.join(out,'build.json'),'utf8'));
- if(receipt.kind!=='opentake-compositor-software-video-v3'||receipt.ffmpegSdkSha256!==input.upstream.sdkSha256||receipt.upstreamCommit!==input.upstream.commit||receipt.sourceSha256!==input.sourceSha256||receipt.binarySha256!==sha(fs.readFileSync(path.join(out,'compositor_view.node'))))throw Error('原生合成器与固定源码或构建回执不一致，请重新构建。');
+ if(receipt.kind!=='opentake-compositor-software-video-v4'||receipt.ffmpegSdkSha256!==input.upstream.sdkSha256||receipt.upstreamCommit!==input.upstream.commit||receipt.sourceSha256!==input.sourceSha256||receipt.binarySha256!==sha(fs.readFileSync(path.join(out,'compositor_view.node'))))throw Error('原生合成器与固定源码或构建回执不一致，请重新构建。');
  return receipt;
 }
 function run(file,args,options={}){
@@ -37,9 +37,11 @@ async function build(){
  if(run('git',['rev-parse','HEAD'],{cwd:checkout}).trim()!==upstream.commit)throw Error('OpenScreen 原生源码提交不匹配；保留目录，未覆盖。');
  const reverse=spawnSync('git',['apply','--reverse','--check',patch],{cwd:checkout,windowsHide:true});
  if(reverse.status!==0)run('git',['apply',patch],{cwd:checkout});
- if(sha(fs.readFileSync(path.join(checkout,upstream.patchedFile),'utf8').replaceAll('\r\n','\n'))!==upstream.patchedFileSha256)throw Error('原生解码补丁结果不匹配。');
- const changed=run('git',['diff','--name-only'],{cwd:checkout}).trim().split(/\r?\n/).filter(Boolean);
- if(changed.some(file=>file!==upstream.patchedFile))throw Error('原生源码目录有其他改动；保留目录，未继续编译。');
+ for(const file of upstream.patchedFiles){
+  if(sha(fs.readFileSync(path.join(checkout,file.path),'utf8').replaceAll('\r\n','\n'))!==file.sha256)throw Error('原生补丁结果不匹配：'+file.path);
+ }
+ const changed=run('git',['ls-files','--modified','--others','--exclude-standard'],{cwd:checkout}).trim().split(/\r?\n/).filter(Boolean);
+ if(changed.some(file=>!upstream.patchedFiles.some(expected=>expected.path===file)))throw Error('原生源码目录有其他改动；保留目录，未继续编译。');
  const archive=path.join(work,'ffmpeg-sdk.zip'),sdkRoot=path.join(work,'sdk'),sdk=path.join(sdkRoot,upstream.sdkDirectory);
  if(!fs.existsSync(archive)||sha(fs.readFileSync(archive))!==upstream.sdkSha256){
   const response=await fetch(upstream.sdkUrl,{signal:AbortSignal.timeout(120000)});if(!response.ok)throw Error('无法下载固定 FFmpeg SDK：'+response.status);
@@ -59,11 +61,11 @@ async function build(){
  const cargoArgs=testOnly?'test --locked -j 2 -p openscreen-compositor --lib --target x86_64-pc-windows-msvc -- --test-threads=1 --nocapture':'build --locked --release -j 2 -p compositor-view-napi --target x86_64-pc-windows-msvc';
  fs.writeFileSync(command,`@echo off\r\n${quote(path.join(process.env.SystemRoot||'C:\\Windows','System32/chcp.com'))} 65001 >nul\r\ncall ${quote(vcvars)} x64\r\nif errorlevel 1 exit /b %errorlevel%\r\n${quote(cargo)} +stable-x86_64-pc-windows-msvc ${cargoArgs}\r\nexit /b %errorlevel%\r\n`);
  run(process.env.ComSpec||'cmd.exe',['/d','/s','/c',`""${command}""`],{cwd:path.join(checkout,'crates'),windowsVerbatimArguments:true,env:{...process.env,PATH:path.join(sdk,'bin')+path.delimiter+(process.env.PATH||process.env.Path||''),FFMPEG_DIR:sdk,LIBCLANG_PATH:clang},stdio:'inherit'});
- if(testOnly){console.log('Windows 合成器 Rust 测试完成，包含首帧失败回退用例。');return;}
+ if(testOnly){console.log('Windows 合成器 Rust 测试完成，包含首帧回退、24/30/60 帧率与末帧时长用例。');return;}
  const out=path.join(defaultRoot,'native/windows/compositor');fs.mkdirSync(out,{recursive:true});
  const binary=path.join(out,'compositor_view.node');fs.copyFileSync(path.join(checkout,'crates/target/x86_64-pc-windows-msvc/release/compositor_view.dll'),binary);
  fs.copyFileSync(path.join(vendor,'LICENSE'),path.join(out,'LICENSE'));
- fs.writeFileSync(path.join(out,'build.json'),JSON.stringify({kind:'opentake-compositor-software-video-v3',upstreamCommit:upstream.commit,sourceSha256,binarySha256:sha(fs.readFileSync(binary)),ffmpegSdkSha256:upstream.sdkSha256},null,2)+'\n');
+ fs.writeFileSync(path.join(out,'build.json'),JSON.stringify({kind:'opentake-compositor-software-video-v4',upstreamCommit:upstream.commit,sourceSha256,binarySha256:sha(fs.readFileSync(binary)),ffmpegSdkSha256:upstream.sdkSha256},null,2)+'\n');
  verifyWindowsCompositor();console.log('Windows 原生合成器已构建，支持硬件初始化和首帧解码失败后的一次性软件解码及编码回退。');
 }
-if(process.argv[1]&&fs.realpathSync(process.argv[1])===fs.realpathSync(fileURLToPath(import.meta.url)))await build();
+if(process.argv[1]&&fs.existsSync(process.argv[1])&&fs.realpathSync(process.argv[1])===fs.realpathSync(fileURLToPath(import.meta.url)))await build();

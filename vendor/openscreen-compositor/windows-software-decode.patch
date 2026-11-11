@@ -1,8 +1,7 @@
 diff --git a/crates/compositor/src/pipeline_windows.rs b/crates/compositor/src/pipeline_windows.rs
-index 28bcc4f..5fa02c7 100644
 --- a/crates/compositor/src/pipeline_windows.rs
 +++ b/crates/compositor/src/pipeline_windows.rs
-@@ -38,10 +38,22 @@ enum DecodeFrameTestFault {
+@@ -38,10 +38,22 @@
      CloneNull,
      EofSendError,
      AttachBufferRefNull,
@@ -25,7 +24,7 @@ index 28bcc4f..5fa02c7 100644
      static DECODE_FRAME_TEST_FAULT: std::cell::Cell<Option<DecodeFrameTestFault>> =
          const { std::cell::Cell::new(None) };
      static DECODE_FRAME_TEST_PACKET_RELEASED: std::cell::RefCell<
-@@ -407,6 +419,21 @@ unsafe fn attach_d3d11va(dctx: *mut AVCodecContext, gpu: &Gpu) -> Result<*mut AV
+@@ -407,6 +419,21 @@
      if hwdev.is_null() {
          bail!("av_hwdevice_ctx_alloc");
      }
@@ -47,7 +46,7 @@ index 28bcc4f..5fa02c7 100644
      let hwdc = (*hwdev).data as *mut AVHWDeviceContext;
      let d3dctx = (*hwdc).hwctx as *mut AVD3D11VADeviceContext;
      let dev_clone = gpu.device.clone();
-@@ -437,6 +464,11 @@ unsafe extern "C" fn get_hw_format(
+@@ -437,6 +464,11 @@
      ctx: *mut AVCodecContext,
      mut fmts: *const AVPixelFormat::Type,
  ) -> AVPixelFormat::Type {
@@ -59,7 +58,16 @@ index 28bcc4f..5fa02c7 100644
      while *fmts != AVPixelFormat::AV_PIX_FMT_NONE {
          if *fmts == AVPixelFormat::AV_PIX_FMT_D3D11 {
              // frames-context manuel : impose BindFlags (sinon ffmpeg met BIND_DECODER seul,
-@@ -755,6 +787,9 @@ pub(crate) struct Decoder {
+@@ -610,7 +642,7 @@
+                     "avio_open",
+                 )?;
+                 sn_fmt_set_pb(octx, pb);
+-                averr(avformat_write_header(octx, ptr::null_mut()), "write_header")?;
++                video_mux_timing::write_header(octx, (*ectx).framerate)?;
+             }
+ 
+             (*frame).pts = frames as i64;
+@@ -755,6 +787,9 @@
      /// sous le même contrat que D3D11VA (voir `cpu_frames`). `None` en matériel — le
      /// décodeur rend alors directement la texture du pool D3D11VA, sans copie.
      cpu: Option<CpuFrames>,
@@ -69,7 +77,7 @@ index 28bcc4f..5fa02c7 100644
      /// Buffer de lookahead pour `peek_next_time_sec` : symétrique de
      /// `pipeline_macos::Decoder::peek_frame`. Cf. là-bas pour la justification.
      peek_frame: *mut AVFrame,
-@@ -850,20 +885,38 @@ impl Decoder {
+@@ -850,20 +885,38 @@
          // (`tests/warp_device_cannot_decode.rs`). AV1/VP9 (legacy WebMs, #554)
          // take the same software CpuFrames axis as Backend::Cpu.
          let want_hw = gpu.backend != Backend::Cpu && d3d11va_for_codec(codec_id);
@@ -119,7 +127,7 @@ index 28bcc4f..5fa02c7 100644
          let (fmt, dctx, hwdev) = resources.into_raw();
  
          Ok(Decoder {
-@@ -876,6 +929,7 @@ impl Decoder {
+@@ -876,6 +929,7 @@
              sent_eof: false,
              cur_pts: None,
              cpu,
@@ -127,7 +135,7 @@ index 28bcc4f..5fa02c7 100644
              peek_frame: av_frame_alloc(),
              has_peek: false,
          })
-@@ -1086,9 +1140,46 @@ impl Decoder {
+@@ -1086,9 +1140,46 @@
      /// Décode dans `into` (buffer courant ou de lookahead) jusqu'à obtenir une frame ou
      /// l'EOF — cf. `pipeline_macos::Decoder::receive_into` pour la justification.
      unsafe fn receive_into(&mut self, into: *mut AVFrame) -> Result<bool> {
@@ -174,7 +182,7 @@ index 28bcc4f..5fa02c7 100644
                  return Ok(true);
              }
              if r == AVERROR_EOF {
-@@ -1102,7 +1193,7 @@ impl Decoder {
+@@ -1102,7 +1193,7 @@
              }
              let rr = av_read_frame(self.fmt, self.pkt);
              if rr == AVERROR_EOF {
@@ -183,7 +191,7 @@ index 28bcc4f..5fa02c7 100644
                  self.sent_eof = true;
              } else {
                  averr(rr, "read_frame")?;
-@@ -1175,16 +1266,26 @@ impl Drop for Decoder {
+@@ -1175,16 +1266,26 @@
  const SEEK_FORWARD_MAX_SEC: f64 = 0.5;
  
  unsafe fn make_enc_frames(gpu: &Gpu, w: i32, h: i32) -> Result<(*mut AVBufferRef, *mut AVBufferRef)> {
@@ -199,14 +207,15 @@ index 28bcc4f..5fa02c7 100644
      (*d3dctx).device = dev_clone.as_raw() as *mut ID3D11Device;
      std::mem::forget(dev_clone);
 -    averr(av_hwdevice_ctx_init(hwdev), "enc hwdevice init")?;
+-
+-    let frames = av_hwframe_ctx_alloc(hwdev);
+-    let fc = (*frames).data as *mut AVHWFramesContext;
 +    #[cfg(test)]
 +    if ENCODE_FRAME_TEST_FAULT.with(|fault| fault.get() == Some(EncodeFrameTestFault::DeviceInit)) {
 +        bail!("injected enc hwdevice init failure");
 +    }
 +    averr(av_hwdevice_ctx_init(hwdev.0), "enc hwdevice init")?;
- 
--    let frames = av_hwframe_ctx_alloc(hwdev);
--    let fc = (*frames).data as *mut AVHWFramesContext;
++
 +    let mut frames = BufferGuard(av_hwframe_ctx_alloc(hwdev.0));
 +    if frames.0.is_null() {
 +        bail!("enc av_hwframe_ctx_alloc");
@@ -215,7 +224,7 @@ index 28bcc4f..5fa02c7 100644
      (*fc).format = AVPixelFormat::AV_PIX_FMT_D3D11;
      (*fc).sw_format = AVPixelFormat::AV_PIX_FMT_NV12;
      (*fc).width = w;
-@@ -1195,8 +1296,27 @@ unsafe fn make_enc_frames(gpu: &Gpu, w: i32, h: i32) -> Result<(*mut AVBufferRef
+@@ -1195,8 +1296,27 @@
      // notre propre NV12 simple (RT) puis CopySubresourceRegion vers ce pool. GPU->GPU.
      let d3dfc = (*fc).hwctx as *mut AVD3D11VAFramesContext;
      (*d3dfc).BindFlags = D3D11_BIND_DECODER | D3D11_BIND_SHADER_RESOURCE;
@@ -245,7 +254,16 @@ index 28bcc4f..5fa02c7 100644
  }
  
  /// C1..C8 (§9) : composite 2 sources → encode, effets gatés par `cfg`. Mesuré au plus extérieur (§10).
-@@ -1593,7 +1713,7 @@ impl VideoEncoder {
+@@ -1252,7 +1372,7 @@
+     let mut pb: *mut AVIOContext = ptr::null_mut();
+     averr(avio_open(&mut pb, outc.as_ptr(), AVIO_FLAG_WRITE as i32), "avio_open")?;
+     sn_fmt_set_pb(octx, pb);
+-    averr(avformat_write_header(octx, ptr::null_mut()), "write_header")?;
++    video_mux_timing::write_header(octx, (*ectx).framerate)?;
+ 
+     let opkt = av_packet_alloc();
+     let mut frames: u64 = 0;
+@@ -1593,7 +1713,7 @@
          h: u32,
          pts: i64,
      ) -> Result<()> {
@@ -254,7 +272,7 @@ index 28bcc4f..5fa02c7 100644
          averr(av_frame_make_writable(self.sw), "frame_make_writable")?;
          let landing = if self.nv12.is_null() { self.sw } else { self.nv12 };
          comp.read_nv12_scaled(
-@@ -1723,16 +1843,10 @@ unsafe fn run_multi_inner(
+@@ -1723,16 +1843,10 @@
          .unwrap_or_default();
  
      // ---- encodeur (choisi à l'exécution, cf. ExportCodec::candidates) + mux ----
@@ -275,10 +293,20 @@ index 28bcc4f..5fa02c7 100644
      // Libérés en fin de portée sur toutes les sorties : une annulation qui les laisserait fuir
      // coûterait 32 surfaces NV12 à chaque fois. `enc` garde sa propre référence sur le pool.
      let _enc_pool = (BufferGuard(enc_frames), BufferGuard(enc_hwdev));
-@@ -1884,6 +1998,14 @@ unsafe fn run_multi_inner(
+@@ -1771,7 +1885,7 @@
+     let mut pb: *mut AVIOContext = ptr::null_mut();
+     averr(avio_open(&mut pb, outc.as_ptr(), AVIO_FLAG_WRITE as i32), "avio_open")?;
+     sn_fmt_set_pb(octx, pb);
+-    averr(avformat_write_header(octx, ptr::null_mut()), "write_header")?;
++    video_mux_timing::write_header(octx, (*ectx).framerate)?;
+ 
+     let opkt = av_packet_alloc();
+     let _opkt = PacketGuard(opkt);
+@@ -1883,6 +1997,14 @@
+ #[cfg(test)]
  mod tests {
      use super::*;
- 
++
 +    struct EncodeFrameFaultReset;
 +
 +    impl Drop for EncodeFrameFaultReset {
@@ -286,15 +314,13 @@ index 28bcc4f..5fa02c7 100644
 +            ENCODE_FRAME_TEST_FAULT.with(|fault| fault.set(None));
 +        }
 +    }
-+
+ 
      struct DecodeFrameFaultReset;
  
-     impl Drop for DecodeFrameFaultReset {
-@@ -2866,6 +2988,129 @@ mod tests {
-         println!("CORE_ASSERTIONS_COMPLETED:h264_opens_on_d3d11va");
+@@ -2867,6 +2989,158 @@
      }
  
-+    #[test]
+     #[test]
 +    fn h264_device_init_failure_falls_back_to_software_and_keeps_seek_clock() {
 +        let gpu = Gpu::create_auto(false).expect("D3D11 device for injected failure test");
 +        let path = encode_color(&["-c:v", "libopenh264", "-b:v", "200k"], "software-fallback.mp4");
@@ -374,6 +400,35 @@ index 28bcc4f..5fa02c7 100644
 +    }
 +
 +    #[test]
++    fn hardware_unavailable_export_duration_includes_last_frame_24_30_60() {
++        // WARP is deliberate: windows-2025 has no usable hardware video decoder.
++        // Do not weaken the nine existing hardware-specific tests or skip this one.
++        let gpu = Gpu::create_backend(Backend::Cpu, false).expect("WARP device");
++        let source = encode_color_for_duration(
++            &["-c:v", "libopenh264", "-b:v", "200k"], "duration-source.mp4", "1.0",
++        );
++        let comp = Compositor::new_sized(&gpu, 64, 64).expect("CPU compositor");
++        let (device, pool) = unsafe { make_export_frames(&gpu, 64, 64) };
++        assert!(device.is_null() && pool.is_null(), "no hardware encoding pool");
++        for fps in [24, 30, 60] {
++            let out = source.with_file_name(format!("no-hardware-duration-{fps}.mp4"));
++            let params = ExportParams {
++                width: 64, height: 64, fps: Some(fps), codec: ExportCodec::H264,
++                bit_rate: Some(200_000),
++            };
++            let stats = run_composited_multi(
++                &[ClipSource {
++                    screen: source.to_string_lossy().into_owned(), webcam: String::new(),
++                    source_start_sec: 0.0, source_end_sec: 1.0, webcam_offset_sec: 0.0,
++                    has_audio: false,
++                }], &out.to_string_lossy(), &gpu, &comp, &Cfg::c8(), &params, &mut |_| {},
++            ).expect("hardware-unavailable export");
++            assert_eq!(stats.frames, fps as u64);
++            unsafe { super::video_duration_tests::assert_container(&out, fps as i64, fps as i32); }
++        }
++    }
++
++    #[test]
 +    fn h264_encoder_pool_failure_falls_back_and_exports_decodable_frames() {
 +        let gpu = Gpu::create_auto(false).expect("D3D11 device for encoder fault injection");
 +        let path = encode_color_for_duration(
@@ -417,6 +472,234 @@ index 28bcc4f..5fa02c7 100644
 +        println!("CORE_ASSERTIONS_COMPLETED:h264_encoder_pool_failure_falls_back_and_exports_decodable_frames");
 +    }
 +
-     #[test]
++    #[test]
      fn current_frame_requires_pixels_and_recovers_after_eof_seek() {
          let Some(gpu) =
+             strict_hardware_gpu("current_frame_requires_pixels_and_recovers_after_eof_seek")
+@@ -3135,6 +3409,7 @@
+         }
+         averr(r, "receive_packet")?;
+         (*opkt).stream_index = (*ostream).index;
++        video_mux_timing::packet_duration(opkt, ectx)?;
+         av_packet_rescale_ts(opkt, (*ectx).time_base, (*ostream).time_base);
+         averr(
+             av_interleaved_write_frame(octx, opkt),
+@@ -3180,3 +3455,10 @@
+         Ok(n)
+     }
+ }
++
++#[cfg(test)]
++#[path = "video_duration_tests.rs"]
++mod video_duration_tests;
++
++#[path = "video_mux_timing.rs"]
++mod video_mux_timing;
+diff --git a/crates/compositor/src/pipeline_macos.rs b/crates/compositor/src/pipeline_macos.rs
+--- a/crates/compositor/src/pipeline_macos.rs
++++ b/crates/compositor/src/pipeline_macos.rs
+@@ -1269,10 +1269,7 @@
+     // qui manquait, pas la machinerie.
+     let mut audio_encoder = unsafe { AacEncoder::open(octx)? };
+     unsafe {
+-        crate::ffi::averr(
+-            crate::ffi::avformat_write_header(octx, ptr::null_mut()),
+-            "write_header",
+-        )?;
++        video_mux_timing::write_header(octx, (*ectx).framerate)?;
+     }
+     // Un PCM par clip, assemblé après la marche vidéo : c'est elle qui dit combien de
+     // frames chaque clip a réellement produit, donc combien d'audio lui revient.
+@@ -1423,6 +1420,7 @@
+             return Ok(());
+         }
+         averr(r, "receive_packet")?;
++        video_mux_timing::packet_duration(opkt, ectx)?;
+         av_packet_rescale_ts(opkt, (*ectx).time_base, (*ostream).time_base);
+         averr(
+             av_interleaved_write_frame(octx, opkt),
+@@ -1444,3 +1442,10 @@
+ // que le type reste référencé.
+ #[allow(dead_code)]
+ fn _typecheck_compositor(_c: &Compositor, _g: &Gpu) {}
++
++#[cfg(test)]
++#[path = "video_duration_tests.rs"]
++mod video_duration_tests;
++
++#[path = "video_mux_timing.rs"]
++mod video_mux_timing;
+diff --git a/crates/compositor/src/video_duration_tests.rs b/crates/compositor/src/video_duration_tests.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/compositor/src/video_duration_tests.rs
+@@ -0,0 +1,102 @@
++//! Container regression shared by the Windows and Mac production drain paths.
++//! No remux, metadata override, browser, GPU or installed application is involved.
++use super::drain_encoder;
++use crate::ffi::*;
++use std::{ffi::CString, path::Path, ptr};
++
++pub(super) unsafe fn assert_container(path: &Path, frames: i64, fps: i32) {
++    let name = CString::new(path.to_string_lossy().as_bytes()).unwrap();
++    let mut input = ptr::null_mut();
++    averr(avformat_open_input(&mut input, name.as_ptr(), ptr::null_mut(), ptr::null_mut()), "read exported MP4").unwrap();
++    averr(avformat_find_stream_info(input, ptr::null_mut()), "read streams").unwrap();
++    let index = av_find_best_stream(input, AVMediaType::AVMEDIA_TYPE_VIDEO, -1, -1, ptr::null_mut(), 0);
++    assert!(index >= 0);
++    let stream = sn_fmt_stream(input, index);
++    let tb = (*stream).time_base;
++    let rate = (*stream).avg_frame_rate;
++    let duration = (*stream).duration;
++    let count = (*stream).nb_frames;
++    avformat_close_input(&mut input);
++    assert_eq!(count, frames, "all encoded frames must be muxed");
++    assert!(rate.num > 0 && rate.den > 0, "average frame rate must be present");
++    assert_eq!(rate.num as i64, fps as i64 * rate.den as i64, "average rate must equal requested CFR");
++    let expected = av_rescale_q(frames, AVRational { num: 1, den: fps }, tb);
++    assert!((duration - expected).abs() <= 1, "last frame duration lost: {duration}, expected {expected}, fps={fps}");
++    eprintln!("CONTAINER_DURATION_OK fps={fps} frames={count} duration={duration} time_base={}/{} avg={}/{} path={}", tb.num, tb.den, rate.num, rate.den, path.display());
++}
++
++unsafe fn encode_and_check(name: &str, format: AVPixelFormat::Type, fps: i32, frames: i64) {
++    let dir = std::env::var_os("OPENSCREEN_DURATION_TEST_OUTPUT").map(std::path::PathBuf::from)
++        .unwrap_or_else(|| std::env::temp_dir().join(format!("openscreen-duration-{}", std::process::id())));
++    std::fs::create_dir_all(&dir).unwrap();
++    let path = dir.join(format!("{name}-{fps}-{frames}.mp4"));
++    let cname = CString::new(name).unwrap();
++    let codec = avcodec_find_encoder_by_name(cname.as_ptr());
++    assert!(!codec.is_null(), "required software encoder {name} missing; do not skip");
++    let mut enc = avcodec_alloc_context3(codec);
++    (*enc).width = 64;
++    (*enc).height = 64;
++    (*enc).pix_fmt = format;
++    (*enc).time_base = AVRational { num: 1, den: fps };
++    (*enc).framerate = AVRational { num: fps, den: 1 };
++    (*enc).bit_rate = 200_000;
++    (*enc).flags |= AV_CODEC_FLAG_GLOBAL_HEADER as i32;
++    averr(avcodec_open2(enc, codec, ptr::null_mut()), "open software encoder").unwrap();
++    let file = CString::new(path.to_string_lossy().as_bytes()).unwrap();
++    let mut output = ptr::null_mut();
++    averr(avformat_alloc_output_context2(&mut output, ptr::null(), ptr::null(), file.as_ptr()), "create MP4").unwrap();
++    let stream = avformat_new_stream(output, ptr::null());
++    assert!(!stream.is_null());
++    averr(avcodec_parameters_from_context((*stream).codecpar, enc), "codec parameters").unwrap();
++    (*stream).time_base = (*enc).time_base;
++    let mut pb = ptr::null_mut();
++    averr(avio_open(&mut pb, file.as_ptr(), AVIO_FLAG_WRITE as i32), "open MP4").unwrap();
++    sn_fmt_set_pb(output, pb);
++    super::video_mux_timing::write_header(output, (*enc).framerate).unwrap();
++    let mut frame = av_frame_alloc();
++    (*frame).format = format;
++    (*frame).width = 64;
++    (*frame).height = 64;
++    averr(av_frame_get_buffer(frame, 0), "frame buffer").unwrap();
++    let mut packet = av_packet_alloc();
++    for pts in 0..frames {
++        averr(av_frame_make_writable(frame), "writable frame").unwrap();
++        for plane in 0..if format == AVPixelFormat::AV_PIX_FMT_NV12 { 2 } else { 3 } {
++            let rows = if plane == 0 { 64 } else { 32 };
++            ptr::write_bytes((*frame).data[plane], if plane == 0 { 64 + (pts % 64) as u8 } else { 128 }, (*frame).linesize[plane] as usize * rows);
++        }
++        (*frame).pts = pts;
++        // The production compositor provides PTS, but no input duration. Exercise
++        // the real encoder's missing-duration packets, including delayed flush.
++        (*frame).duration = 0;
++        averr(avcodec_send_frame(enc, frame), "send frame").unwrap();
++        drain_encoder(enc, output, stream, packet).unwrap();
++    }
++    averr(avcodec_send_frame(enc, ptr::null()), "flush encoder").unwrap();
++    drain_encoder(enc, output, stream, packet).unwrap();
++    averr(av_write_trailer(output), "trailer").unwrap();
++    avio_closep(&mut pb);
++    avformat_free_context(output);
++    av_packet_free(&mut packet);
++    av_frame_free(&mut frame);
++    avcodec_free_context(&mut enc);
++    assert_container(&path, frames, fps);
++    if std::env::var_os("OPENSCREEN_DURATION_TEST_OUTPUT").is_none() { std::fs::remove_file(path).unwrap(); }
++}
++
++#[test]
++fn software_export_duration_includes_last_frame_24_30_60() {
++    #[cfg(windows)]
++    let candidates = [("h264_mf", AVPixelFormat::AV_PIX_FMT_NV12), ("libopenh264", AVPixelFormat::AV_PIX_FMT_YUV420P)];
++    // Homebrew's local Mac SDK does not ship libopenh264. libx264 is only a test
++    // fixture; this does not add a GPL encoder to the product's candidate list.
++    #[cfg(target_os = "macos")]
++    let candidates = [("libx264", AVPixelFormat::AV_PIX_FMT_YUV420P)];
++    for (name, format) in candidates {
++        for fps in [24, 30, 60] {
++            for frames in [1, 7, 200] {
++                unsafe { encode_and_check(name, format, fps, frames); }
++            }
++        }
++    }
++}
+diff --git a/crates/compositor/src/video_mux_timing.rs b/crates/compositor/src/video_mux_timing.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/compositor/src/video_mux_timing.rs
+@@ -0,0 +1,62 @@
++//! CFR timing at the first mux write, shared by the Windows and Mac pipelines.
++use crate::ffi::*;
++use anyhow::{bail, Result};
++use std::ptr;
++
++pub(super) unsafe fn packet_duration(packet: *mut AVPacket, encoder: *mut AVCodecContext) -> Result<()> {
++    // Some encoders, including h264_mf, omit duration even on the flush packet.
++    // MOV infers earlier durations from DTS but cannot infer the final sample.
++    // Fill in the encoder clock BEFORE rescale; preserve valid durations/PTS/DTS.
++    if (*packet).duration <= 0 {
++        let rate = (*encoder).framerate;
++        if rate.num <= 0 || rate.den <= 0 {
++            bail!("missing encoder frame rate for CFR packet duration");
++        }
++        (*packet).duration = av_rescale_q(
++            1, AVRational { num: rate.den, den: rate.num }, (*encoder).time_base,
++        );
++        if (*packet).duration <= 0 {
++            bail!("encoder time base cannot represent one CFR frame");
++        }
++    }
++    Ok(())
++}
++
++pub(super) unsafe fn write_header(output: *mut AVFormatContext, rate: AVRational) -> Result<()> {
++    // MOV's default 1000-Hz movie clock rounds elst to milliseconds. Even with
++    // correct stts/mdhd this can clip the demuxed stream by several video ticks.
++    // Choose an exact frame-compatible movie clock at header creation; no duration
++    // overrides or post-export changes. Precision is at least the previous 1 ms.
++    if rate.num <= 0 || rate.den <= 0 { bail!("invalid CFR frame rate"); }
++    let scale = rate.num.checked_mul(1000).ok_or_else(|| anyhow::anyhow!("CFR movie clock overflow"))?;
++    let mut options = ptr::null_mut();
++    averr(av_dict_set_int(&mut options, b"movie_timescale\0".as_ptr().cast(), scale as i64, 0), "movie timescale")?;
++    let result = avformat_write_header(output, &mut options);
++    av_dict_free(&mut options);
++    averr(result, "write_header")
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn missing_duration_is_in_encoder_ticks_and_existing_duration_is_preserved() {
++        unsafe {
++            let mut enc = avcodec_alloc_context3(ptr::null());
++            let mut packet = av_packet_alloc();
++            assert!(!enc.is_null() && !packet.is_null());
++            (*enc).framerate = AVRational { num: 24, den: 1 };
++            (*enc).time_base = AVRational { num: 1, den: 48 };
++            (*packet).pts = 6;
++            (*packet).dts = 2;
++            packet_duration(packet, enc).unwrap();
++            assert_eq!((*packet).duration, 2);
++            (*packet).duration = 4;
++            packet_duration(packet, enc).unwrap();
++            assert_eq!((*packet).duration, 4);
++            assert_eq!(((*packet).pts, (*packet).dts), (6, 2));
++            av_packet_free(&mut packet);
++            avcodec_free_context(&mut enc);
++        }
++    }
++}

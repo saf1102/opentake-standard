@@ -2,10 +2,26 @@
   "repository": "https://github.com/getopenscreen/openscreen.git",
   "tag": "v2.1.2",
   "commit": "d8889c626f859e0be8f4f87fdffc7362629550bc",
-  "patchedFile": "crates/compositor/src/pipeline_windows.rs",
-  "patchedFileSha256": "b5c44f385654c9653a112bb29086016c2cc70c3c48ea584e51cbaf52816a6939",
   "sdkUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-31-14-10/ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1.zip",
   "sdkSha256": "c222a490dde4e7059f45495deef6bfb98dbcacc2b43df5b607546252037aa95c",
   "sdkDirectory": "ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1",
-  "license": "MIT"
+  "license": "MIT",
+  "patchedFiles": [
+    {
+      "path": "crates/compositor/src/pipeline_windows.rs",
+      "sha256": "95aeed2f96f45775a622e7bfc1cd50dde3856b286c82a4839f6ffa201894b3ae"
+    },
+    {
+      "path": "crates/compositor/src/pipeline_macos.rs",
+      "sha256": "73e181dff11523ca4476da446b3111259e29eae107bdb602b2bc11d8e8019270"
+    },
+    {
+      "path": "crates/compositor/src/video_duration_tests.rs",
+      "sha256": "4169b25d72d12b42966d4a850366ba747253f5e0610cd9fed277ebbff1594fe1"
+    },
+    {
+      "path": "crates/compositor/src/video_mux_timing.rs",
+      "sha256": "fb410d3db2bc1a5759ce4d31329c0a83009b8ec6eddef394453184eb9d1b61cd"
+    }
+  ]
 }

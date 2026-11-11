@@ -22,3 +22,20 @@ To run the focused upstream native regression after applying the patch, run
 from its crates directory, with FFMPEG_DIR and LIBCLANG_PATH set and the pinned
 FFmpeg DLL directory on PATH. This requires a working hardware D3D11 device to
 inject the failures; it does not silently pass without that prerequisite.
+
+## v4: CFR packet duration on Windows and macOS
+
+Both production drain paths now supply a missing encoded packet duration in the
+encoder time base before timestamp rescaling and the first mux write. A positive
+encoder duration and PTS/DTS are preserved, including packets received on flush.
+No remux, duration metadata override or post-export repair is used. The pinned
+patch also contains the Mac fix; applying it is necessary for a future Mac addon
+rebuild, but this task does not replace any installed Mac or Windows binary.
+
+`patchedFiles` pins every changed or added source file. The build receipt kind is
+`opentake-compositor-software-video-v4`; v2/v3 receipts cannot be reused.
+The Rust container regression writes and reads actual MP4s at 24/30/60 fps with
+1, 7 and 200 frames. Windows tests h264_mf and libopenh264, plus full WARP export
+without a hardware video device. Mac runs its real drain path using a local SDK
+software encoder fixture (libx264 only in tests; product candidates unchanged).
+The nine hardware-dependent legacy tests remain unchanged.
