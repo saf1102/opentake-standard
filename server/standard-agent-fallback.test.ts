@@ -17,7 +17,7 @@ test('fake Codex uses default, preserves requested and settings, rejects unsuppo
  {model:'gpt-6.1-sol',displayName:'GPT-6.1-Sol',isDefault:true,defaultReasoningEffort:'medium',supportedReasoningEfforts:[{reasoningEffort:'medium'}]}];
  fs.writeFileSync(cli,`#!${process.execPath}
 const fs=require('node:fs'),args=process.argv.slice(2);
-if(args[0]==='--version'){console.log('codex-cli fixture');process.exit(0)}
+if(args[0]==='--version'){console.log('codex-cli 1.0.0');process.exit(0)}
 if(args[0]==='app-server')require('node:readline').createInterface({input:process.stdin}).on('line',line=>{const q=JSON.parse(line);if(q.method==='initialize')console.log(JSON.stringify({id:q.id,result:{}}));if(q.method==='model/list')console.log(JSON.stringify({id:q.id,result:{data:${JSON.stringify(models)},nextCursor:null}}));});
 else {fs.writeFileSync(${JSON.stringify(path.join(root,'argv.json'))},JSON.stringify(args));fs.writeFileSync(args[args.indexOf('--output-last-message')+1],JSON.stringify({ok:true}));console.error('model: '+args[args.indexOf('-m')+1]);console.error('reasoning effort: medium');}
 `,{mode:0o700});

@@ -24,7 +24,7 @@ async function mount(page:'deploy'|'project'|'models',offline=false){
  globals.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
  for(const[key,value]of Object.entries(globals)){saved.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true})}
  const connections=CONNECTION_DEFINITIONS.filter(c=>c.kind==='agent').map(c=>({
-  id:c.id,name:c.name,kind:c.kind,mode:'cli',enabled:c.id!=='claude',connected:c.id==='codex',
+  id:c.id,name:c.name,kind:c.kind,mode:c.id==='builtin'?'api':'cli',enabled:c.id!=='claude',connected:c.id==='codex',
   cliInstalled:['codex','kimi'].includes(c.id),heavySupported:c.id!=='claude',filmOutdated:false,
   cliAuthState:c.id==='codex'?'connected':c.id==='kimi'?'needs-login':'missing',cliLoginAvailable:c.id==='kimi',
   cliAuthMessage:c.id==='codex'?'已接通':'还没登录',cliPath:'',baseUrl:c.baseUrl,model:'default',models:[],hasKey:false,
@@ -37,7 +37,7 @@ async function mount(page:'deploy'|'project'|'models',offline=false){
  let failConnections=offline;
  globalThis.fetch=(async(input:any,options:any={})=>{
   const url=String(input),method=options.method||'GET';requests.push({url,method,body:options.body?JSON.parse(options.body):undefined});let result:unknown;
-  if(url==='/api/editor/agent-connections'){
+  if(url==='/api/editor/agent-connections'&&method==='GET'||url==='/api/editor/agent-connections/recheck'&&method==='POST'){
    if(failConnections)return Response.json({ok:false,error:'测试：暂时离线'},{status:503});
    result={connections};
   }else if(url==='/api/editor/system-settings')result={revision:1,preferences:{paths:{projects:'D:/QA',cache:'',exports:'',backups:''},reserveGB:1,export:{},backup:{}},paths:{},libraries:[]};
@@ -78,9 +78,10 @@ test('Windows ready panel exposes all agent settings/install paths and returns f
  const h=await mount('deploy');
  try{
   await h.click('✓已就绪');assert.match(document.body.textContent||'',/智能体 · 至少要有一个/);
-  assert.equal(document.querySelectorAll('.ot-deploy-agent').length,10);
+  assert.equal(document.querySelectorAll('.ot-deploy-agent').length,11);
   for(const c of h.connections){
    const current=card(c.name);assert.ok([...current.querySelectorAll('button')].some(b=>b.textContent==='设置 ›'));
+   if(c.id==='builtin'){assert.match(current.textContent||'',/模型密钥/);continue}
    if(!c.cliInstalled){const install=current.querySelector<HTMLAnchorElement>('a');assert.equal(install?.href,CONNECTION_DEFINITIONS.find(d=>d.id===c.id)!.page);assert.equal(install?.target,'_blank')}
   }
   await h.click('在设置里管理 →');assert.equal(document.querySelector('.ot-deploy'),null);assert.ok(document.querySelector('.unified-connections'));
@@ -91,18 +92,19 @@ test('Windows ready panel exposes all agent settings/install paths and returns f
    const selected=document.querySelector(`#connection-row-${id}`)!;assert.equal(selected.closest('details'),null,'deep links expose uninstalled agents');
    await h.click('← 回到一键部署');assert.ok(document.querySelector('.ot-deploy'));
   }
-  await h.click('填密钥',card('GitHub Copilot'));
-  const editor=document.querySelector('#connection-editor-copilot')!;
-  assert.ok(editor.querySelector('#connection-copilot-key'));assert.equal(editor.querySelector('button[aria-pressed="true"]')?.textContent,'API 密钥');
+  assert.ok(![...card('GitHub Copilot').querySelectorAll('button')].some(b=>b.textContent==='填密钥'),'未适配 API 的接入不能承诺可用');
+  await h.click('填密钥',card('MiniMax Code'));
+  const editor=document.querySelector('#connection-editor-minimax')!;
+  assert.ok(editor.querySelector('#connection-minimax-key'));assert.equal(editor.querySelector('button[aria-pressed="true"]')?.textContent,'API 密钥');
   await h.click('← 回到一键部署');assert.match(document.querySelector('.settings-confirm-modal')?.textContent||'',/未保存的修改/);
-  await h.click('继续编辑');assert.ok(document.querySelector('#connection-editor-copilot'));
+  await h.click('继续编辑');assert.ok(document.querySelector('#connection-editor-minimax'));
   await h.click('← 回到一键部署');await h.click('放弃修改');assert.ok(document.querySelector('.ot-deploy'));
   assert.ok(h.requests.every(r=>r.method==='GET'),'navigation never saves credentials or settings');
   h.offline(true);await h.click('重新查找');assert.match(document.querySelector('.ot-deploy-connection-error')?.textContent||'',/暂时离线/);
   h.offline(false);await h.click('重新查找');assert.equal(document.querySelector('.ot-deploy-connection-error'),null);
   await h.click('登录',card('Kimi'));assert.match(card('Kimi').textContent||'',/等你登录/);
   await h.click('取消',card('Kimi'));assert.ok([...card('Kimi').querySelectorAll('button')].some(b=>b.textContent==='登录'));
-  assert.deepEqual(h.requests.filter(r=>r.method!=='GET').map(r=>[r.method,r.url]),[['POST','/api/editor/agent-connections/kimi/login'],['DELETE','/api/editor/agent-connections/kimi/login']]);
+  assert.deepEqual(h.requests.filter(r=>r.method!=='GET').map(r=>[r.method,r.url]),[['POST','/api/editor/agent-connections/recheck'],['POST','/api/editor/agent-connections/recheck'],['POST','/api/editor/agent-connections/kimi/login'],['DELETE','/api/editor/agent-connections/kimi/login']]);
   assert.equal(window.location.pathname,'/general/projects/qa');
  }finally{await h.close()}
 });

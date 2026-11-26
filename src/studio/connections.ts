@@ -1,4 +1,4 @@
-export {CONNECTION_DEFINITIONS,connectionDefinition,connectionReadyForFilm,isRelay} from '../../shared/agent-connections';
+export {CONNECTION_DEFINITIONS,connectionDefinition,connectionReadyForFilm,selectableAgentModels,isRelay} from '../../shared/agent-connections';
 export type {ConnectionId,ConnectionView,ConnectionConfig,ConnectionModel,ConnectionMode} from '../../shared/agent-connections';
 export async function connectionRequest<T>(suffix='',method='GET',body?:unknown):Promise<T>{
  const response=await fetch(`/api/editor/agent-connections${suffix?`/${suffix}`:''}`,{method,headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -6,5 +6,5 @@ export async function connectionRequest<T>(suffix='',method='GET',body?:unknown)
 }
 export function notifyConnectionsChanged(connection?:import('../../shared/agent-connections').ConnectionView){window.dispatchEvent(new window.CustomEvent('opentake-connections-changed',{detail:{connection}}));}
 
-export type ConnectionManagement={id:import('../../shared/agent-connections').ConnectionId;action:'install'|'logout'|'switch-account'|'upgrade';state:'waiting'|'complete'|'failed'|'cancelled';phase?:'logout'|'login';message:string;connection?:import('../../shared/agent-connections').ConnectionView};
+export type ConnectionManagement={id:import('../../shared/agent-connections').ConnectionId;action:'install'|'install-and-login'|'logout'|'switch-account'|'upgrade';state:'waiting'|'complete'|'failed'|'cancelled';phase?:'install'|'logout'|'login';message:string;connection?:import('../../shared/agent-connections').ConnectionView};
 export type AgentUsageComparison={days:30;rows:{agent:import('../../shared/agent-connections').AgentConnectionId;name:string;films:number;averageDurationMs:number|null;averageTokens:number|null;successRate:number|null}[]};

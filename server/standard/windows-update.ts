@@ -48,6 +48,7 @@ export function createWindowsUpdater(options:{root?:()=>string; fetcher?:typeof 
 const local = process.env.OPENTAKE_WINDOWS_UPDATE_TEST_URL;
 if (local && !/^http:\/\/127\.0\.0\.1:\d+\/windows-update\.json$/.test(local)) throw Error('Windows 更新测试源必须是本机地址');
 const updater=createWindowsUpdater({endpoint:local});
+export const windowsDailyEnabled=()=>updater.preferences().daily;
 export async function windowsUpdateApi(req:IncomingMessage,res:ServerResponse,route:string) {
   if (req.method==='GET'&&route==='/client') return sendJson(res,200,updater.view());
   if (req.method==='GET'&&route==='/preferences') return sendJson(res,200,updater.preferences());

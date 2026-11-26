@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {afterPack}=require('./production-pack.cjs');
 test('package cleanup removes dependency fixtures/maps/types and preserves runtime code and licenses',async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'opentake-production-pack-')),out=path.join(dir,'output'),app=path.join(out,'resources/app');
- const needed=['dist/index.html','dist/opentake-icon-512.png','dist/openscreen/linkreader.html','dist/openscreen/wallpapers/wallpaper1.jpg','desktop/main.cjs','server/editor/openscreen-export.ts','node_modules/example/runtime.js','node_modules/example/LICENSE','node_modules/example/schema.json'];
+ const needed=['desktop/builtin-runtime/agent.mjs','desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt','dist/index.html','dist/opentake-icon-512.png','dist/openscreen/linkreader.html','dist/openscreen/wallpapers/wallpaper1.jpg','desktop/main.cjs','server/editor/openscreen-export.ts','node_modules/example/runtime.js','node_modules/example/LICENSE','node_modules/example/schema.json'];
  const discarded=['node_modules/example/tests/fixture.js','node_modules/example/__snapshots__/value.snap','node_modules/example/lib/parse.spec.ts','node_modules/example/lib/runtime.js.map','node_modules/example/lib/runtime.d.mts'];
  try{
   await fs.mkdir(path.join(dir,'source'));

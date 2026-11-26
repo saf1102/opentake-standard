@@ -51,6 +51,17 @@ test('任务23：部署与设置共享单家登录状态、仅轮询登录的Age
   await click('登录',document.querySelector('aside')!);connection={...connection,revision:4,connected:true,state:'connected',cliAuthState:'connected'};waiting=false;await poll();
   assert.match(document.querySelector('.connection-pill')!.textContent!,/已接通/,'本窗口重新登录成功仍恢复两处状态');
   let detail:any;window.addEventListener('opentake:open-settings',(event:any)=>{detail=event.detail},{once:true});h.openSettings('agents','kimi',true,'api');assert.deepEqual(detail,{group:'agents',agentId:'kimi',fromDeploy:true,mode:'api'});
+  const regionalHint='国内版在开着 VPN 或代理时可能登录不上。请把 codebuddy.cn、workbuddy.cn 设为直连，或暂时关掉代理再登录。';
+  const hints=()=>[...document.querySelectorAll<HTMLElement>('[role="note"]')].filter(item=>item.textContent===regionalHint);
+  assert.equal(hints().length,0);
+  connection={...connection,id:'codebuddy',name:'CodeBuddy / WorkBuddy',connected:false,cliAuthState:'needs-login',state:'unconfigured'};
+  await h.act(async()=>h.acceptConnection(connection));
+  assert.ok(hints().some(el=>el.closest('aside'))&&hints().some(el=>el.closest('.connection-row')));
+  assert.ok(hints().every(el=>el.style.color==='rgb(152, 105, 220)'));
+  connection={...connection,cliAuthState:'unknown'};await h.act(async()=>h.acceptConnection(connection));assert.equal(hints().length,0);
+  await h.act(async()=>h.startConnectionLogin('codebuddy'));waiting=false;await poll();
+  assert.ok(hints().length>=2,'登录结束仍未接通时给出代理提示');
+  connection={...connection,connected:true,cliAuthState:'connected'};await h.act(async()=>h.acceptConnection(connection));assert.equal(hints().length,0);
   await h.act(async()=>app.unmount());app=null;assert.equal(streams[0].closed,true,'最后一处界面卸载关闭实时连接');
  }finally{if(app)app.unmount();globalThis.fetch=oldFetch;globalThis.setTimeout=oldTimeout;globalThis.clearTimeout=oldClear;dom.window.close();for(const[key,value]of saved){if(value)Object.defineProperty(globalThis,key,value);else delete(globalThis as any)[key]}fs.rmSync(dir,{recursive:true,force:true})}
 });

@@ -1,5 +1,5 @@
 // Shared by the Mac and Windows update dialogs.
-export type Progress={step:number;status:string;error?:string;downloadedBytes?:number;totalBytes?:number};export type Bridge={updateStatus:()=>Promise<Progress&{supported:boolean;modified?:boolean;reason?:string}>;updateStart:(release:unknown)=>Promise<void>;updateCancel:()=>Promise<void>;updateRestart:()=>Promise<void>};
+export type Progress={step:number;status:string;error?:string;downloadedBytes?:number;totalBytes?:number};export type Bridge={downloadPro:()=>Promise<{ok?:boolean;error?:string}>;updateStatus:()=>Promise<Progress&{supported:boolean;modified?:boolean;reason?:string}>;updateStart:(release:unknown)=>Promise<void>;updateCancel:()=>Promise<void>;updateRestart:()=>Promise<void>};
 export const RELEASES_PAGE='https://github.com/saf1102/opentake-standard/releases/latest';
 export const mb=(n?:number)=>((n||0)/1024/1024).toFixed(0);
 /** Step list shared by the Mac and Windows dialogs; the download step shows how much has arrived. */

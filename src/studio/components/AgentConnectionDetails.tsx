@@ -1,3 +1,4 @@
+import {harnessRouteLabel} from '../../../shared/agent-connections';
 import {useEffect,useRef,useState} from 'react';
 import {connectionDefinition,connectionRequest,notifyConnectionsChanged,type AgentUsageComparison,type ConnectionManagement,type ConnectionView} from '../connections';
 import {AgentMark} from './AgentMark';
@@ -22,16 +23,17 @@ export function AgentConnectionDetails({connection,disabled=false,showRecheck=tr
  useEffect(()=>{
   mounted.current=true;const stamp=generation.current;
   // Restore only this provider's server-owned wait after returning to settings.
-  if(!blocked)void connectionRequest<ConnectionManagement>(`${connection.id}/management`).then(result=>{if(mounted.current&&generation.current===stamp){apply(result);if(result.state==='waiting')poll(stamp)}}).catch(()=>{});
+  if(connection.enabled)void connectionRequest<ConnectionManagement>(`${connection.id}/management`).then(result=>{if(mounted.current&&generation.current===stamp&&result?.action!=='install-and-login'){apply(result);if(result.state==='waiting')poll(stamp)}}).catch(()=>{});
   return()=>{mounted.current=false;stop()};
   // The connection result changes while polling; it must not restart the wait.
   // eslint-disable-next-line react-hooks/exhaustive-deps
- },[connection.id,blocked]);
- const run=async(action:'switch-account'|'upgrade')=>{
-  if(blocked||disabled||requesting||waiting)return;
+ },[connection.id,connection.enabled]);
+ const run=async(action:'install'|'switch-account'|'upgrade')=>{
+  if(!connection.enabled||disabled||requesting||waiting)return;
+  if(action==='install'?connection.cliInstalled||!connection.installCommand:blocked)return;
   if(action==='switch-account'&&!definition.logoutArgs){setAppHint(true);return;}
   stop();const stamp=generation.current;setRequesting(true);setError('');setAppHint(false);
-  try{const result=await connectionRequest<ConnectionManagement>(`${connection.id}/${action}`,'POST',action==='upgrade'?{command:connection.upgradeCommand}:{});if(!mounted.current||generation.current!==stamp)return;apply(result);if(result.state==='waiting')poll(stamp)}
+  try{const result=await connectionRequest<ConnectionManagement>(`${connection.id}/${action}`,'POST',action==='install'?{command:connection.installCommand}:action==='upgrade'?{command:connection.upgradeCommand}:{});if(!mounted.current||generation.current!==stamp)return;apply(result);if(result.state==='waiting')poll(stamp)}
   catch(e){if(mounted.current&&generation.current===stamp)setError(e instanceof Error?e.message:'操作失败，请重试')}
   finally{if(mounted.current&&generation.current===stamp)setRequesting(false)}
  };
@@ -44,10 +46,12 @@ export function AgentConnectionDetails({connection,disabled=false,showRecheck=tr
   const stamp=generation.current;setRequesting(true);setError('');
   try{const next=await connectionRequest<ConnectionView>(`${connection.id}/recheck`,'POST',{});if(mounted.current&&generation.current===stamp){changed.current(next);notifyConnectionsChanged(next)}}catch(e){if(mounted.current&&generation.current===stamp)setError(e instanceof Error?e.message:'重新检查失败，请重试')}finally{if(mounted.current&&generation.current===stamp)setRequesting(false)}
  };
- const account=blocked?(connection.enabled?'尚未找到命令行':'默认不调用'):connection.cliAuthState==='connected'?'已登录':connection.cliAuthState==='needs-login'?'还没登录':connection.cliAuthState==='pending'?'登录检查待适配':'尚未确认登录';
+ const account=blocked?(connection.enabled?'尚未找到命令行':'默认不调用'):connection.cliAuthState==='connected'?(connection.id==='deepseek'?harnessRouteLabel(connection):'已登录'):connection.cliAuthState==='needs-login'?(connection.id==='deepseek'?'出片凭据未通过检查':'还没登录'):connection.cliAuthState==='pending'?'登录检查待适配':'尚未确认登录';
  return <div className="connection-account" aria-busy={requesting||waiting}>
-  <span className="connection-detail-label">账号</span><div><span className={connection.cliAuthState==='connected'?'connection-ok':''}>{connection.cliAuthState==='connected'?'● ':''}{account}</span><span className="connection-detail-muted"> · {connection.name} 账号</span></div><button type="button" disabled={blocked||disabled||requesting||waiting} onClick={()=>void run('switch-account')}>换账号…</button>
+  <span className="connection-detail-label">{connection.id==='deepseek'?'出片凭据':'账号'}</span><div><span className={connection.cliAuthState==='connected'?'connection-ok':''}>{connection.cliAuthState==='connected'&&(connection.id!=='deepseek'||connection.deepseekVerified)?'● ':''}{account}</span>{connection.id!=='deepseek'&&<span className="connection-detail-muted"> · {connection.name} 账号</span>}</div>{connection.id==='deepseek'?<span/>:<button type="button" disabled={blocked||disabled||requesting||waiting} onClick={()=>void run('switch-account')}>换账号…</button>}
+  {connection.id==='deepseek'&&connection.cliInstalled&&connection.cliAuthMessage&&<div role="status" className="connection-management-note">{connection.cliAuthMessage}</div>}
   <span className="connection-detail-label">命令行</span><div className="connection-program">{connection.executable||connection.cliPath||'尚未找到'}{connection.cliVersion&&<span className="connection-detail-muted"> · {connection.cliVersion}</span>}</div><span/>
+  {!connection.workBuddyNeedsCli&&!connection.cliInstalled&&connection.enabled&&connection.installCommand&&<div className="connection-upgrade"><span>官方安装命令</span><code>{connection.installCommand}</code><button type="button" disabled={disabled||requesting||waiting} onClick={()=>void run('install')}>在终端里安装</button></div>}
   {connection.filmOutdated&&connection.cliVersion&&connection.filmMinimumVersion&&<div className="connection-upgrade" role="note"><span>{connection.cliVersion} 太旧，需要 {connection.filmMinimumVersion} 以上才能出片</span>{connection.upgradeCommand&&<><code>{connection.upgradeCommand}</code><button type="button" disabled={blocked||disabled||requesting||waiting} onClick={()=>void run('upgrade')}>在终端里升级</button></>}</div>}
   {appHint&&<div className="connection-management-note" role="status"><span>请到 {connection.name} 自己的 App 里换账号；换好后点「重新检查」。</span>{showRecheck&&<button type="button" disabled={blocked||disabled||requesting||waiting} onClick={()=>void recheck()}>{requesting?'检查中…':'重新检查'}</button>}</div>}
   {management&&<div className={`connection-management-note${management.state==='complete'?' connection-management-complete':''}`} role="status"><span>{waiting&&<i className="connection-spinner" aria-hidden="true"/>}{management.message}</span>{waiting&&<button type="button" disabled={requesting} onClick={()=>void cancel()}>取消等待</button>}</div>}

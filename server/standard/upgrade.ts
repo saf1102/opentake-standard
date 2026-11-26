@@ -1,5 +1,5 @@
 import {clientHeaders,updateView,dismissUpdate,macFeed} from './client-update.ts';
-import {windowsUpdateApi} from './windows-update.ts';
+import {windowsUpdateApi,windowsDailyEnabled} from './windows-update.ts';
 import {proDownloadPlatform,proDownloadUrl} from './pro-download.ts';
 import platform from '../platform.ts';
 import {atomicJsonSync} from '../file-ops.ts';
@@ -16,19 +16,37 @@ const root=platform.standardDataRoot();
 const file=path.join(root,'upgrade-session.json');
 type Saved={token?:string;daily?:boolean;checkedDay?:string};let saved:Saved={};try{saved=JSON.parse(fs.readFileSync(file,'utf8'))}catch{/* fresh profile */}
 function save(){fs.mkdirSync(root,{recursive:true,mode:0o700});atomicJsonSync(file,saved,{mode:0o600})}
-async function remote(route:string,method='GET',body?:unknown){const r=await fetch(origin+route,{method,headers:{...clientHeaders(),'Content-Type':'application/json',...(saved.token?{Authorization:`Bearer ${saved.token}`}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(10000)});const value=await r.json();if(!r.ok){if(r.status===401){delete saved.token;save()}throw Object.assign(Error(value.error||'操作失败'),{status:r.status})}return value}
+async function remote(route:string,method='GET',body?:unknown){const r=await fetch(origin+route,{method,redirect:'error',headers:{...clientHeaders(),'Content-Type':'application/json',...(saved.token?{Authorization:`Bearer ${saved.token}`}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(10000)});const value=await r.json();if(!r.ok){if(r.status===401){delete saved.token;save()}throw Object.assign(Error(value.error||'操作失败'),{status:r.status})}return value}
 async function config(){for(const url of [local?local+'/standard/upgrade.json':UPGRADE_URL,fallback]){if(!url)continue;try{const r=await fetch(url,{headers:url===fallback?undefined:clientHeaders(true),credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(5000)});if(!r.ok)continue;const v=await r.json();if(v.mode==='beta'||v.mode==='paid'&&Array.isArray(v.plans)&&v.plans.length===3)return v}catch{/* offline default */}}return {mode:'beta',notice:'',offline:true}}
-function publicView(value:Record<string,unknown>){const {token:_token,...rest}=value;return rest}
+function failureText(e:unknown){return e instanceof TypeError||(e instanceof Error&&['AbortError','TimeoutError','SyntaxError'].includes(e.name))?'暂时连不上升级服务，请检查网络后重试。':e instanceof Error?e.message:'升级服务暂时不可用，请重试。'}
+function publicView(value:Record<string,unknown>){const {token:_token,downloadUrl:_url,...rest}=value;return rest}
 export async function upgradeApi(req:IncomingMessage,res:ServerResponse){const route=new URL(req.url||'/','http://localhost').pathname.replace('/api/upgrade','');try{
  if(route.startsWith('/windows/'))return await windowsUpdateApi(req,res,route.slice('/windows'.length));
  if(req.method==='GET'&&route==='/client')return sendJson(res,200,updateView());
  if(req.method==='POST'&&route==='/dismiss'){const b=await bodyJson(req) as {action:string};return sendJson(res,200,dismissUpdate(b.action))}
  if(req.method==='GET'&&route==='/preferences')return sendJson(res,200,{daily:saved.daily!==false});
  if(req.method==='PUT'&&route==='/preferences'){const b=await bodyJson(req) as {daily?:boolean};saved.daily=b.daily!==false;save();return sendJson(res,200,{daily:saved.daily})}
- if(req.method==='GET'&&(route==='/state'||route==='/daily')){const day=new Date().toLocaleDateString('en-CA');if(route==='/daily'&&(saved.daily===false||saved.checkedDay===day))return sendJson(res,200,{skipped:true});const upgrade=await config();let account=null,error='';if(saved.token&&route!=='/daily')try{account=publicView(await remote('/api/me'))}catch(e){error=e instanceof Error?e.message:'状态检查失败'}const release=await macFeed(upgrade.offline?undefined:(upgrade.standard??null));saved.checkedDay=day;save();return sendJson(res,200,{upgrade,account,error,clientUpdate:release===undefined?{...updateView(),notify:false,offline:true}:updateView(release,route==='/state')})}
+ if(req.method==='GET'&&(route==='/state'||route==='/daily')){
+  const daily=route==='/daily',windows=process.platform==='win32',day=new Date().toLocaleDateString('en-CA');
+  const remindersEnabled=saved.daily!==false&&(!windows||windowsDailyEnabled());
+  if(daily&&(!remindersEnabled||saved.checkedDay===day))return sendJson(res,200,{skipped:true});
+  saved.checkedDay=day;save();
+  const upgrade=await config();let account=null,error='',sessionExpired=false,keepAccount=false;
+  if(saved.token)try{
+   let platformQuery='';
+   try{platformQuery='?platform='+proDownloadPlatform()}catch{/* Account status is available even without a matching installer. */}
+   account=publicView(await remote('/api/me'+platformQuery));
+  }catch(e){error=failureText(e);sessionExpired=(e as {status?:number}).status===401;keepAccount=!sessionExpired}
+  const view:Record<string,unknown>={upgrade,account,error,sessionExpired,keepAccount,remind:daily&&remindersEnabled&&saved.daily!==false&&(!windows||windowsDailyEnabled())};
+  if(!windows){
+   const release=await macFeed(upgrade.offline?undefined:(upgrade.standard??null));
+   view.clientUpdate=release===undefined?{...updateView(),notify:false,offline:true}:updateView(release,!daily);
+  }
+  return sendJson(res,200,view);
+ }
  if(req.method==='POST'&&(route==='/apply'||route==='/login')){const input=await bodyJson(req);const result=await remote(route==='/apply'?'/api/standard/apply':'/api/login','POST',{...input,...(route==='/login'?{scope:'standard'}:{}),device:'电脑 · '+(process.platform==='darwin'?'macOS':process.platform)});saved.token=result.token;save();return sendJson(res,200,publicView(result))}
  if(req.method==='PUT'&&route==='/intent')return sendJson(res,200,await remote('/api/pro/intent','PUT',await bodyJson(req)));
  if(req.method==='POST'&&route==='/logout'){try{await remote('/api/logout','POST')}finally{delete saved.token;save()}return sendJson(res,200,{ok:true})}
  if(req.method==='GET'&&route==='/download'){const target=proDownloadPlatform();const value=await remote('/api/me?platform='+target);const location=proDownloadUrl(value,origin,target,local);res.writeHead(302,{Location:location,'Referrer-Policy':'no-referrer','Cache-Control':'no-store'});return res.end()}
  return sendJson(res,404,{error:'接口不存在'});
- }catch(e){return sendJson(res,(e as {status?:number}).status||503,{error:e instanceof Error?e.message:'服务暂时不可用'})}}
+ }catch(e){return sendJson(res,(e as {status?:number}).status||503,{error:failureText(e)})}}

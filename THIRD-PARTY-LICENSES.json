@@ -13623,5 +13623,235 @@
     "notices": [
       "licenses/npm/vendor__openscreen__node_modules__zustand/LICENSE"
     ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "@anthropic-ai/sdk",
+    "version": "0.129.0",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.129.0.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "@earendil-works/pi-agent-core",
+    "version": "1.5.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/@earendil-works/pi-agent-core/-/pi-agent-core-1.5.2.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "@earendil-works/pi-ai",
+    "version": "1.5.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-1.5.2.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "@earendil-works/pi-coding-agent",
+    "version": "1.5.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/@earendil-works/pi-coding-agent/-/pi-coding-agent-1.5.2.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "@earendil-works/pi-schema",
+    "version": "1.5.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/@earendil-works/pi-schema/-/pi-schema-1.5.2.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "@earendil-works/pi-tui",
+    "version": "1.5.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/@earendil-works/pi-tui/-/pi-tui-1.5.2.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "@silvia-odwyer/photon-node",
+    "version": "0.3.4",
+    "license": "Apache-2.0",
+    "source": "https://registry.npmjs.org/@silvia-odwyer/photon-node/-/photon-node-0.3.4.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "@stablelib/base64",
+    "version": "1.0.1",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/@stablelib/base64/-/base64-1.0.1.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "cross-spawn",
+    "version": "7.0.6",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "fast-sha256",
+    "version": "1.3.0",
+    "license": "Unlicense",
+    "source": "https://registry.npmjs.org/fast-sha256/-/fast-sha256-1.3.0.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "get-east-asian-width",
+    "version": "1.6.0",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/get-east-asian-width/-/get-east-asian-width-1.6.0.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "highlight.js",
+    "version": "10.7.3",
+    "license": "BSD-3-Clause",
+    "source": "https://registry.npmjs.org/highlight.js/-/highlight.js-10.7.3.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "isexe",
+    "version": "2.0.0",
+    "license": "ISC",
+    "source": "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "marked",
+    "version": "18.0.11",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/marked/-/marked-18.0.11.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "marked-cjk-friendly",
+    "version": "0.1.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/marked-cjk-friendly/-/marked-cjk-friendly-0.1.2.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "openai",
+    "version": "7.19.0",
+    "license": "Apache-2.0",
+    "source": "https://registry.npmjs.org/openai/-/openai-7.19.0.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "partial-json",
+    "version": "0.1.7",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "path-key",
+    "version": "3.1.1",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "shebang-command",
+    "version": "2.0.0",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "shebang-regex",
+    "version": "3.0.0",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "standardwebhooks",
+    "version": "1.3.0",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/standardwebhooks/-/standardwebhooks-1.3.0.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "typebox",
+    "version": "1.3.27",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
+  },
+  {
+    "scope": "builtin-agent",
+    "name": "which",
+    "version": "2.0.2",
+    "license": "ISC",
+    "source": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
+    "notices": [
+      "desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+    ]
   }
 ]

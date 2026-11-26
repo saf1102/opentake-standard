@@ -1,3 +1,4 @@
+import {connectionMethodLabel} from '../../shared/agent-connections';
 /**
  * Which model and reasoning effort the project's Codex uses, and whether it may go online (S先生 2026-10-26, mock
  * docs/通用剪辑模型选择-效果图.html). 系统默认 follows settings → 通用剪辑出片; a project's own choice shows a teal dot.
@@ -9,7 +10,7 @@ import { Check, ChevronDown, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { getAgentSettings } from '@/studio/api'
 import { EFFORT_LABELS, FOLLOW_DEFAULT, effectiveChoice, type AgentModel } from '@/studio/agent-settings'
-import {connectionRequest, connectionReadyForFilm, type ConnectionView} from '@/studio/connections'
+import {connectionRequest, selectableAgentModels, connectionReadyForFilm, type ConnectionView} from '@/studio/connections'
 import type { GeneralAgentChoice } from './general-contract'
 import { UNIFIED_AGENTS } from './platform'
 import {openSettings} from '../onboarding/onboarding-store'
@@ -70,7 +71,7 @@ function ConnectedAgentPicker({ value, onChange, compact, up, disabled, onResolv
   const selectedId=shown?.agent||'codex'
   useEffect(() => { onResolvedAgent?.(catalog ? selectedId : undefined) }, [catalog, selectedId, onResolvedAgent])
   const connected=catalog?.connections.find(c=>c.id===selectedId)
-  const models:AgentModel[]=connected?.id==='codex'&&connected.mode==='cli'?catalog?.models??[]:(connected?.models??[]).map(m=>({...m,efforts:['low','medium','high'],defaultEffort:'medium'}))
+  const models:AgentModel[]=connected?.id==='codex'&&connected.mode==='cli'?catalog?.models??[]:selectableAgentModels(connected).map(m=>({...m,efforts:['low','medium','high'],defaultEffort:'medium'}))
   const real=(c?:GeneralAgentChoice)=>c&&models.length?{...effectiveChoice(c,models),agent:c.agent}:c
   const followsCliDefault=connected?.mode==='cli'&&selectedId!=='codex'&&selectedId!=='claude'&&connected.acpModelSelection!==true
   const nameOf=(id?:string)=>id===FOLLOW_DEFAULT||followsCliDefault?`跟随 ${connected?.name||'智能体'} 默认`:models.find(m=>m.id===id)?.name??id??''
@@ -99,7 +100,7 @@ function ConnectedAgentPicker({ value, onChange, compact, up, disabled, onResolv
       {!catalog.connections.length&&<div className="ge-model-grp" style={{color:'#9869dc'}}>还没有接通的智能体，请先到设置接入。</div>}
       <button type="button" className="ge-model-opt" onClick={()=>{setOpen(false);openSettings('agents',selectedId)}}>管理智能体接入 →</button>
       {catalog.connections.map(c=><button key={c.id} type="button" className="ge-model-opt" disabled={!connectionReadyForFilm(c)} data-on={selectedId===c.id||undefined} onClick={()=>onChange({agent:c.id as GeneralAgentChoice['agent'],model:'default',effort:'medium'})}>
-        <span><b>{c.name}</b><small>{c.mode==='api'?'API 密钥':'命令行 · 账号登录'}{!c.cliInstalled?' · 仅轻活，出片需安装命令行':!c.heavySupported?' · 出片待适配':''}</small></span><Check size={15}/>
+        <span><b>{c.name}</b><small>{connectionMethodLabel(c)}{c.id!=='builtin'&&!c.cliInstalled?' · 仅轻活，出片需安装命令行':!c.heavySupported?' · 出片待适配':''}</small></span><Check size={15}/>
       </button>)}
       {fallback&&<div role="status" className="ge-model-grp" style={{color:'#9869dc'}}>原模型不可用，出片时改用该智能体默认模型。</div>}
       {!connected&&shown&&<div role="status" className="ge-model-grp" style={{color:'#9869dc'}}>所选智能体未接通，请重新连接或选择。</div>}

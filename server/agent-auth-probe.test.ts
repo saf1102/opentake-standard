@@ -1,4 +1,6 @@
 import {fakeNodeCli} from './test-support/fake-cli.ts';
+import type {IncomingMessage,ServerResponse} from 'node:http';
+import {ROSTER_AGENTS,rosterExecutableCandidates} from './agent-roster.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -89,17 +91,20 @@ test('错误绑定 Claude 的路径、符号链接和硬链接不能作为其他
 });
 
 
-test('十家智能体共享明确的 ACP/登录命令；DeepSeek 用官方 ACP profile、不提供登录命令',()=>{
- assert.equal(AGENT_CONNECTION_IDS.length,10);
+test('内置智能体无需 CLI，十家外置智能体保留 ACP/登录命令；DeepSeek 用官方 ACP profile、不提供登录命令',()=>{
+ assert.equal(AGENT_CONNECTION_IDS.length,11);
  for(const id of AGENT_CONNECTION_IDS){
   const def=connectionDefinition(id);
+  if(id==='builtin'){assert.equal(def.heavySupported,true);assert.deepEqual(def.cliNames,[]);assert.deepEqual(agentAcpArgs(id),[]);assert.equal(agentCliLoginArgs(id),undefined);continue;}
   if(id==='deepseek'){assert.equal(def.heavySupported,true);assert.deepEqual(agentAcpArgs(id),['--profile','acp']);assert.equal(agentCliLoginArgs(id),undefined);continue;}
   assert.equal(def.heavySupported,true);
   assert.ok(agentCliLoginArgs(id));
   if(id!=='codex'&&id!=='claude')assert.ok(agentAcpArgs(id)?.length);
  }
- assert.deepEqual(agentAcpArgs('copilot'),['--acp','--stdio']);
- assert.deepEqual(agentAcpArgs('qwen'),['--acp']);
+ assert.deepEqual(agentAcpArgs('copilot'),['--acp','--stdio','--allow-all']);
+ assert.deepEqual(agentAcpArgs('qwen'),['--acp','--approval-mode','yolo']);
+ assert.deepEqual(agentAcpArgs('cursor'),['--force','acp']);
+ assert.deepEqual(agentAcpArgs('codebuddy'),['--acp','--permission-mode','bypassPermissions']);
  assert.equal(agentAcpArgs('claude'),undefined,'Claude 保留现有适配，不能绕进 ACP');
 });
 
@@ -217,4 +222,91 @@ test('forget 使进行中的旧探测不能重新填满十分钟缓存',async()=
  await Promise.resolve();cache.forget('kimi');release();await pending;
  const current=await cache.check('kimi','v1',async()=>{calls++;return {state:'needs-login',message:'还没登录'}});
  assert.equal(calls,1);assert.equal(current.state,'needs-login');
+});
+
+test('Windows 五家的官方命令行目录只列公开的文件名，桌面安装根可从登记位置注入',()=>{
+ const home='C:\\Users\\tester',env={USERPROFILE:home,Path:'C:\\other',LOCALAPPDATA:'C:\\Local'};
+ const expected=[
+  ['kimi','C:\\Users\\tester\\.kimi-code\\bin\\kimi.exe'],['minimax','C:\\Users\\tester\\.minimax-code\\mcode.cmd'],
+  ['codebuddy','C:\\Local\\codebuddy\\bin\\codebuddy.exe'],['cursor','C:\\Local\\cursor-agent\\agent.ps1'],
+  ['deepseek','D:\\custom\\深度\\resources\\runtime\\cli\\bin\\dsh.cmd'],
+ ] as const;
+ for(const [id,file] of expected){
+  const agent=ROSTER_AGENTS.find(item=>item.id===id)!;
+  const candidates=rosterExecutableCandidates(agent,{platform:'win32',home,env,installedRoots:['D:\\custom\\深度','relative'],applicationDirs:[]});
+  assert(candidates.includes(file),id);assert(!candidates.some(path=>path.includes('Contents')||path.includes('relative')));
+  if(id==='deepseek')assert(!candidates.includes(file.replace('.cmd','.exe')));
+ }
+});
+
+test('统一列表重新查找只重读一次登录环境，随后刷新单家也跳过缓存', {skip:process.platform==='win32'},async()=>{
+ const {handleAgentConnectionsApi}=await import('./agent-connections-api.ts');
+ const {defaultConnection,AGENT_CONNECTION_IDS}=await import('../shared/agent-connections.ts');
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'task57-refresh-'));
+ const keys=['HOME','SHELL','PATH','LINKREADER_CONNECTION_SETTINGS_FILE','LINKREADER_AGENT_SETTINGS_FILE'] as const;
+ const saved=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+ try{
+  const shell=path.join(home,'shell'),counter=path.join(home,'reads'),settings=path.join(home,'connections.json'),bin=path.join(home,'new');
+  Object.assign(process.env,{HOME:home,SHELL:shell,PATH:'/bin',LINKREADER_CONNECTION_SETTINGS_FILE:settings,LINKREADER_AGENT_SETTINGS_FILE:path.join(home,'agents.json')});
+  // Every other provider is pinned to a missing fixture. The only command run is the fake local CLI.
+  fs.writeFileSync(settings,JSON.stringify(Object.fromEntries(AGENT_CONNECTION_IDS.map(id=>[id,{...defaultConnection(id),mode:'api',cliPath:id==='kimi'?'':path.join(home,'missing',id)}]))));
+  const script=(dir:string)=>fs.writeFileSync(shell,"#!/bin/sh\nprintf x >> '"+counter+"'\nprintf '__CW_LOGIN_ENV_7B31__\\0PATH="+dir+":/bin\\0'\n",{mode:0o755});
+  script(path.join(home,'old'));fs.mkdirSync(bin);fs.writeFileSync(path.join(bin,'kimi'),'#!/bin/sh\necho 1.2.3\n',{mode:0o755});
+  const call=async(method:string,...parts:string[])=>{
+   const req={method,headers:{},socket:{remoteAddress:'127.0.0.1'}} as IncomingMessage;
+   let body='';const res={setHeader(){},end(value:string){body=value}};
+   await handleAgentConnectionsApi(req,res as unknown as ServerResponse,['agent-connections',...parts],false);
+   const payload=JSON.parse(body);assert.equal(payload.ok,true);return payload.result;
+  };
+  const kimiFound=(payload:{connections:{id:string;executable?:string}[]})=>payload.connections.find(item=>item.id==='kimi')?.executable;
+  assert.equal(kimiFound(await call('GET')),undefined);
+  script(bin);
+  assert.equal(kimiFound(await call('GET')),undefined);
+  assert.equal(kimiFound(await call('POST','recheck')),path.join(bin,'kimi'));
+  assert.equal(fs.readFileSync(counter,'utf8'),'xx','十张卡只读一次登录环境');
+  script(path.join(home,'newer'));
+  assert.equal((await call('POST','kimi','recheck')).cliInstalled,false);
+  assert.equal(fs.readFileSync(counter,'utf8'),'xxx');
+ }finally{
+  for(const key of keys){if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];}
+  fs.rmSync(home,{recursive:true,force:true});
+ }
+});
+
+test('CodeBuddy 登录探测与工程工作进程收到同一地区与 ACP 参数',async()=>{
+ const {resolveAgentConnectionLaunch,agentRegionEnvironment}=await import('./agent-connections.ts');
+ const {filmAgentArgs,startFilmAgent}=await import('./general/agent-adapter.ts');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-region-'));
+ const old=process.env.LINKREADER_CONNECTION_SETTINGS_FILE;
+ try{
+  const file=path.join(root,'fixture.cjs'),log=path.join(root,'calls.jsonl');
+  fs.writeFileSync(file,`#!${process.execPath}
+const fs=require('node:fs');
+fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),region:process.env.CODEBUDDY_INTERNET_ENVIRONMENT})+'\\n');
+require('node:readline').createInterface({input:process.stdin}).on('line',line=>{
+ const m=JSON.parse(line),sessionId='fixture';
+ if(m.method==='session/prompt')console.log(JSON.stringify({jsonrpc:'2.0',method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'完成'}}}}));
+ const result=m.method==='initialize'?{protocolVersion:1}:m.method==='session/new'?{sessionId}:{stopReason:'end_turn'};
+ console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result}));
+});`,{mode:0o755});
+  const args=['--acp','--permission-mode','bypassPermissions'];
+  for(const region of [undefined,'ioa','']){
+   process.env.LINKREADER_CONNECTION_SETTINGS_FILE=path.join(root,'settings-'+String(region));
+   const discoveryEnv={PATH:process.env.PATH,...(region===undefined?{}:{CODEBUDDY_INTERNET_ENVIRONMENT:region})};
+   const deps={detect:async()=>file,discoveryEnv};
+   fs.writeFileSync(log,'');
+   const status=await refreshAgentConnection('codebuddy',deps);
+   assert.equal(status.cliAuthState,'connected');
+   const launch=await resolveAgentConnectionLaunch('codebuddy',undefined,deps);
+   const agent={...launch,agent:'codebuddy' as const,effort:'medium'};
+   const cli=filmAgentArgs(agent,{work:root,lastMessage:'',network:false,model:'default',effort:'medium'});
+   const options={cwd:root,env:launch.env,projectRoot:root,prompt:'制作测试卡片',onEvent:()=>{}};
+   assert.throws(()=>startFilmAgent(agent,cli,{...options,cwd:path.dirname(root)}),/工程目录/);
+   const result=await startFilmAgent(agent,cli,options).done;
+   assert.equal(result.code,0,result.stderr);
+   assert.deepEqual(fs.readFileSync(log,'utf8').trim().split('\n').map(s=>JSON.parse(s)),Array(2).fill({args,region:region??'internal'}));
+   assert.equal(discoveryEnv.CODEBUDDY_INTERNET_ENVIRONMENT,region);
+   assert.deepEqual(agentRegionEnvironment('qwen',{}),{});
+  }
+ }finally{if(old===undefined)delete process.env.LINKREADER_CONNECTION_SETTINGS_FILE;else process.env.LINKREADER_CONNECTION_SETTINGS_FILE=old;fs.rmSync(root,{recursive:true,force:true});}
 });

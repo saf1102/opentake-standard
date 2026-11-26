@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState} from 'react'
 import {ChevronRight, RefreshCw} from 'lucide-react'
-import {connectionReadyForFilm, type ConnectionId, type ConnectionView} from '../../shared/agent-connections'
+import {connectionMethodLabel,connectionReadyForFilm, type ConnectionId, type ConnectionView} from '../../shared/agent-connections'
 import {ConnectionEditor} from '@/studio/components/ConnectionSettings'
 import {connectionRequest} from '@/studio/connections'
 import {getAgentSettings} from '@/studio/api'
@@ -26,7 +26,7 @@ export function useFirstAgentChoice() {
     const refreshLabel = () => {
       void Promise.all([getAgentSettings(), connectionRequest<{connections: ConnectionView[]}>()]).then(([view, list]) => {
         const choice = list.connections.find(item => item.id === (view.settings.modules.generalEditing.agent || 'codex'))
-        if (alive) setLabel(choice && connectionReadyForFilm(choice) ? `${choice.name} · ${choice.mode === 'api' ? 'API 密钥' : '命令行 · 账号登录'}` : '选择出片智能体')
+        if (alive) setLabel(choice && connectionReadyForFilm(choice) ? `${choice.name} · ${connectionMethodLabel(choice)}` : '选择出片智能体')
       }).catch(() => {})
     }
     window.addEventListener('opentake:general-agent-changed', refreshLabel)
@@ -40,12 +40,13 @@ export function useFirstAgentChoice() {
 export function FirstAgentChoice({onDone}: {onDone: () => void}) {
   const enabled = isAgentOnboarding()
   const [connections, setConnections] = useState<ConnectionView[]>([])
-  const [selected, setSelected] = useState<ConnectionId>('codex')
-  const [section, setSection] = useState<'cli' | 'api' | 'claude'>('cli')
+  const [selected, setSelected] = useState<ConnectionId>('builtin')
+  const [section, setSection] = useState<'cli' | 'api' | 'claude'>('api')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editorBusy, setEditorBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [startWithDeepseek,setStartWithDeepseek]=useState(false)
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
   useEffect(() => {
@@ -56,16 +57,26 @@ export function FirstAgentChoice({onDone}: {onDone: () => void}) {
       if (!alive) return
       const agents = body.connections.filter(connection => connection.kind === 'agent')
       setConnections(agents)
+      if(!agents.some(c=>c.id==='builtin'))setSection(current=>current==='api'?(agents.find(c=>c.id==='codex')?.mode||'cli'):current)
       setSelected(current => agents.some(connection => connection.id === current) ? current : agents[0]?.id || 'codex')
       setError('')
     }).catch(failure => {if (alive) setError(failure instanceof Error ? failure.message : '智能体列表暂时读不到')}).finally(() => {if (alive) setLoading(false)})
     return () => {alive = false}
   }, [refresh, enabled])
+  useEffect(() => {
+    if (!enabled) return
+    const update = (event: Event) => {
+      const next = (event as CustomEvent<{connection?: ConnectionView}>).detail?.connection
+      if (next) setConnections(current => current.map(item => item.id === next.id ? next : item))
+    }
+    window.addEventListener('opentake-connections-changed', update)
+    return () => window.removeEventListener('opentake-connections-changed', update)
+  }, [enabled])
   const chosen = connections.find(connection => connection.id === selected)
-  const cli = connections.filter(connection => connection.id !== 'claude' && connection.cliInstalled)
+  const cli = connections.filter(connection => connection.id !== 'claude' && (connection.cliInstalled || connection.workBuddyNeedsCli))
   const ready = chosen && (section === 'claude' || chosen.mode === section) && connectionReadyForFilm(chosen) && !dirty && !editorBusy && !loading
-  const changeSection = (next: typeof section, id: ConnectionId = next === 'claude' ? 'claude' : selected === 'claude' ? 'codex' : selected) => {
-    setSection(next);setSelected(id);setDirty(false);setError('')
+  const changeSection = (next: typeof section, id: ConnectionId = next === 'claude' ? 'claude' : next==='api'&&connections.some(c=>c.id==='builtin')?'builtin':selected === 'claude'||selected==='builtin'?'codex':selected) => {
+    setStartWithDeepseek(false);setSection(next);setSelected(id);setDirty(false);setError('')
   }
   const changed = (connection: ConnectionView) => {
     setConnections(current => current.map(item => item.id === connection.id ? connection : item))
@@ -89,7 +100,7 @@ export function FirstAgentChoice({onDone}: {onDone: () => void}) {
     finally {setSaving(false)}
   }
   const editorConnection = useMemo(() => chosen && section !== 'claude' ? {...chosen, mode: section} : chosen, [chosen, section])
-  const editor = editorConnection && <ConnectionEditor key={`${selected}-${section}`} connection={editorConnection} onChanged={changed} onBusyChange={setEditorBusy} onDirtyChange={setDirty}/>
+  const editor = editorConnection && <ConnectionEditor key={`${selected}-${section}`} connection={editorConnection} startWithDeepseek={selected==='codex'&&startWithDeepseek} onOpenCodex={()=>{changeSection('api','codex');setStartWithDeepseek(true)}} onChanged={changed} onBusyChange={setEditorBusy} onDirtyChange={setDirty}/>
   if (!enabled) return null
   return <section className="first-agent-choice" aria-labelledby="first-agent-title" aria-busy={loading || saving}>
     <h2 id="first-agent-title">选一个出片的智能体</h2>
@@ -98,21 +109,21 @@ export function FirstAgentChoice({onDone}: {onDone: () => void}) {
       <div className="first-agent-option" data-active={section === 'cli' || undefined}>
         <button type="button" className="first-agent-option-head" disabled={editorBusy || saving || dirty} aria-expanded={section === 'cli'} onClick={() => changeSection('cli')}><span className="first-agent-radio" data-checked={section === 'cli' || undefined}/>已装好的命令行</button>
         {section === 'cli' && <>
-          {loading ? <p className="first-agent-note">正在检测已安装的智能体…</p> : cli.length ? <div className="first-agent-detected">{cli.map(connection => <button key={connection.id} type="button" disabled={editorBusy || saving || dirty} aria-pressed={selected === connection.id} className="first-agent-chip" onClick={() => {setSelected(connection.id);setDirty(false)}}><b>{connection.name}</b><small data-connected={connection.connected || undefined}>{connection.connected ? '已接通' : '已安装'}{!connection.heavySupported ? ' · 出片待适配' : ''}</small>{selected === connection.id && <span aria-hidden>✓</span>}</button>)}</div> : <p className="first-agent-note first-agent-notice">没找到，去装一个　<a href="https://developers.openai.com/codex/cli/" target="_blank" rel="noreferrer">Codex 官网 ↗</a></p>}
+          {loading ? <p className="first-agent-note">正在检测已安装的智能体…</p> : cli.length ? <div className="first-agent-detected">{cli.map(connection => <button key={connection.id} type="button" disabled={editorBusy || saving || dirty} aria-pressed={selected === connection.id} className="first-agent-chip" onClick={() => {setSelected(connection.id);setDirty(false)}}><b>{connection.name}</b><small data-connected={connection.connected || undefined}>{connection.connected ? (connection.id==='deepseek'?connectionMethodLabel(connection):'已接通') : connection.workBuddyNeedsCli ? '已装桌面版' : '已安装'}{!connection.heavySupported ? ' · 出片待适配' : ''}</small>{selected === connection.id && <span aria-hidden>✓</span>}</button>)}</div> : <p className="first-agent-note first-agent-notice">没找到，去装一个　<a href="https://developers.openai.com/codex/cli/" target="_blank" rel="noreferrer">Codex 官网 ↗</a></p>}
           {chosen && (!chosen.connected || chosen.mode !== 'cli') && editor}
         </>}
       </div>
       <div className="first-agent-option" data-active={section === 'api' || undefined}>
         <button type="button" className="first-agent-option-head" disabled={editorBusy || saving || dirty} aria-expanded={section === 'api'} onClick={() => changeSection('api')}><span className="first-agent-radio" data-checked={section === 'api' || undefined}/>API 密钥</button>
-        {section === 'api' && <div className="first-agent-editor"><label className="first-agent-provider">智能体<select aria-label="API 接入的智能体" disabled={editorBusy || saving || dirty} value={selected} onChange={event => {setSelected(event.target.value as ConnectionId);setDirty(true)}}>{connections.map(connection => <option key={connection.id} value={connection.id}>{connection.name}{connection.cliInstalled ? ' · 已安装命令行' : ''}</option>)}</select></label>{editor}</div>}
-        <p className="first-agent-note">只有 API 密钥、没装命令行的，只能做标题、翻译这类轻活，出片需要命令行</p>
+        {section === 'api' && <div className="first-agent-editor"><label className="first-agent-provider">智能体<select aria-label="API 接入的智能体" disabled={editorBusy || saving || dirty} value={selected} onChange={event => {setSelected(event.target.value as ConnectionId);setDirty(false)}}>{connections.map(connection => <option key={connection.id} value={connection.id}>{connection.name}{connection.cliInstalled ? ' · 已安装命令行' : ''}</option>)}</select></label>{editor}</div>}
+        <p className="first-agent-note">内置智能体通过看图测试后就能出片。其他接入的出片条件见各自的连接设置。</p>
       </div>
       <div className="first-agent-option" data-active={section === 'claude' || undefined}>
         <button type="button" className="first-agent-option-head" disabled={editorBusy || saving || dirty} aria-expanded={section === 'claude'} onClick={() => changeSection('claude')}><span aria-hidden>✳</span>Claude Code<span className="first-agent-aside">{connections.find(item => item.id === 'claude')?.enabled ? '已打开' : '默认关闭'}</span></button>
         {section === 'claude' && editor}
       </div>
     </div>
-    {chosen && chosen.connected && !chosen.cliInstalled && <p className="first-agent-notice">连接已通过；还需要安装 {chosen.name} 命令行才能出片。</p>}
+    {chosen && chosen.id!=='builtin' && chosen.connected && !chosen.cliInstalled && <p className="first-agent-notice">连接已通过；还需要安装 {chosen.name} 命令行才能出片。</p>}
     {chosen && !chosen.heavySupported && <p className="first-agent-notice">{chosen.name} 出片待适配，请选择已支持出片的智能体。</p>}
     {error && <p role="alert" className="first-agent-notice">{error} <button type="button" className="first-agent-retry" disabled={loading} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={13} aria-hidden/>重新检测</button></p>}
     <div className="first-agent-foot"><button type="button" className="first-agent-later" disabled={saving || editorBusy} onClick={() => void finish(true)}>以后再说</button><button type="button" className="first-agent-primary" disabled={!ready || saving} onClick={() => void finish(false)}>{saving ? '正在保存…' : '用这个开始'}<ChevronRight size={16} aria-hidden/></button></div>

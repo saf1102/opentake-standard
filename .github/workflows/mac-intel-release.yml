@@ -59,6 +59,7 @@ jobs:
       - run: npx --no-install playwright-core install chromium
       - run: brew install ffmpeg
       - run: npm run typecheck
+      - run: npm --prefix desktop/builtin-agent ci --omit=optional --ignore-scripts --no-audit --no-fund
       - run: npm test
       - run: npm run test:release
       - name: Prepare frozen official source identity (not an update publication)

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {startAcpAgent,acpPermissionDecision,acpPathInside,classifyAgentFailure,applyAcpEvent,redactAcpText,normalizeAcpTool} from './general/acp.ts';
 import {initialSteps} from './general/events.ts';
+import {probeAcpAuthentication} from './agent-auth-probe.ts';
 
 const fixture=String.raw`
 const fs=require('node:fs'),rl=require('node:readline').createInterface({input:process.stdin});
@@ -158,3 +159,73 @@ test('任务24修复二：只有工具、思考或计划输出不是空回应，
   const {dir,events,proc}=await run(mode,'default');try{assert.equal((await proc.done).code,0);assert.equal(events.some(event=>event.type==='acp.error'),false);assert.equal(events.some(event=>event.type==='acp.completed'),true);}finally{proc.stop();fs.rmSync(dir,{recursive:true,force:true})}
  }
 });
+
+const privateRequestPeer=String.raw`
+const fs=require('node:fs');
+const send=value=>console.log(JSON.stringify({jsonrpc:'2.0',...value}));
+const log=process.argv[2], mode=process.argv[3];
+const sessionId='fake-private-session';
+let pending;
+require('node:readline').createInterface({input:process.stdin}).on('line',line=>{
+ const message=JSON.parse(line);
+ fs.appendFileSync(log,line+'\n');
+ if(message.method==='session/cancel')return;
+ if(message.method){
+  const {id,method}=message;
+  const callbackId=method==='initialize'?0:method==='session/new'?'private-session':id;
+  const callbackMethod=method==='initialize'?'_codebuddy.ai/command':method==='session/new'?'':'_codebuddy.ai/modResidentInvalidate';
+  send({method:'_codebuddy.ai/modResidentInvalidate',params:{sessionId}});
+  if(method==='session/prompt'){
+   send({method:'fs/write_text_file',params:{sessionId,path:process.cwd()+'/unexpected.txt',content:'unexpected'}});
+  }
+  pending={id,method,callbackId};
+  send({id:callbackId,method:callbackMethod,params:method==='session/prompt'?{sessionId:'other'}:{}});
+  return;
+ }
+ if(!pending||message.id!==pending.callbackId)return;
+ const {id,method}=pending;
+ pending=undefined;
+ if(message.error?.code!==-32601){
+  send({id,error:{code:-32001,message:'Expected Method not found'}});
+ }else if(method==='initialize'){
+  send({id,result:{protocolVersion:1}});
+ }else if(method==='session/new'){
+  send({id,result:{sessionId}});
+ }else{
+  send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'你好'}}}});
+  send({id,result:{stopReason:mode==='refusal'?'refusal':'end_turn'}});
+ }
+});
+`;
+for(const mode of ['probe','end_turn','refusal']){
+ test(`任务57：ACP 私有请求和通知（${mode}）`,async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'task57-acp-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const script=path.join(dir,'fake.cjs'),log=path.join(dir,'received.jsonl'),lastMessage=path.join(dir,'last.txt');
+  fs.writeFileSync(script,privateRequestPeer);
+  const args=[script,log,mode];
+  if(mode==='probe'){
+   const check=await probeAcpAuthentication(process.execPath,args,{tempRoot:dir,env:{},timeoutMs:3000});
+   assert.equal(check.state,'connected');
+  }else{
+   const events:Record<string,unknown>[]=[];
+   const proc=startAcpAgent(process.execPath,args,{agent:'codebuddy',cwd:dir,env:{},prompt:'问候',lastMessage,onEvent:e=>events.push(e)});
+   t.after(()=>proc.stop());
+   const result=await proc.done;
+   if(mode==='end_turn'){
+    assert.equal(result.code,0);
+    assert.equal(fs.readFileSync(lastMessage,'utf8'),'你好');
+   }else{
+    assert.notEqual(result.code,0);
+    assert.match(String(events.find(e=>e.type==='acp.error')?.excerpt),/refusal/);
+    assert.ok(!events.some(e=>e.type==='acp.completed'));
+    assert.ok(!fs.existsSync(lastMessage));
+   }
+  }
+  const wire=fs.readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));
+  const replies=wire.filter(message=>!message.method);
+  assert.deepEqual(replies.map(message=>[message.id,message.error?.code]),mode==='probe'?[[0,-32601],['private-session',-32601]]:[[0,-32601],['private-session',-32601],[3,-32601]]);
+  assert.ok(!fs.existsSync(path.join(dir,'unexpected.txt')));
+  if(mode==='probe')assert.deepEqual(wire.filter(message=>message.method).map(message=>message.method),['initialize','session/new']);
+ });
+}

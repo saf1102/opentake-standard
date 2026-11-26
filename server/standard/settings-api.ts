@@ -28,7 +28,7 @@ export async function handleSharedSettings(req:IncomingMessage,res:ServerRespons
  if(parts[1]==='choose-cli'&&req.method==='POST')return reply(await chooseAgentCli());
  if(parts[1]==='test'&&req.method==='POST')return reply(await testAgentConnection(await bodyJson(req)));
  if(parts[1]==='installation'&&parts[2]==='codex'){
-  if(parts.length===3&&req.method==='GET')return reply(await agentInstallationStatus('codex'));
+  if(parts.length===3&&req.method==='GET')return reply(await agentInstallationStatus('codex',undefined,{refresh:req.headers['x-opentake-refresh']==='1'}));
   if(parts.length===3&&['PUT','POST'].includes(req.method||'')){const b=await bodyJson(req);if(typeof b.cliPath!=='string')throw Error('CLI 路径必须为文本');return reply(await (req.method==='PUT'?saveAgentInstallation('codex',b.cliPath):agentInstallationStatus('codex',b.cliPath)));}
   if(req.method==='POST'&&['login','install'].includes(parts[3]))return reply(await openCodexTerminal(parts[3] as 'login'|'install',await bodyJson(req)));
  }

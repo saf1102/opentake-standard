@@ -1,5 +1,11 @@
 {
   "schema": 1,
+  "builtinAgent": {
+    "lock": "desktop/builtin-agent/package-lock.json",
+    "sha256": "e2f47771a76d529d9afb2b9eab5508a449d6cccd48df3c0880203b8e4e548546",
+    "entry": "resources/app/desktop/builtin-runtime/agent.mjs",
+    "licenseFile": "resources/app/desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt"
+  },
   "components": [
     {
       "name": "Python",

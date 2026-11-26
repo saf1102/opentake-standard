@@ -80,9 +80,9 @@ let runtime: GeneralRuntime = {
       return { executable: agent.executable, model: agent.model, effort: agent.effort, ...(agent.requested ? {requested: agent.requested} : {}) };
     }
     const launch=await resolveAgentConnectionLaunch(id,undefined,{},selected.model);
-    const model=launch.transport==='acp'?(selected.model||'default'):launch.model;
+    const model=id!=='builtin'&&id!=='deepseek'&&launch.transport==='acp'?(selected.model||'default'):launch.model;
     const requested=selected.model && selected.model!=='default' && selected.model!==model?selected:undefined;
-    return {agent:id,executable:launch.executable,model,effort:selected.effort||'medium',env:launch.env,args:launch.args,method:launch.method,...(launch.transport?{transport:launch.transport}:{}),...(requested?{requested}:{})};
+    return {agent:id,executable:launch.executable,model,effort:selected.effort||'medium',connectionRevision:launch.connectionRevision,env:launch.env,args:launch.args,method:launch.method,...(launch.transport?{transport:launch.transport}:{}),...(requested?{requested}:{})};
   },
   style: id => extraStyle?.id === id ? extraStyle : styleLibrary().find(s => s.id === id),
   baseEnv: () => installations.sanitizeAgentEnv(installations.loginEnvironment()),
@@ -598,6 +598,7 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
     personEdits: phase === 'revise' ? personEditsOf(dir, session.revision?.version) : undefined,
   });
   if(codex.transport==='acp')prompt+='\n\n工具命令请使用当前目录的相对路径或工程内绝对路径；不要用 shell 变量展开或内联求值。需要代码时先写入工程文件再执行。只能读写本工程，不要访问外部目录。';
+  if(agentId==='builtin'&&process.platform==='win32')prompt+='\n在 PowerShell 中用正斜线写工程内相对路径，带空格的路径用双引号括起。';
   const images = [...queued.map(n => n.reference?.image), phase === 'revise' ? session.revision?.reference?.image : undefined].filter((f): f is string => !!f && fs.existsSync(f));
   const lastFile = path.join(dir, 'agent', `last-${runId}-${session.turns.length + 1}.txt`);
   // Keep the original requested model (including default), never reinterpret an ACP-reported
@@ -615,6 +616,10 @@ async function turn(id: string, dir: string, phase: Phase, runId: string, recove
   const proc = startFilmAgent(codex, args, {
     cwd: work, projectRoot:dir, env, prompt, lastMessage:lastFile,images, eventLog: path.join(dir, 'agent', `events-${runId}.jsonl`),
     onEvent: event => {
+      if(event.type==='acp.deepseek-route'&&event.keyRejected===true&&typeof event.message==='string'){
+        const notice=event.message;
+        updateGeneral(id,p=>{p.messages.push(message('system',notice));});
+      }
       if(event.type==='acp.model'&&typeof event.model==='string'){
         codex.model=event.model;agentRecord.model=event.model;agentRecord.modelSelection=event.modelSelection==='selected'?'selected':'default';
         patchRun(id,r=>{r.model=String(event.model);r.modelSelection=event.modelSelection==='selected'?'selected':'default';});
@@ -747,7 +752,7 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
   const thumbs = frames.frames.map(f => fileUrl(id, path.relative(dir, f.file)));
   patchRun(id, r => { r.steps = setStep(r.steps, 'review', { thumbs, detail: `看图审片（${checks.filter(c => !c.ok).length ? `机检有 ${checks.filter(c => !c.ok).length} 项不合格` : '机检通过'}）` }); });
   let verdict: Verdict | undefined, problem: string | undefined;
-  if (!runtime.agentReview || filmAgentId(project.agent ?? readAgentSettings().modules.generalEditing)!=='codex') {
+  if (!runtime.agentReview || !['codex','builtin'].includes(filmAgentId(project.agent ?? readAgentSettings().modules.generalEditing))) {
     const failed = checks.filter(c => !c.ok);
     verdict = { pass: !failed.length, summary: failed.length ? '成片没过机检' : '机检通过', issues: failed.map(c => ({ time: null, problem: c.text, fix: '' })) };
     patchRun(id, r => { r.steps = setStep(r.steps, 'review', { state: 'done', endedAt: now(), detail: verdict!.pass ? '机检通过' : `机检要改：${failed.map(c => c.text).join('；')}`.slice(0, 600) }); });
@@ -762,11 +767,11 @@ async function review(id: string, dir: string, runId: string): Promise<Verdict |
     const pick = frames.frames.filter((_, i) => i % 3 === 1).map(f => f.file); // seven large frames beside the sheet
     const reviewArgv = reviewArgs({ ...codex, dir: reviewDir, lastMessage: lastFile, schema, images: [frames.sheet, ...pick] });
     if(codex.method==='api'&&codex.model==='default'){const at=reviewArgv.indexOf('-m');if(at>=0)reviewArgv.splice(at,2);}
-    const args=codex.args?.length?[reviewArgv[0],...codex.args,...reviewArgv.slice(1)]:reviewArgv;
+    const args=codex.agent==='builtin'?(codex.args||[]):codex.args?.length?[reviewArgv[0],...codex.args,...reviewArgv.slice(1)]:reviewArgv;
     const prompt = reviewPrompt({ styleId: style.id, styleName: style.name_zh, kit: KIT_DIR, project, frames, checks, round });
     const record = agentRunRecord(codex, now());
     let usage: Usage | undefined;
-    const proc = startFilmAgent(codex, args, { cwd: reviewDir, env: {...runtime.baseEnv(),...codex.env}, redact:filmAgentRedactor(codex.env||{}), prompt, eventLog: path.join(reviewDir, 'events.jsonl'), onEvent: e => { const o = applyCodexEvent([], e, now()); if (o.usage) usage = o.usage; } });
+    const proc = startFilmAgent(codex, args, { cwd: reviewDir, ...(codex.agent==='builtin'?{readOnly:true,projectRoot:dir,images:[frames.sheet,...pick],lastMessage:lastFile}:{}), env: {...runtime.baseEnv(),...codex.env}, redact:filmAgentRedactor(codex.env||{}), prompt:codex.agent==='builtin'?prompt+'\n只返回符合此结构的 JSON：'+JSON.stringify(REVIEW_SCHEMA):prompt, eventLog: path.join(reviewDir, 'events.jsonl'), onEvent: e => { const o = applyFilmAgentEvent(filmAgentId(codex),[], e, now()); if (o.usage) usage = o.usage; } });
     entry.proc = proc;
     const result = await proc.done;
     entry.proc = undefined;

@@ -28,10 +28,10 @@ test('原子替换失败保留旧文件和可恢复新字节',()=>{
  }finally{fs.renameSync=original;fs.rmSync(dir,{recursive:true,force:true})}
 });
 test('平台路径保留 Mac 历史位置，Windows 使用 Standard 独立目录',()=>{
- assert.equal(platform.desktopDataRoot('darwin',{},'/Users/test'),'/Users/test/Library/Application Support/linkreader-desktop');
+ assert.equal(platform.desktopDataRoot('darwin',{},'/fixture/home'),'/fixture/home/Library/Application Support/linkreader-desktop');
  assert.equal(platform.desktopDataRoot('win32',{APPDATA:'C:\\Users\\test\\AppData\\Roaming'},'C:\\Users\\test'),'C:\\Users\\test\\AppData\\Roaming\\OpenTake Standard');
  assert.equal(platform.cacheRoot('LinkReader','win32',{LOCALAPPDATA:'D:\\缓存'},'C:\\Users\\test'),'D:\\缓存\\LinkReader');
- assert.equal(platform.projectsRoot('darwin',{},'/Users/test'),'/Users/test/Movies/LinkReader Projects');
+ assert.equal(platform.projectsRoot('darwin',{},'/fixture/home'),'/fixture/home/Movies/LinkReader Projects');
 });
 test('Windows 工具搜索和 PATH 不注入 Mac 目录',()=>{
  const dirs=platform.runtimeBinaryCandidates('ffmpeg',{platform:'win32',env:{LINKREADER_BIN_DIR:'D:\\本地 工具',Path:'C:\\Windows;C:\\Node'}});

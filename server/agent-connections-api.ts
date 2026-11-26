@@ -1,10 +1,11 @@
+import {agentDiagnosticReport} from './agent-diagnostic-report.ts';
 import {compareRecentAgentFilms} from './agent-comparison.ts';
-import {getAgentDiagnostics,setAgentProgramPath,agentManagement} from './agent-management.ts';
+import {getAgentDiagnostics,setAgentProgramPath,agentManagement,agentManagementActions,type AgentManagementAction} from './agent-management.ts';
 import type {IncomingMessage,ServerResponse} from 'node:http';
 import {z} from 'zod';
 import {bodyJson,sendJson} from './http.ts';
 import {CONNECTION_IDS,connectionDefinition} from '../shared/agent-connections.ts';
-import {listAgentConnections,getConnectionStatus,saveAgentConnection,testUnifiedConnection,testTransientConnection,refreshConnectionModels,deleteConnectionKey,refreshAgentConnection,onAgentConnectionStatusChanged,getConnectionConfig} from './agent-connections.ts';
+import {switchBuiltinProfile,listAgentConnections,getConnectionStatus,saveAgentConnection,testUnifiedConnection,testTransientConnection,refreshConnectionModels,deleteConnectionKey,refreshAgentConnection,onAgentConnectionStatusChanged,getConnectionConfig} from './agent-connections.ts';
 import {agentLoginManager} from './agent-login.ts';
 /** 只有本机同源页面可写密钥、测试网络或启用命令行。两个版本只在可见范围上不同。 */
 export async function handleAgentConnectionsApi(req:IncomingMessage,res:ServerResponse,parts:string[],includeServices=true){
@@ -22,13 +23,17 @@ export async function handleAgentConnectionsApi(req:IncomingMessage,res:ServerRe
    res.once('close',()=>{clearInterval(heartbeat);unsubscribe()});
    return true;
   }
+  if(parts.length===2&&parts[1]==='diagnostics'&&req.method==='GET')return reply(200,{ok:true,result:await agentDiagnosticReport(includeServices?'Pro':'标准版')});
   if(parts.length===2&&parts[1]==='usage'&&req.method==='GET')return reply(200,{ok:true,result:compareRecentAgentFilms()});
+  if(parts.length===2&&parts[1]==='recheck'&&req.method==='POST')return reply(200,{ok:true,result:await listAgentConnections(includeServices,{},true)});
   if(parts.length===1&&req.method==='GET')return reply(200,{ok:true,result:await listAgentConnections(includeServices)});
   const id=z.enum(CONNECTION_IDS).parse(parts[1]);if(!includeServices&&connectionDefinition(id).kind==='service')return reply(404,{ok:false,error:'标准版不提供此服务'});
   let result:unknown;
+  if(id==='builtin'&&parts.length===3&&parts[2]==='profiles'&&req.method==='POST'){const body=z.object({id:z.string().optional()}).strict().parse(await bodyJson(req));return reply(200,{ok:true,result:await switchBuiltinProfile(body.id)});}
   if(parts.length===3&&parts[2]==='diagnostics'&&req.method==='GET')result=getAgentDiagnostics(id);
   else if(parts.length===3&&parts[2]==='program'&&req.method==='PUT'){const body=z.object({cliPath:z.string().max(4096)}).strict().parse(await bodyJson(req));result=await setAgentProgramPath(id,body.cliPath);}
-  else if(parts.length===3&&['install','logout','switch-account','upgrade'].includes(parts[2])&&req.method==='POST'){const body=z.object({command:z.string().optional()}).strict().parse(await bodyJson(req));result=await agentManagement.start(id,parts[2] as 'install'|'logout'|'switch-account'|'upgrade',body);}
+  else if(parts.length===3&&agentManagementActions.includes(parts[2] as AgentManagementAction)&&req.method==='POST'){const body=z.object({command:z.string().optional()}).strict().parse(await bodyJson(req));result=await agentManagement.start(id,parts[2] as AgentManagementAction,body);}
+  else if(parts.length===3&&id==='codebuddy'&&parts[2]==='install-and-login'&&(req.method==='GET'||req.method==='DELETE'))result=await agentManagement.workBuddySetup(req.method==='DELETE');
   else if(parts.length===3&&parts[2]==='management'&&req.method==='GET')result=await agentManagement.check(id);
   else if(parts.length===3&&parts[2]==='management'&&req.method==='DELETE')result=await agentManagement.cancel(id);
   else if(parts.length===2&&req.method==='GET')result=await getConnectionStatus(id);

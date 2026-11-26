@@ -20,6 +20,7 @@ export function validateHost({platform, arch, node, mac, freeBytes, translated=f
 export function installPlan() { return [
  {id:'root', cwd:'.', args:['ci','--no-audit','--no-fund'], label:'根目录依赖'},
  {id:'openscreen', cwd:'vendor/openscreen', args:['ci','--ignore-scripts','--no-audit','--no-fund'], label:'录屏编辑器依赖'},
+ {id:'builtin',cwd:'desktop/builtin-agent',args:['ci','--omit=optional','--ignore-scripts','--no-audit','--no-fund'],label:'内置智能体依赖'},
 ]; }
 export async function setup(options = {}) {
  const dir=options.root || root, env={...(options.env || process.env),npm_config_arch:process.arch,npm_config_cpu:process.arch,npm_config_platform:process.platform};
@@ -29,7 +30,7 @@ export async function setup(options = {}) {
  const stat=fs.statfsSync(dir);
  const mac=run('/usr/bin/sw_vers',['-productVersion']);
  validateHost({platform:process.platform,arch:process.arch,translated:process.platform==='darwin' && macTranslated(run),node:process.version,mac:mac.stdout?.trim() || '',freeBytes:Number(stat.bavail)*Number(stat.bsize)});
- log('1/7 系统、芯片、Node 和磁盘检查通过');
+ log('1/8 系统、芯片、Node 和磁盘检查通过');
  const stampFile=path.join(dir,'.setup-state.json');
  let state={};try{state=JSON.parse(fs.readFileSync(stampFile,'utf8'))}catch{}
  const save=()=>fs.writeFileSync(stampFile,JSON.stringify(state,null,2)+'\n',{mode:0o600});
@@ -40,12 +41,12 @@ export async function setup(options = {}) {
   const modules=path.join(cwd,'node_modules');
   // Validate the installed dependency tree as well as the receipt: partial removals must reinstall.
   const intact=state[step.id]===digest && fs.existsSync(modules) && run('npm',['ls','--depth=0','--omit=optional'],{cwd}).status===0;
-  log(`${i+2}/7 ${step.label}：${intact?'已安装，检查通过':'安装中'}`);
+  log(`${i+2}/8 ${step.label}：${intact?'已安装，检查通过':'安装中'}`);
   if(!intact){must('npm',step.args,step.label,{cwd});state[step.id]=digest;save();}
  }
- log('4/7 准备 Playwright Chromium（已安装的版本自动复用）');
+ log('5/8 准备 Playwright Chromium（已安装的版本自动复用）');
  must('npx',['--no-install','playwright-core','install','chromium'],'Chromium 安装');
- log('5/7 准备独立 Python + numpy');
+ log('6/8 准备独立 Python + numpy');
  const venv=env.OPENTAKE_SETUP_VENV || path.join(os.homedir(),'.opentake-venv');
  if(!path.isAbsolute(venv))throw Error('OPENTAKE_SETUP_VENV 必须是独立虚拟环境的绝对路径。');
  const py=path.join(venv,'bin/python3');
@@ -57,11 +58,11 @@ export async function setup(options = {}) {
  }
  if(run(py,['-c','import numpy'],{env:pyEnv}).status!==0)must(py,['-m','pip','install','numpy'],'numpy 安装',{env:pyEnv});
  must(py,['-c','import sys, numpy; assert sys.version_info.major == 3'],'Python 与 numpy 检查',{env:pyEnv});
- log('6/7 检查 FFmpeg / ffprobe');
+ log('7/8 检查 FFmpeg / ffprobe');
  const media=options.media || require('../desktop/media-tools.cjs');
  const result=media.doctor({env});
  if(!result.ok)throw Error('缺少可运行且位于同一目录的 FFmpeg / ffprobe。请运行 brew install ffmpeg，或把工具目录设为 LINKREADER_BIN_DIR，再重试 npm run setup。不会自动下载或替换 FFmpeg。');
- log('7/7 检查 OpenScreen（可选）并构建界面');
+ log('8/8 检查 OpenScreen（可选）并构建界面');
  try {
   const probe=options.screenCheck || (await import('../server/onboarding-common.ts')).openscreen;
   const status=await probe(); log(`OpenScreen：${status.text}`);

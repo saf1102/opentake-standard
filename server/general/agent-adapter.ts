@@ -3,22 +3,23 @@
  * 测试仅使用假进程和事件，不能据此声称真实 Claude 出片已经验收。
  */
 import fs from 'node:fs';
+import {OFFLINE_PACKAGES} from './net-guard.ts';
 import type {GeneralAgentChoice, GeneralStep} from '../../src/general/general-contract.ts';
-import {assertAgentWorkAllowed, assertConnectionModel, onAgentDisabled, markAgentCredentialsRejected, getConnectionConfig} from '../agent-connections.ts';
+import {assertAgentWorkAllowed, assertConnectionModel, onAgentDisabled, markAgentCredentialsRejected, recordDeepseekKeyRejection, recordDeepseekAccountRejection, recordDeepseekRouteVerified, getConnectionConfig} from '../agent-connections.ts';
 import {filmTurnArgs, startCodex, type CodexProcess, type TurnArgs} from './codex.ts';
 import {applyCodexEvent, type EventOutcome} from './events.ts';
-import {agentAcpArgs,connectionDefinition,type AgentConnectionId} from '../../shared/agent-connections.ts';
+import {agentFilmUnavailableReason,agentAcpArgs,connectionDefinition,type AgentConnectionId} from '../../shared/agent-connections.ts';
 import {startAcpAgent,applyAcpEvent,classifyAgentFailure} from './acp.ts';
 
 export type FilmAgentId = AgentConnectionId;
 export type ResolvedFilmAgent = {
   agent?: FilmAgentId; executable:string; model:string; effort:string;
-  requested?:GeneralAgentChoice; env?:NodeJS.ProcessEnv; args?:string[]; method?:'cli'|'api'; transport?:'acp';
+  requested?:GeneralAgentChoice; connectionRevision?:number; env?:NodeJS.ProcessEnv; args?:string[]; method?:'cli'|'api'; transport?:'acp';
 };
 export function filmAgentId(choice?: {agent?:string}): FilmAgentId {
   const id=choice?.agent || 'codex';
   if(id!=='codex' && id!=='claude' && (!agentAcpArgs(id as AgentConnectionId) || !connectionDefinition(id as AgentConnectionId).heavySupported)) throw Object.assign(Error('这个智能体的出片适配还没完成，请选择已适配的智能体'),{status:412});
-  if(id==='claude' && process.platform==='win32') throw Object.assign(Error('Windows 版暂未支持：Claude Code 出片'),{status:412});
+  const unavailable=agentFilmUnavailableReason(id as AgentConnectionId);if(unavailable)throw Object.assign(Error(unavailable),{status:412});
   return id as FilmAgentId;
 }
 export function claudeTurnArgs(a:TurnArgs & {method?:'cli'|'api'}):string[] {
@@ -66,7 +67,7 @@ export function applyClaudeEvent(steps:GeneralStep[],event:Record<string,unknown
 export const applyFilmAgentEvent=(id:FilmAgentId,steps:GeneralStep[],event:Record<string,unknown>,at:string)=>id==='codex'?applyCodexEvent(steps,event,at):id==='claude'?applyClaudeEvent(steps,event,at):applyAcpEvent(steps,event,at);
 
 /** Reuse the existing process-group transport, including descendant cancellation and event log handling. */
-export function startFilmAgent(agent:ResolvedFilmAgent,args:string[],options:Parameters<typeof startCodex>[2] & {lastMessage?:string;images?:string[];projectRoot?:string}):CodexProcess {
+export function startFilmAgent(agent:ResolvedFilmAgent,args:string[],options:Parameters<typeof startCodex>[2] & {lastMessage?:string;images?:string[];projectRoot?:string;readOnly?:boolean}):CodexProcess {
   assertAgentWorkAllowed(agent.agent||'codex');
   const id=filmAgentId(agent);
   // Kept immediately before transport start; even stale jobs must re-read the current switch.
@@ -75,10 +76,17 @@ export function startFilmAgent(agent:ResolvedFilmAgent,args:string[],options:Par
   const config=getConnectionConfig(id),method=agent.method||config.mode,revision=config.revision||0;
   // session/new can succeed without usable credentials (observed with Kimi).
   // The actual prompt rejection overrides the cached, non-generating probe immediately.
-  const rejected=(error:unknown)=>{if(classifyAgentFailure(error).kind==='credentials')markAgentCredentialsRejected(id,method,revision);};
+  let deepseekRevision=agent.connectionRevision??revision;
+  const rejected=(error:unknown)=>{if(id!=='deepseek'&&classifyAgentFailure(error).kind==='credentials')markAgentCredentialsRejected(id,method,revision);};
   const onEvent=(event:Record<string,unknown>)=>{
     const error=applyFilmAgentEvent(id,[],event,new Date().toISOString()).error;
-    if(event.type==='acp.error'&&event.kind==='credentials')markAgentCredentialsRejected(id,method,revision);
+    if(id==='deepseek'&&event.type==='acp.deepseek-key-rejected')deepseekRevision=recordDeepseekKeyRejection(deepseekRevision);
+    if(id==='deepseek'&&event.type==='acp.deepseek-account-rejected')recordDeepseekAccountRejection(deepseekRevision);
+    if(id==='deepseek'&&event.type==='acp.deepseek-route'){
+      if(event.provider==='deepseek-account')recordDeepseekRouteVerified(deepseekRevision,'account');
+      else if(event.provider==='deepseek-official')recordDeepseekRouteVerified(deepseekRevision,'official');
+    }
+    if(id!=='deepseek'&&event.type==='acp.error'&&event.kind==='credentials')markAgentCredentialsRejected(id,method,revision);
     else if(error)rejected(error);
     options.onEvent(event);
   };
@@ -87,7 +95,14 @@ export function startFilmAgent(agent:ResolvedFilmAgent,args:string[],options:Par
     return {...proc,done:proc.done.then(result=>{if(result.code!==0)rejected(result.stderr);return result;}).finally(unsubscribe)};
   };
   if(id!=='codex'&&id!=='claude'){
-    return observe(startAcpAgent(agent.executable,args,{...options,onEvent,agent:id,model:agent.model,redact:filmAgentRedactor(options.env)}));
+    // The project environment can contain an inherited key. Only the resolved card credential belongs to dsh.
+    if(id==='deepseek'){
+      const env={...options.env};
+      for(const key of Object.keys(env))if(key.toUpperCase()==='DEEPSEEK_API_KEY')delete env[key];
+      if(agent.env?.DEEPSEEK_API_KEY)env.DEEPSEEK_API_KEY=agent.env.DEEPSEEK_API_KEY;
+      options={...options,env};
+    }
+    return observe(startAcpAgent(agent.executable,args,{...options,...(id==='builtin'?{env:{...agent.env,...OFFLINE_PACKAGES,...Object.fromEntries(Object.entries(options.env).filter(([name])=>/^(CW_(WORK|MEDIA|KIT|BIN|FFMPEG|FFPROBE|CHROME|HFX_CHROME|PYTHON|NODE_MODULES|FONT_MANIFEST_SHA256|FONT_DIRS|ICONS_DIR|NETWORK|STYLE)|PATH|TMP|TEMP|TMPDIR|TMPPREFIX|ZDOTDIR|LINKREADER_BIN_DIR|PLAYWRIGHT_CHROMIUM_EXECUTABLE|PYTHON(UTF8|PATH|DONTWRITEBYTECODE|NOUSERSITE|PYCACHEPREFIX)|PIP_NO_INDEX|HF_HUB_OFFLINE|TRANSFORMERS_OFFLINE)$/i.test(name)))}}:{}),onEvent,agent:id,model:agent.model,redact:filmAgentRedactor(options.env)}));
   }
   const prompt=id==='claude' && options.images?.length?`${options.prompt}\n\n请用 Read 查看以下参考图片：\n${options.images.join('\n')}`:options.prompt;
   const redact=filmAgentRedactor(options.env);
@@ -100,6 +115,6 @@ export function startFilmAgent(agent:ResolvedFilmAgent,args:string[],options:Par
 
 /** API credentials stay in the child environment only; even an echoed provider error is scrubbed. */
 export function filmAgentRedactor(env:NodeJS.ProcessEnv):(text:string)=>string {
-  const keys=['OPENTAKE_CODEX_API_KEY','OPENAI_API_KEY','ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN'].map(key=>env[key]).filter((key):key is string=>!!key);
+  const keys=['OPENTAKE_BUILTIN_KEY','OPENTAKE_CODEX_API_KEY','OPENAI_API_KEY','ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN','DEEPSEEK_API_KEY'].map(key=>env[key]).filter((key):key is string=>!!key);
   return text=>keys.reduce((value,key)=>value.split(key).join('[已隐藏密钥]'),text);
 }

@@ -8,8 +8,8 @@ test('安装前挡住不支持的系统、芯片、Node 和磁盘',()=>{
  assert.doesNotThrow(()=>validateHost({...good,arch:'x64'}));
  for(const change of [{platform:'win32'},{arch:'ia32'},{arch:'x64',translated:true},{node:'24.14.0'},{node:'25.0.0'},{mac:'11.7'},{mac:''},{freeBytes:1024}])assert.throws(()=>validateHost({...good,...change}));
 });
-test('两份锁定安装不能漏掉录屏依赖，不执行其原生安装脚本',()=>{
- assert.deepEqual(installPlan().map((p:{cwd:string})=>p.cwd),['.','vendor/openscreen']);
+test('三份锁定安装不能漏掉录屏依赖，不执行其原生安装脚本',()=>{
+ assert.deepEqual(installPlan().map((p:{cwd:string})=>p.cwd),['.','vendor/openscreen','desktop/builtin-agent']);
  assert.deepEqual(installPlan()[1].args,['ci','--ignore-scripts','--no-audit','--no-fund']);
 });
 
@@ -22,7 +22,7 @@ test('重复安装检查依赖树，失败不写成功回执，重试可继续',
  if(process.platform!=='darwin'||!['arm64','x64'].includes(process.arch))return;
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-setup-test-'));
  try{
-  for(const dir of [root,path.join(root,'vendor/openscreen')]){
+  for(const dir of [root,path.join(root,'vendor/openscreen'),path.join(root,'desktop/builtin-agent')]){
    fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'package.json'),'{}');fs.writeFileSync(path.join(dir,'package-lock.json'),'{}');
   }
   const venv=path.join(root,'python'),calls:string[]=[];let broken=false,failInstall=true;
@@ -41,11 +41,11 @@ test('重复安装检查依赖树，失败不写成功回执，重试可继续',
   await assert.rejects(setup(options),/根目录依赖失败/);
   assert.equal(fs.existsSync(path.join(root,'.setup-state.json')),false);
   failInstall=false;await setup(options);
-  assert.equal(calls.filter(s=>s.startsWith('npm ci')).length,3);
+  assert.equal(calls.filter(s=>s.startsWith('npm ci')).length,4);
   calls.length=0;await setup(options);
   assert.equal(calls.some(s=>s.startsWith('npm ci')),false,'完整依赖应复用');
   broken=true;await setup(options);
-  assert.equal(calls.filter(s=>s.startsWith('npm ci')).length,2,'依赖损坏须重装两份');
+  assert.equal(calls.filter(s=>s.startsWith('npm ci')).length,3,'依赖损坏须重装三份');
   await assert.rejects(setup({...options,media:{doctor:()=>({ok:false})}}),/FFmpeg/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

@@ -1,3 +1,4 @@
+import {validateAgentProgram} from './agent-program-path.ts';
 import {spawnAgentProcess} from './agent-launch.ts';
 import {AGENT_CONNECTION_IDS,LIGHT_AGENT_MODULES,connectionReadyForLight,connectionReadyForFilm} from '../shared/agent-connections.ts';
 import platform from './platform.ts';
@@ -8,6 +9,7 @@ import path from 'node:path';
 
 import {createInterface} from 'node:readline';
 import {z} from 'zod';
+import {builtinSupportsModule} from '../shared/builtin-models.ts';
 import {AGENT_MODULES, defaultAgentSettings, effectiveChoice, type AgentCatalog, type AgentModule, type AgentSettings, type AgentRun, type AgentSettingsView} from '../src/studio/agent-settings.ts';
 import {execFileAsync} from './proc.ts';
 
@@ -23,21 +25,8 @@ export function readAgentSettings(): AgentSettings {
   try { const stored=JSON.parse(fs.readFileSync(file,'utf8')); return settingsSchema.parse({...stored,modules:{...defaultAgentSettings().modules,...stored.modules}}); }
   catch { throw new Error('Agent 配置文件损坏，请检查 agent-settings.json；未自动改用其他模型'); }
 }
-/**
- * A saved path that no longer works falls back to auto-detection. Versions before 1.0.0 saved whatever they found,
- * often the Codex bundled inside the old app, which 1.0.0 removed. A path being typed in still fails on its own.
- */
 export function resolveCliPath(configured = readAgentSettings().cliPath): string {
-  try { return installations.resolveAgent('codex', configured); }
-  catch (error) {
-    if (!configured || configured !== readAgentSettings().cliPath) throw error;
-    return installations.resolveAgent('codex', '');
-  }
-}
-/** Clears a saved Codex path that stopped working, only if it is still the one saved. */
-export function forgetStaleCliPath(stale: string) {
-  const settings = readAgentSettings();
-  if (stale && settings.cliPath === stale) atomicAgentJson(agentSettingsFile(), { ...settings, cliPath: '' });
+  return installations.resolveAgent('codex', configured);
 }
 export async function checkCliPath(configured: string) {
   const executable = resolveCliPath(configured);
@@ -113,7 +102,14 @@ export function validateAgentChoice(module: AgentModule, settings: AgentSettings
 }
 export async function saveAgentSettings(value: unknown) {
   const settings = settingsSchema.parse(value);
-  const hasCodex=AGENT_MODULES.some(m=>!settings.modules[m.id].agent||settings.modules[m.id].agent==='codex');
+  if(settings.cliPath&&settings.cliPath!==readAgentSettings().cliPath){
+    const {getConnectionConfig}=await import('./agent-connections.ts');
+    await validateAgentProgram('codex',settings.cliPath,getConnectionConfig('claude').cliPath);
+  }
+  const previous=readAgentSettings();
+  const usesBuiltin=Object.values(settings.modules).some(choice=>choice.agent==='builtin');
+  const unchangedCodex=(module:AgentModule)=>usesBuiltin&&settings.cliPath===previous.cliPath&&JSON.stringify(settings.modules[module])===JSON.stringify(previous.modules[module]);
+  const hasCodex=(process.platform!=='darwin'&&process.platform!=='win32')||AGENT_MODULES.some(m=>(!settings.modules[m.id].agent||settings.modules[m.id].agent==='codex')&&!unchangedCodex(m.id));
   const catalog = hasCodex ? await getAgentCatalog(settings.cliPath, true) : null;
   for (const module of AGENT_MODULES) {
     // A model this Codex lacks is kept (it runs on the default); an effort the chosen model rejects is a mistake to fix now.
@@ -121,10 +117,12 @@ export async function saveAgentSettings(value: unknown) {
     if(agentId!=='codex'){
       const {getConnectionStatus}=await import('./agent-connections.ts');const connection=await getConnectionStatus(agentId);
       if(!connection.enabled||!connection.connected)throw Error(`${module.name}：所选智能体未接通`);
-      if(module.id!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module.id)||!connectionReadyForLight(connection)))throw Error(`${module.name}：所选智能体暂不支持这项工作`);
+      if(agentId==='builtin'&&!builtinSupportsModule(module.id))throw Error('选题研究需要支持联网搜索的智能体');
+      if(agentId!=='builtin'&&module.id!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module.id)||!connectionReadyForLight(connection)))throw Error(`${module.name}：所选智能体暂不支持这项工作`);
       if(module.id==='generalEditing'&&!connectionReadyForFilm(connection))throw Error('出片需要已适配的命令行');
       continue;
     }
+    if(!catalog&&unchangedCodex(module.id))continue;
     if(!catalog)throw Error('Codex 没有返回可用模型');
     validateAgentChoice(module.id, settings, catalog);
     const choice = settings.modules[module.id], model = catalog.models.find(m => m.id === choice.model);
@@ -161,8 +159,9 @@ export async function validateModuleAgentChoice(module:AgentModule,value:unknown
  const choice=parseAgentChoice(value);if(!AGENT_MODULES.some(m=>m.id===module))throw Error('未知工作模块');
  const {getConnectionStatus}=await import('./agent-connections.ts');const connection=await getConnectionStatus(choice.agent||'codex');
  if(!connection.enabled||!connection.connected)throw Error('所选智能体未接通');
- if(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)&&(!connection.cliInstalled||module==='generalEditing'&&!connectionReadyForFilm(connection)))throw Error('出片需要安装已适配的命令行');
- if(choice.agent&&choice.agent!=='codex'&&module!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)||!connectionReadyForLight(connection)))throw Error('此模块的智能体接法待适配，请使用已支持的接入');
+ if(choice.agent==='builtin'&&!builtinSupportsModule(module))throw Error('选题研究需要支持联网搜索的智能体');
+ if(choice.agent!=='builtin'&&!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)&&(!connection.cliInstalled||module==='generalEditing'&&!connectionReadyForFilm(connection)))throw Error('出片需要安装已适配的命令行');
+ if(choice.agent&&choice.agent!=='builtin'&&choice.agent!=='codex'&&module!=='generalEditing'&&(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module)||!connectionReadyForLight(connection)))throw Error('此模块的智能体接法待适配，请使用已支持的接入');
  return choice;
 }
 /** 单模块默认值：首次引导只修改自己的选择，不校验或覆盖其他模块。 */

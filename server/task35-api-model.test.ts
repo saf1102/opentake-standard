@@ -67,7 +67,7 @@ test('任务35：本地模拟 Responses 只对 404/405/501 回退一次，测试
    save('codex',{baseUrl,model:'chosen-model'});requests.length=0;const result=await testUnifiedConnection('codex',deps);assert.equal(result.ok,false);assert.equal(requests.length,2);assert.ok(!JSON.stringify(result).includes(KEY));
   }
   status=404;fallbackStatus=404;save('codex',{baseUrl,model:'chosen-model'});requests.length=0;
-  const unsupported=await testUnifiedConnection('codex',deps);assert.equal(unsupported.error,'这个接口不支持 Responses 协议，不能用于出片');assert.equal(requests.length,3);
+  const unsupported=await testUnifiedConnection('codex',deps);assert.match(unsupported.error!,/不支持 Responses 协议.*支持 Responses 的接口地址/);assert.equal(requests.length,3);
   fallbackStatus=200;invalid=true;save('codex',{baseUrl,model:'chosen-model'});assert.match((await testUnifiedConnection('codex',deps)).error!,/返回结构不正确/);
   invalid=false;save('codex',{baseUrl,model:'default'});requests.length=0;assert.equal((await testUnifiedConnection('codex',deps)).ok,true);assert.equal(requests.length,3);
   status=200;save('codex',{baseUrl,model:'chosen-model'});requests.length=0;assert.equal((await testUnifiedConnection('codex',deps)).ok,true);assert.equal(requests.length,2);
@@ -136,7 +136,7 @@ test('中转站：没有模型列表或计数接口时，手填模型走最小�
 
 test('中转站：协议不对和鉴权失败不算通过；404 提示实际地址',async()=>fixture(async(save,deps)=>{
  save('claude',{baseUrl:'https://r.example',model:'relay-model',connected:false});
- const missing=await testUnifiedConnection('claude',{...deps,fetcher:relay(()=>false,relayReply)});assert.equal(missing.ok,false);assert.match(missing.error||'',/不支持 Anthropic Messages/);
+ const missing=await testUnifiedConnection('claude',{...deps,fetcher:relay(()=>false,relayReply)});assert.equal(missing.ok,false);assert.match(missing.error||'',/找不到接口地址.*是否支持 Anthropic Messages/);
  const wrongShape=await testUnifiedConnection('claude',{...deps,fetcher:relay(url=>url.endsWith('/messages'),()=>({choices:[]}))});assert.equal(wrongShape.ok,false);assert.match(wrongShape.error||'',/返回结构不正确/);
  const denied=await testUnifiedConnection('claude',{...deps,fetcher:(async()=>new Response('{}',{status:401})) as typeof fetch});assert.equal(denied.ok,false);assert.doesNotMatch(denied.error||'',/不支持/);
  save('codex',{baseUrl:'https://r.example',model:'default',connected:false});

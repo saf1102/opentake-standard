@@ -96,3 +96,42 @@ test('真实本机HTTP：旧网关丢弃新标记仍可申请/登录，新后台
   fs.rmSync(root,{recursive:true,force:true});
  }
 });
+
+for(const platform of ['darwin','win32'])test(platform+' 回环账号审批、每日提醒防重和关闭设置',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'pro-daily-'));
+ const savedPlatform=Object.getOwnPropertyDescriptor(process,'platform')!,savedArch=Object.getOwnPropertyDescriptor(process,'arch')!;
+ let state='pending',checks=0,blocked=0;
+ const remote=http.createServer(async(req,res)=>{
+  res.setHeader('Content-Type','application/json');
+  if(req.url==='/standard/upgrade.json'){checks++;return res.end(JSON.stringify({mode:'beta',notice:'可以升级 Pro'}))}
+  if(req.url?.endsWith('.json')){res.writeHead(404);return res.end('{}')}
+  if(req.url==='/api/standard/apply'||req.url==='/api/login')return res.end(JSON.stringify({token:'local-test-only',proStatus:state}));
+  if(req.url?.startsWith('/api/me?')){
+   assert.equal(req.url,'/api/me?platform='+(platform==='win32'?win:mac));assert.equal(req.headers.authorization,'Bearer local-test-only');
+   if(blocked){res.writeHead(blocked);return res.end(JSON.stringify({error:'本机假后台原话 '+blocked}))}
+   return res.end(JSON.stringify({username:'user@example.test',proStatus:state,downloadMessage:'本平台安装包暂未提供'}));
+  }
+  throw Error('意外路由 '+req.url);
+ });
+ await new Promise<void>(r=>remote.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+(remote.address() as any).port;
+ const vars={OPENTAKE_STANDARD_USER_DATA:root,OPENTAKE_UPGRADE_TEST_URL:origin,OPENTAKE_MAC_UPDATE_TEST_URL:origin+'/mac-update.json',OPENTAKE_UPGRADE_FALLBACK_URL:origin+'/fallback.json'};
+ const before=Object.fromEntries(Object.keys(vars).map(k=>[k,process.env[k]]));
+ Object.assign(process.env,vars);Object.defineProperty(process,'platform',{value:platform});Object.defineProperty(process,'arch',{value:platform==='win32'?'x64':'arm64'});
+ const {upgradeApi}=await import('./standard/upgrade.ts?daily-'+platform);
+ const local=http.createServer((req,res)=>void upgradeApi(req,res));await new Promise<void>(r=>local.listen(0,'127.0.0.1',r));
+ t.after(async()=>{Object.defineProperty(process,'platform',savedPlatform);Object.defineProperty(process,'arch',savedArch);
+  for(const [k,v] of Object.entries(before)){if(v===undefined)delete process.env[k];else process.env[k]=v}
+  for(const s of [local,remote])await new Promise<void>(r=>s.close(()=>r()));fs.rmSync(root,{recursive:true,force:true})});
+ const call=(route:string,method='GET',body?:unknown)=>fetch('http://127.0.0.1:'+(local.address() as any).port+'/api/upgrade/'+route,{method,redirect:'manual',...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});
+ const prefs=platform==='win32'?'windows/preferences':'preferences';
+ await call(prefs,'PUT',{daily:false});assert.deepEqual(await (await call('daily')).json(),{skipped:true});assert.equal(checks,0);
+ await call(prefs,'PUT',{daily:true});assert.equal((await (await call('apply','POST',{name:'fixture'})).json()).proStatus,'pending');
+ const responses=await Promise.all([call('daily'),call('daily')]);const pair=await Promise.all(responses.map(r=>r.json()));
+ assert.equal(pair.filter(x=>x.remind&&x.account.proStatus==='pending').length,1);assert.equal(pair.filter(x=>x.skipped).length,1);assert.equal(checks,1);
+ for(state of ['rejected','ended','approved']){
+  const value=await (await call('state')).json();assert.equal(value.account.proStatus,state);assert.equal(value.remind,false);
+  if(platform==='win32')assert.equal(value.clientUpdate,undefined);
+ }
+ await call('login','POST',{username:'fixture',password:'synthetic-only'});
+ for(blocked of [409,503]){const r=await call('download');assert.equal(r.status,blocked);assert.equal((await r.json()).error,'本机假后台原话 '+blocked);}
+});

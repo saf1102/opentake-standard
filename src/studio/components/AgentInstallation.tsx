@@ -19,11 +19,11 @@ export function AgentInstallation({kind,onSaved,use,onStatus,onDirtyChange,onBus
  useEffect(()=>{onBusyChange?.(busy);return()=>onBusyChange?.(false)},[busy,onBusyChange]);
  const name=kind==='codex'?'Codex':'Claude Code';
  // `action` opens Codex's login or confirmed installer in Terminal; success means only that Terminal opened.
- async function request(method='GET',cliPath?:string,action?:'login'|'install'){
+ async function request(method='GET',cliPath?:string,action?:'login'|'install',refresh=false){
   controller.current?.abort();const current=new AbortController();controller.current=current;setBusy(true);setError('');setOpening(!!action);if(action)setConfirm(false);
   try{
    const payload=action?{command:action==='install'?status?.installCommand:undefined}:cliPath!==undefined?{cliPath}:undefined;
-   const response=await fetch(`/api/editor/agent-settings/installation/${kind}${action?`/${action}`:''}`,{method:action?'POST':method,signal:current.signal,headers:{'Content-Type':'application/json'},...(payload?{body:JSON.stringify(payload)}:{})});
+   const response=await fetch(`/api/editor/agent-settings/installation/${kind}${action?`/${action}`:''}`,{method:action?'POST':method,signal:current.signal,headers:{'Content-Type':'application/json',...(refresh?{'X-OpenTake-Refresh':'1'}:{})},...(payload?{body:JSON.stringify(payload)}:{})});
    const body=await response.json();if(!response.ok||!body.ok)throw Error(body.error||(action?'没有打开终端':'检测失败'));
    if(current.signal.aborted)return;
    if(action){setWatch(action);return}
@@ -62,7 +62,7 @@ export function AgentInstallation({kind,onSaved,use,onStatus,onDirtyChange,onBus
   {diagnosis&&status&&<div className="agent-row-diagnosis"><b>诊断 · 已检查 {status.candidates.length} 个位置</b>{status.candidates.map(c=><p key={c.path}><code>{c.path}</code> · {c.status==='valid'?(kind==='claude'?'已找到':'有效'):c.status==='invalid'?'版本检查失败':c.status==='duplicate'?'重复路径':'未找到'} {c.version||''}</p>)}</div>}
   </div>
   <div className="agent-row-actions">
-   {watch?<button onClick={()=>{setWatch('');controller.current?.abort();setBusy(false)}}>{watch==='login'?'停止登录检测':'停止安装检测'}</button>:<button disabled={busy} onClick={()=>void request()}>重新检测</button>}
+   {watch?<button onClick={()=>{setWatch('');controller.current?.abort();setBusy(false)}}>{watch==='login'?'停止登录检测':'停止安装检测'}</button>:<button disabled={busy} onClick={()=>void request('GET',undefined,undefined,true)}>重新检测</button>}
    <DropdownMenu>
     <DropdownMenuTrigger asChild><button ref={manualButton} className="agent-row-more" aria-label={`${name} 更多操作`} title="更多操作">⋯</button></DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="agent-row-menu" onCloseAutoFocus={e=>{if(focusManual.current){e.preventDefault();focusManual.current=false;manualInput.current?.focus()}}}>

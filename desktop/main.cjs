@@ -57,7 +57,7 @@ async function start() {
  if(process.platform==='win32')buildTarget();
  const profile = app.getPath('userData');
  fs.mkdirSync(profile,{recursive:true});
- const env = distributionEnvironment({...process.env,ELECTRON_RUN_AS_NODE:'1',
+ const env = distributionEnvironment({...process.env,OPENTAKE_HOST_VERSION:app.getVersion(),ELECTRON_RUN_AS_NODE:'1',
   OPENTAKE_STANDARD_USER_DATA:profile,
   LINKREADER_SYSTEM_SETTINGS_FILE:process.env.LINKREADER_SYSTEM_SETTINGS_FILE || path.join(profile,'system-settings.json'),
   LINKREADER_AGENT_SETTINGS_FILE:process.env.LINKREADER_AGENT_SETTINGS_FILE || path.join(profile,'agent-settings.json')},
@@ -74,6 +74,7 @@ async function start() {
  if(process.platform==='win32')win.on('page-title-updated',event=>event.preventDefault());
  if(process.platform==='darwin')app.dock.setIcon(path.join(assets,'opentake-icon-512.png'));
  permissions();
+ require('./pro-download.cjs').installProDownload({ipcMain,trusted,getOrigin:()=>origin,shell});
  require('./client-update.cjs').installUpdateIPC({app,ipcMain,trusted,root,getOrigin:()=>origin});
  if(process.platform==='win32'){
   recordingControls=createRecordingControls({electron:require('electron'),root,parent:win,

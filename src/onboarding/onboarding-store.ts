@@ -31,14 +31,15 @@ async function fetchCheck(id:DeployItemId):Promise<CheckResult>{
 }
 export async function recheck(id:DeployItemId){
  setRow(id,'checking',snapshot.rows[id]?.result);
- try{const result=await fetchCheck(id);setRow(id,result.state,result);return result}
- catch(error){const result:CheckResult={id,state:'warn',text:`这一项没查成：${error instanceof Error?error.message:String(error)}`};setRow(id,'warn',result);return result}
+ const pending=snapshot.rows[id];
+ try{const result=await fetchCheck(id);if(snapshot.rows[id]===pending)setRow(id,result.state,result);return result}
+ catch(error){const result:CheckResult={id,state:'warn',text:`这一项没查成：${error instanceof Error?error.message:String(error)}`};if(snapshot.rows[id]===pending)setRow(id,'warn',result);return result}
 }
 /** Update the shared deployment summary from an already checked connection, without probing every agent again. */
 export function syncDeployConnections(connections:ConnectionView[]){
  if(!connections.length)return;
  const agents=connections.filter(item=>item.kind==='agent'),ready=agents.filter(connectionReadyForFilm);
- const result:CheckResult={id:'agent',state:ready.length?'ok':'act',text:`找到 ${agents.filter(item=>item.cliInstalled).length} 个，已接通 ${agents.filter(item=>item.connected).length} 个${ready.length?'':'；请在设置里接通支持出片的智能体'}`,agents:agents.map(item=>({id:item.id,name:item.name,line:item.cliInstalled?'已找到命令行':'没找到命令行',state:item.connected?'on':item.cliInstalled?'found':'off',status:item.connected?'已接通':item.cliAuthMessage||'未接通'})),action:{kind:'settings',label:'管理智能体',target:'agents'}};
+ const result:CheckResult={id:'agent',state:ready.length?'ok':'act',text:`找到 ${agents.filter(item=>item.cliInstalled).length} 个，已接通 ${agents.filter(item=>item.connected).length} 个${ready.length?'':`；给内置智能体填入模型密钥即可出片，也可以接通 Codex 等智能体`}`,agents:agents.map(item=>({id:item.id,name:item.name,line:item.id==='builtin'?'随软件提供':item.cliInstalled?'已找到命令行':'没找到命令行',state:item.connected?'on':item.cliInstalled?'found':'off',status:item.connected?'已接通':item.cliAuthMessage||'未接通'})),action:{kind:'settings',label:'管理智能体',target:'agents'}};
  setRow('agent',result.state,result);
 }
 let current:Promise<void>|null=null;

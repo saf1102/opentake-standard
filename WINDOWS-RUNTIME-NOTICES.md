@@ -15,3 +15,7 @@ The separately runnable programs below are bundled as application-local tools. T
 - **Jianying draft generation**: pinned PyPI wheels for pyJianYingDraft 0.3.0, pymediainfo 7.0.1 (including its MediaInfo DLL), imageio 2.38.1, uiautomation 2.0.29 and comtypes 1.4.17. Original package license notices remain under `jianying-python`; existing bundled NumPy and Pillow are reused. Archive URLs and SHA-256 are in `desktop/windows-export-runtime-lock.json`, the runtime `runtime-lock.json`, and provenance.json. No Jianying application binaries, accounts or user drafts are included. Jianying is separately installed by the user to open/edit the generated drafts. No GUI automation is used to import drafts.
 
 Component names and marks remain their owners' trademarks. Inclusion does not imply endorsement. Source recipes identify upstream fixed revisions, not an instruction to update OpenTake from GitHub main.
+
+## 内置剪辑智能体
+
+Pi SDK 1.5.2 及运行所需的依赖随安装目录提供。各组件的许可原文见 `resources/app/desktop/builtin-runtime/THIRD-PARTY-NOTICES.txt`，组件和版本见 `THIRD-PARTY-LICENSES.json`。

@@ -1,37 +1,48 @@
 import {Hourglass,Check} from 'lucide-react';
 import {useEffect,useState,useRef} from 'react';import * as Dialog from '@radix-ui/react-dialog';import './pro-flow.css';
+import {bridge} from './update-shared';
 import {IS_MAC} from '../general/platform';
 export const openUpgrade=()=>window.dispatchEvent(new Event('opentake-upgrade'));
-type Plan='monthly'|'yearly'|'lifetime';type Account={name:string;username:string;purpose:string;createdAt:number;proStatus:string;kind?:string;plan?:Plan;intent?:Plan|null;message?:string;expiresAt?:number;downloadUrl?:string;downloadMessage?:string};type Config={mode:string;notice?:string;plans?:{id:Plan;label:string;price:string;badge?:string}[];buyUrl?:string};
+type Plan='monthly'|'yearly'|'lifetime';type Account={name:string;username:string;purpose:string;createdAt:number;proStatus:string;kind?:string;plan?:Plan;intent?:Plan|null;message?:string;expiresAt?:number;downloadMessage?:string};type Config={mode:string;notice?:string;plans?:{id:Plan;label:string;price:string;badge?:string}[];buyUrl?:string};
 const purposes=['口播短视频','知识讲解','产品宣传片','电商带货','团队或公司商用','其他'];const labels={monthly:'按月',yearly:'按年',lifetime:'终身买断'};
 const mask=(s:string)=>s.includes('@')?s.slice(0,1)+'***@'+s.split('@')[1]:'***'+s.slice(-4);
-async function api(route:string,method='GET',body?:unknown){const r=await fetch('/api/upgrade/'+route,{method,headers:{'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});const value=await r.json();if(!r.ok)throw Error(value.error||'操作失败');return value}
+async function api(route:string,method='GET',body?:unknown){const r=await fetch('/api/upgrade/'+route,{method,headers:{'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}).catch(()=>{throw Error('暂时连不上升级服务，请检查网络后重试。')});const value=await r.json();if(!r.ok)throw Error(value.error||'操作失败');return value}
 export function UpgradeButton(){const[notice,setNotice]=useState('');useEffect(()=>{const receive=(e:Event)=>setNotice((e as CustomEvent<string>).detail);window.addEventListener('opentake-upgrade-notice',receive);return()=>window.removeEventListener('opentake-upgrade-notice',receive)},[]);return <button type="button" className="home-entry__button" aria-haspopup="dialog" onClick={openUpgrade} title={notice||'升级到 Pro'}>{notice&&<i className="upgrade-dot"/>}升级到 Pro</button>}
-export function UpgradePreferences(){const[daily,setDaily]=useState(true);useEffect(()=>{void api('preferences').then(v=>setDaily(v.daily))},[]);return <label><input type="checkbox" checked={daily} onChange={e=>{const next=e.target.checked;void api('preferences','PUT',{daily:next}).then(()=>setDaily(next))}}/>每天启动时检查升级与申请进度（默认开启）</label>}
-export function UpgradeDialog(){return IS_MAC?<ProAccountDialog/>:<ProDevelopmentDialog/>}
-function ProDevelopmentDialog(){
- const[open,setOpen]=useState(false);const trigger=useRef<HTMLElement|null>(null);
- useEffect(()=>{
-  const show=()=>{trigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;setOpen(true)};
-  window.addEventListener('opentake-upgrade',show);
-  // Standard update checks continue independently of the local Pro notice.
-  let mounted=true;
-  const daily=async()=>{try{const v=await api('windows/daily');if(mounted&&!v.skipped)window.dispatchEvent(new CustomEvent('standard-update-state',{detail:v.clientUpdate}))}catch{}};
-  void daily();const timer=setInterval(()=>void daily(),3600000);
-  return()=>{mounted=false;clearInterval(timer);window.removeEventListener('opentake-upgrade',show)};
- },[]);
- return <Dialog.Root open={open} onOpenChange={setOpen}><Dialog.Portal><Dialog.Overlay className="pro-flow-overlay"/><Dialog.Content className="pro-flow pro-flow-modal" onCloseAutoFocus={event=>{if(trigger.current?.isConnected){event.preventDefault();trigger.current.focus()}}}><div className="dialog"><div className="state"><div className="ring wait" aria-hidden="true"><Hourglass/></div><Dialog.Title asChild><h2>OpenTake Pro 开发中</h2></Dialog.Title><Dialog.Description asChild><p>Pro 版本正在开发中，敬请期待。</p></Dialog.Description><div className="row"><span className="sp"/><Dialog.Close className="primary">知道了</Dialog.Close></div></div></div></Dialog.Content></Dialog.Portal></Dialog.Root>;
-}
+export function UpgradePreferences(){const[daily,setDaily]=useState(true);useEffect(()=>{void api('preferences').then(v=>setDaily(v.daily))},[]);return <label><input type="checkbox" checked={daily} onChange={e=>{const next=e.target.checked;void api('preferences','PUT',{daily:next}).then(()=>{setDaily(next);if(!next)window.dispatchEvent(new CustomEvent('opentake-upgrade-notice',{detail:''}))})}}/>每天启动时检查升级与申请进度（默认开启）</label>}
+export function UpgradeDialog(){return <ProAccountDialog/>}
 function ProAccountDialog(){
  const[open,setOpen]=useState(false),[config,setConfig]=useState<Config>({mode:'beta'}),[account,setAccount]=useState<Account|null>(null),[login,setLogin]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[purpose,setPurpose]=useState(purposes[0]),[plan,setPlan]=useState<Plan>('yearly'),[granting,setGranting]=useState(false);const openedAt=useRef(Date.now());
- const refresh=async(route='state')=>{const v=await api(route);if(v.skipped)return;window.dispatchEvent(new CustomEvent('standard-update-state',{detail:v.clientUpdate}));setConfig(v.upgrade);setAccount(v.account);setError(v.error||'');window.dispatchEvent(new CustomEvent('opentake-upgrade-notice',{detail:v.upgrade.notice||''}));if(v.account?.proStatus==='active')setGranting(false)};
- useEffect(()=>{const show=()=>{openedAt.current=Date.now();setOpen(true);setError('');void refresh().catch(e=>setError(e.message))};window.addEventListener('opentake-upgrade',show);void refresh('daily').catch(()=>{});const timer=setInterval(()=>void refresh('daily').catch(()=>{}),3600000);return()=>{clearInterval(timer);window.removeEventListener('opentake-upgrade',show)}},[]);
+ const dailyJob=useRef<Promise<void>|null>(null);
+ const revision=useRef(0),trigger=useRef<HTMLElement|null>(null);
+ const [downloaded,setDownloaded]=useState(false);
+ const refresh=async(route='state')=>{
+  const ticket=route==='daily'?revision.current:++revision.current;
+  const v=await api(route);
+  if(v.skipped||ticket!==revision.current)return;
+  if(v.clientUpdate)window.dispatchEvent(new CustomEvent('standard-update-state',{detail:v.clientUpdate}));
+  setConfig(v.upgrade);if(!v.keepAccount)setAccount(v.account);if(v.sessionExpired)setLogin(true);setError(v.error||(route==='state'&&v.upgrade.offline?'暂时连不上升级服务，请检查网络后重试。':''));
+  if(v.remind)window.dispatchEvent(new CustomEvent('opentake-upgrade-notice',{detail:v.upgrade.notice||(['approved','active'].includes(v.account?.proStatus)?'可以升级 Pro':'')}));
+  if(v.account?.proStatus==='active')setGranting(false);
+ };
+ useEffect(()=>{
+  const show=()=>{trigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;openedAt.current=Date.now();setOpen(true);setDownloaded(false);setError('');void refresh().catch(e=>setError(e.message))};
+  const daily=()=>{
+   if(dailyJob.current)return;
+   const update=IS_MAC?Promise.resolve():api('windows/daily').then(v=>{
+    if(v.clientUpdate)window.dispatchEvent(new CustomEvent('standard-update-state',{detail:v.clientUpdate}));
+   });
+   dailyJob.current=Promise.allSettled([refresh('daily'),update]).then(()=>{dailyJob.current=null});
+  };
+  window.addEventListener('opentake-upgrade',show);daily();
+  const timer=setInterval(daily,3600000);
+  return()=>{clearInterval(timer);window.removeEventListener('opentake-upgrade',show)};
+ },[]);
  useEffect(()=>{if(!open||!granting)return;const id=setInterval(()=>void refresh().catch(e=>setError(e.message)),3000);return()=>clearInterval(id)},[open,granting]);
- const perform=async(fn:()=>Promise<void>)=>{setBusy(true);setError('');try{await fn()}catch(e){setError(e instanceof Error?e.message:'操作失败')}finally{setBusy(false)}};
+ const perform=async(fn:()=>Promise<void>)=>{revision.current++;setDownloaded(false);setBusy(true);setError('');try{await fn()}catch(e){setError(e instanceof Error?e.message:'操作失败')}finally{setBusy(false)}};
  const intent=<div className="intent"><span>正式版上线后，你会考虑买哪一档？（可不选，随时能改）</span><div className="chips">{(Object.keys(labels) as Plan[]).map(p=><button type="button" disabled={busy} className={'chip'+(account?.intent===p?' on':'')} aria-pressed={account?.intent===p} key={p} onClick={()=>void perform(async()=>{const result=await api('intent','PUT',{plan:account?.intent===p?null:p});setAccount(a=>a?{...a,intent:result.intent}:a)})}>{labels[p]}</button>)}</div></div>;
  const summary=(rows:[string,string][])=> <div className="summary">{rows.map(([label,value])=><div key={label}><span>{label}</span>{value}</div>)}</div>;
  const approved=account&&['approved','active'].includes(account.proStatus),ended=account?.proStatus==='ended';
- return <Dialog.Root open={open} onOpenChange={setOpen}><Dialog.Portal><Dialog.Overlay className="pro-flow-overlay"/><Dialog.Content className="pro-flow pro-flow-modal" aria-describedby={undefined}><div className="dialog">
+ return <Dialog.Root open={open} onOpenChange={setOpen}><Dialog.Portal><Dialog.Overlay className="pro-flow-overlay"/><Dialog.Content className="pro-flow pro-flow-modal" aria-describedby={undefined} onCloseAutoFocus={e=>{if(trigger.current?.isConnected){e.preventDefault();trigger.current.focus()}}}><div className="dialog">
  {!account?<><div className="head"><img src="/brand/icon-pro-a.png" alt=""/><div><Dialog.Title asChild><h2>{login?'登录查看申请进度':'申请 OpenTake Pro 内测'}</h2></Dialog.Title><small>邀请内测 · 一批一批地开，选上就能用</small></div></div><p className="lead">Pro 包含口播剪辑、动效库、链接读取、文案发布、运营分析、智能选题，以及全部 56 种风格。</p><form onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const fields=Object.fromEntries(new FormData(form));void perform(async()=>{const result=await api(login?'login':'apply','POST',login?{username:fields.contact,password:fields.password}:{...fields,purpose,openedAt:openedAt.current});form.reset();setAccount(result);await refresh()})}}>
  <div className="form-two">{!login&&<label><span className="label">名字</span><input className="input" name="name" required maxLength={30}/></label>}<label><span className="label">手机号或邮箱</span><input className="input" name="contact" autoComplete="username" required maxLength={254}/></label></div><label className="label password-row">{login?'密码':'设置密码'}<input className="input" name="password" type="password" autoComplete={login?'current-password':'new-password'} minLength={10} maxLength={128} required/></label>
  {!login&&<><span className="label">主要用来做什么</span><div className="chips">{purposes.map(p=><button type="button" key={p} className={'chip'+(purpose===p?' on':'')} aria-pressed={purpose===p} onClick={()=>setPurpose(p)}>{p}</button>)}</div>{purpose==='其他'&&<input className="input" name="purposeNote" aria-label="用途说明" maxLength={60}/>}<input className="hp" name="website" tabIndex={-1} aria-hidden="true" autoComplete="off"/></>}
@@ -39,7 +50,12 @@ function ProAccountDialog(){
  <>
  {granting?<div className="state"><div className="ring wait"><Hourglass/></div><Dialog.Title asChild><h2>付款完成，正在开通</h2></Dialog.Title><p>开通好会自动生效，不用输入任何码。完成后这里会出现下载按钮，已经装了 Pro 的直接登录就能用。</p>{summary([['账号',mask(account.username)],['方案',labels[plan]],['状态','正在开通…']])}<p className="fine">当前未接支付；仅等待服务端确认授权。</p></div>:
  config.mode==='paid'&&account.proStatus!=='active'?<><div className="head"><img src="/brand/icon-pro-a.png" alt=""/><div><Dialog.Title asChild><h2>OpenTake Pro</h2></Dialog.Title><small>账号 {mask(account.username)} · 买好就能直接用</small></div></div><div className="plans">{config.plans?.map(p=><button className={'plan'+(plan===p.id?' on':'')} onClick={()=>setPlan(p.id)} key={p.id}>{p.badge&&<em>{p.badge}</em>}<small>{p.label}</small><b>{p.price}</b><span>{p.id==='lifetime'?'一次付清，永久使用':p.id==='yearly'?'每年':'每月，随时停'}</span></button>)}</div><ul className="feat"><li>口播剪辑：智能粗剪、动效卡、字幕、配乐一起排好</li><li>文案发布：写稿、审核、一键填进各平台发布页</li><li>运营分析、智能选题、链接读取、动效库，以及全部 56 种风格</li></ul><div className="row"><span className="fine">当前仅展示方案，尚未接入支付</span><span className="sp"/><button className="primary" disabled={!config.buyUrl} onClick={()=>{if(!config.buyUrl)return;const url=new URL(config.buyUrl);if(url.protocol!=='https:'){setError('购买地址无效');return}url.searchParams.set('plan',plan);window.open(url.href,'_blank','noopener,noreferrer');setGranting(true)}}>购买</button></div></>:
- <div className="state"><div className={'ring '+(approved?'ok':'wait')}>{approved?<Check/>:<Hourglass/>}</div><Dialog.Title asChild><h2>{approved?account.kind==='paid'?'已开通 OpenTake Pro':'选上了':ended?'内测期已结束':account.proStatus==='rejected'?'感谢关注':'已提交，正在排队'}</h2></Dialog.Title><p>{approved?account.kind==='paid'?'你的账号已经开通，下载后登录即可使用。':'你的账号已经开通 Pro 内测，内测期一周，从第一次登录 Pro 那天算起。':ended?'工程都还在。正式版上线后会在这里通知，账号不变。':account.proStatus==='rejected'?account.message||'感谢关注，这次暂未通过内测申请。':'内测一批一批地开。这一批还没轮到的话，下一批会再选，不用重新申请。'}</p>{summary(approved?[['账号',mask(account.username)],[account.kind==='paid'?'付费方案':'内测期',account.kind==='paid'?labels[account.plan||'lifetime']:'7 天']]:[['名字',account.name],['账号',mask(account.username)],['用途',account.purpose],['提交时间',new Date(account.createdAt).toLocaleString()],['状态',ended?'已到期':account.proStatus==='rejected'?'未通过':'排队中']])}{config.mode==='beta'&&(approved||ended)&&intent}{approved&&<ol className="steps">{['下载并安装 OpenTake Pro','用手机号或邮箱和密码登录，不用输任何码','换电脑重新登录就行，同一时间只在一台上用','Standard 里的工程，在 Pro 里直接就能打开'].map((v,i)=><li key={v}><i>{i+1}</i>{v}</li>)}</ol>}<div className="row"><span className="fine">{approved?'下载链接 6 小时内有效，过期再点一次就行':''}</span><span className="sp"/>{approved?<a className="primary" href="/api/upgrade/download" target="_blank" rel="noreferrer">下载 OpenTake Pro</a>:<Dialog.Close className="primary">知道了</Dialog.Close>}</div></div>}
+ <div className="state"><div className={'ring '+(approved?'ok':'wait')}>{approved?<Check/>:<Hourglass/>}</div><Dialog.Title asChild><h2>{approved?account.kind==='paid'?'已开通 OpenTake Pro':'选上了':ended?'内测期已结束':account.proStatus==='rejected'?'感谢关注':'已提交，正在排队'}</h2></Dialog.Title><p>{approved?account.kind==='paid'?'你的账号已经开通，下载后登录即可使用。':'你的账号已经开通 Pro 内测，内测期一周，从第一次登录 Pro 那天算起。':ended?'工程都还在。正式版上线后会在这里通知，账号不变。':account.proStatus==='rejected'?account.message||'感谢关注，这次暂未通过内测申请。':'内测一批一批地开。这一批还没轮到的话，下一批会再选，不用重新申请。'}</p>{summary(approved?[['账号',mask(account.username)],[account.kind==='paid'?'付费方案':'内测期',account.kind==='paid'?labels[account.plan||'lifetime']:'7 天']]:[['名字',account.name],['账号',mask(account.username)],['用途',account.purpose],['提交时间',new Date(account.createdAt).toLocaleString()],['状态',ended?'已到期':account.proStatus==='rejected'?'未通过':'排队中']])}{config.mode==='beta'&&(approved||ended)&&intent}{approved&&<ol className="steps">{[IS_MAC?'下载并安装 macOS 版 OpenTake Pro':'下载并安装 Windows 版 OpenTake Pro。第一次打开系统会提示未知发布者，360 或火绒也可能拦截安装。','用手机号或邮箱和密码登录，不用输任何码','换电脑重新登录就行，同一时间只在一台上用','Standard 里的工程，在 Pro 里直接就能打开'].map((v,i)=><li key={v}><i>{i+1}</i>{v}</li>)}</ol>}<div className="row"><span className="fine">{approved?'下载链接 6 小时内有效，过期再点一次就行':''}</span><span className="sp"/>{approved?<button className="primary" disabled={busy} onClick={()=>void perform(async()=>{
+   setDownloaded(false);const desktop=bridge();
+   if(!desktop?.downloadPro)throw Error('请在 OpenTake 标准版桌面程序中打开此页下载。');
+   const result=await desktop.downloadPro();if(!result.ok)throw Error(result.error||'下载未开始，请重试。');
+   setDownloaded(true);
+  })}>{busy?'正在获取链接…':error?'重试下载 OpenTake Pro':'下载 OpenTake Pro'}</button>:<Dialog.Close className="primary">知道了</Dialog.Close>}</div></div>}
  <div className="row"><button className="ghost" disabled={busy} onClick={()=>void perform(()=>refresh())}>刷新状态</button><button className="ghost" onClick={()=>void perform(async()=>{await api('logout','POST');setAccount(null);setGranting(false)})}>退出登录</button><span className="sp"/><Dialog.Close className="ghost">关闭</Dialog.Close></div></>}
- {error&&<p className="err" role="alert">{error}</p>}</div></Dialog.Content></Dialog.Portal></Dialog.Root>
+ {approved&&account.downloadMessage&&!error&&!downloaded&&<p role="status">{account.downloadMessage}</p>}{downloaded&&approved&&<p role="status">已在系统浏览器中打开下载链接。</p>}{error&&<p className="err" role="alert">{error}</p>}</div></Dialog.Content></Dialog.Portal></Dialog.Root>
 }

@@ -3,13 +3,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import installations from './agent-installation.ts';
 import {startWindowsAgentTerminal,windowsAgentTerminalState} from './windows-agent-terminal.ts';
 import {type ConnectionId, type ConnectionView} from '../shared/agent-connections.ts';
-import {assertAgentExecutionAllowed, getConnectionConfig, getConnectionStatus, detectConnectionExecutable, refreshAgentConnection, completeAgentLogin, agentLoginArgs} from './agent-connections.ts';
+import {assertAgentExecutionAllowed, getConnectionConfig, getConnectionStatus, detectConnectionExecutable, refreshAgentConnection, completeAgentLogin, agentLoginArgs, agentRegionEnvironment} from './agent-connections.ts';
 
 const execFileAsync=promisify(execFile);
 type TerminalRun=(script:string)=>Promise<string>;
-export type LoginDependencies={complete?:(id:ConnectionId,revision:number|undefined)=>Promise<ConnectionView>;exitCode?:(file:string)=>number|undefined;platform?:NodeJS.Platform;run?:TerminalRun;status?:(id:ConnectionId)=>Promise<ConnectionView>;refresh?:(id:ConnectionId)=>Promise<ConnectionView>;detect?:(id:ConnectionId)=>Promise<string|undefined>;assertAllowed?:(id:ConnectionId)=>void};
+export type LoginDependencies={complete?:(id:ConnectionId,revision:number|undefined,stillWaiting?:()=>boolean)=>Promise<ConnectionView>;exitCode?:(file:string)=>number|undefined;platform?:NodeJS.Platform;run?:TerminalRun;status?:(id:ConnectionId)=>Promise<ConnectionView>;refresh?:(id:ConnectionId)=>Promise<ConnectionView>;detect?:(id:ConnectionId)=>Promise<string|undefined>;assertAllowed?:(id:ConnectionId)=>void};
 const runTerminal:TerminalRun=async script=>{
  try{return (await execFileAsync('/usr/bin/osascript',['-e',script],{timeout:8000,maxBuffer:4096})).stdout.trim()}
  catch{throw Error('无法查看或打开终端，请在系统设置的「隐私与安全性 → 自动化」中允许 OpenTake 控制终端');}
@@ -32,7 +33,17 @@ export function createAgentLoginManager(){
   const connection=await status(id,deps);
   if(connection.connected||connection.mode!=='cli'||!connection.enabled){if(sessions.get(id)===session){sessions.delete(id);removeResult(session)}return {waiting:false,connection};}
   const result=session.windowsPid?windowsAgentTerminalState(session.windowsPid,session.resultDir):await (deps.run??runTerminal)(`if application "Terminal" is not running then return "closed"\ntell application "Terminal"\nrepeat with w in windows\nif id of w is ${session.windowId} then\nrepeat with t in tabs of w\nif tty of t is ${quoteApple(session.tty)} then\nif busy of t then return "waiting"\nreturn "finished"\nend if\nend repeat\nend if\nend repeat\nend tell\nreturn "closed"`);
-  if(result==='waiting')return {waiting:sessions.get(id)===session,connection};
+  if(result==='waiting'){
+   // CodeBuddy stays interactive after /login. A previously rejected credential needs a fresh session/new.
+   const active=()=>sessions.get(id)===session;
+   if(id==='codebuddy'&&active()&&connection.authRejectedAt&&connection.revision===session.revision){
+    const complete=deps.complete??((agent,revision,isCurrent)=>completeAgentLogin(agent,revision,{},isCurrent));
+    const checked=await complete(id,session.revision,active);
+    if(checked.connected&&active()){sessions.delete(id);removeResult(session);}
+    return {waiting:active(),connection:checked};
+   }
+   return {waiting:active(),connection};
+  }
   if(!['closed','finished'].includes(result))throw Error('没查到终端状态，请重新检查或取消等待');
   if(sessions.get(id)!==session)return {waiting:false,connection:await status(id,deps)};
   sessions.delete(id);
@@ -61,14 +72,15 @@ export function createAgentLoginManager(){
    const resultDir=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-login-result-'));
    if(platform==='win32'){
     try{
-     const pid=await startWindowsAgentTerminal(executable,args,resultDir);
+     const pid=await startWindowsAgentTerminal(executable,args,resultDir,agentRegionEnvironment(id,installations.loginEnvironment()));
      const session={tty:'windows',windowId:pid,windowsPid:pid,resultDir,revision:before.revision};
      if((revisions.get(id)||0)===revision)sessions.set(id,session);else removeResult(session);
      return {waiting:sessions.get(id)===session,connection:await status(id,deps)};
     }catch(error){fs.rmSync(resultDir,{recursive:true,force:true});throw error}
    }
    // Only our command's exit code is written; never collect terminal output or provider files.
-   const command=`( ${[executable,...args].map(quoteShell).join(' ')} ); printf '%s' \"$?\" > ${quoteShell(path.join(resultDir,'exit-code'))}`;
+   const region=id==='codebuddy'?'CODEBUDDY_INTERNET_ENVIRONMENT="${CODEBUDDY_INTERNET_ENVIRONMENT-internal}" ':'';
+   const command=`( ${region}${[executable,...args].map(quoteShell).join(' ')} ); _ot_exit=$?; if [ -d ${quoteShell(resultDir)} ]; then printf '%s' "$_ot_exit" > ${quoteShell(path.join(resultDir,'exit-code'))}; fi`;
    let identity:string;
    try{identity=await (deps.run??runTerminal)(`tell application "Terminal"\nactivate\nset loginTab to do script ${quoteApple(command)}\nrepeat with w in windows\nrepeat with t in tabs of w\nif tty of t is tty of loginTab then return (id of w as text) & ":" & (tty of loginTab)\nend repeat\nend repeat\nend tell`);
    }catch(error){fs.rmSync(resultDir,{recursive:true,force:true});throw error}

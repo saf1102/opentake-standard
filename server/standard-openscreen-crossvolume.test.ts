@@ -17,7 +17,7 @@ import {ffmpegPath,ffprobePath} from './general/kit-env.ts';
 // OpenScreen renderer is a copying child; a test-only encoder adapter replaces
 // VideoToolbox with MPEG-4. No browser or user project is opened. CI without a
 // second volume reports an explicit skip; this does not validate native rendering.
-const secondVolume=process.env.OPENTAKE_CROSS_VOLUME_TEST_ROOT || '/Volumes/CreativeWorkspaceStorage/development';
+const secondVolume=process.env.OPENTAKE_CROSS_VOLUME_TEST_ROOT || process.cwd();
 const firstVolume=process.platform==='darwin'?'/private/tmp':os.tmpdir();
 const available=fs.existsSync(secondVolume)&&fs.statSync(firstVolume).dev!==fs.statSync(secondVolume).dev;
 const skip=available?false:'需要不同 st_dev 的第二卷；可设置 OPENTAKE_CROSS_VOLUME_TEST_ROOT';

@@ -1,3 +1,4 @@
+import {builtinSupportsModule} from '../shared/builtin-models.ts';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {LIGHT_AGENT_MODULES,connectionReadyForLight,type AgentConnectionId,type ConnectionMode} from '../shared/agent-connections.ts';
 import {assertAgentExecutionAllowed,assertAgentWorkAllowed,getConnectionConfig,getConnectionStatus,effectiveConnectionModel,runConnectionText,resolveAgentConnectionLaunch,markAgentCredentialsRejected,type ConnectionDependencies} from './agent-connections.ts';
@@ -18,17 +19,23 @@ const choiceScope=new AsyncLocalStorage<Partial<Record<AgentModule,AgentChoice>>
 /** Scoped choices survive asynchronous jobs; no global settings are modified. Nested overrides preserve other modules. */
 export function withAgentChoiceScope<T>(choices:Partial<Record<AgentModule,AgentChoice>>,work:()=>Promise<T>):Promise<T>{return choiceScope.run({...choiceScope.getStore(),...choices},work);}
 export function currentAgentChoice(module:AgentModule,settings:AgentSettings=readAgentSettings()):AgentChoice{return choiceScope.getStore()?.[module]||settings.modules[module];}
-export type ResolvedAgent = Readonly<{ agent?: AgentConnectionId; method?:ConnectionMode;transport?:'acp'; module: AgentModule; executable: string; cliVersion: string; model: string; effort: string; requested?: { model: string; effort: string } }>;
-export async function resolveAgent(module: AgentModule, settings: AgentSettings = readAgentSettings()): Promise<ResolvedAgent> {
+export type ResolvedAgent = Readonly<{ agent?: AgentConnectionId; profileId?:string; method?:ConnectionMode;transport?:'acp'; module: AgentModule; executable: string; cliVersion: string; model: string; effort: string; requested?: { model: string; effort: string } }>;
+export async function resolveAgent(module: AgentModule, settings: AgentSettings = readAgentSettings(),requireCli=false): Promise<ResolvedAgent> {
   const unified=process.platform==='darwin'||process.platform==='win32';
   const choice=unified?currentAgentChoice(module,settings):settings.modules[module];settings={...settings,modules:{...settings.modules,[module]:choice}};
   const id=unified?(choice.agent||'codex'):'codex';
   if(unified)assertAgentExecutionAllowed(id);
   const connection=unified?getConnectionConfig(id):undefined;
-  if(id==='codex'&&connection?.mode==='api'&&(LIGHT_AGENT_MODULES as readonly string[]).includes(module)){
+  if(!requireCli&&id==='codex'&&connection?.mode==='api'&&(LIGHT_AGENT_MODULES as readonly string[]).includes(module)){
     if(!connection.enabled||!connection.connected||!connection.hasKey)throw Error('请先接通 Codex API 密钥');
     const model=effectiveConnectionModel(id,choice.model);
     return Object.freeze({agent:id,method:'api',module,executable:'',cliVersion:'API 密钥',model,effort:'none',...(model!==choice.model&&choice.model!=='default'?{requested:choice}:{})});
+  }
+  if(id==='builtin'){
+    const config=getConnectionConfig(id);
+    if(!config.connected||!config.hasKey)throw Error('请先通过内置智能体看图测试');
+    if(!builtinSupportsModule(module))throw Error('选题研究需要联网搜索，请选择支持搜索的智能体');
+    return Object.freeze({agent:id,method:'api',transport:'acp',module,executable:process.execPath,cliVersion:'内置智能体',profileId:config.profileId,model:effectiveConnectionModel(id,choice.model),effort:'none'} as const);
   }
   if(id!=='codex'){
     if(!(LIGHT_AGENT_MODULES as readonly string[]).includes(module))throw Error('此工作模块的智能体代码执行待适配，请使用 Codex；Claude Code 出片请从通用剪辑进入');
@@ -75,26 +82,32 @@ export async function runAgent(agent: ResolvedAgent, args: string[], options: Ag
   if (stdoutFile) fs.writeFileSync(stdoutFile, '');
   try {
     if(unified&&(agent.agent&&agent.agent!=='codex'||!agent.executable&&getConnectionConfig('codex').mode==='api')){
-      if(!(LIGHT_AGENT_MODULES as readonly string[]).includes(agent.module))throw Error('此任务需要命令行，不能交给只有 API 密钥的接入');
-      if(argv.includes('--image')||argv.includes('-i'))throw Error('此接入只接受纯文字，图片任务请使用 Codex');
+      const builtin=agent.agent==='builtin';
+      if(!builtin&&!(LIGHT_AGENT_MODULES as readonly string[]).includes(agent.module))throw Error('此任务需要命令行，不能交给只有 API 密钥的接入');
+      if(!builtin&&(argv.includes('--image')||argv.includes('-i')))throw Error('此接入只接受纯文字，图片任务请使用 Codex');
       let prompt=argv.at(-1)||'';const schemaIndex=argv.indexOf('--output-schema');
       if(schemaIndex>=0)prompt+=`\n只返回符合此 JSON Schema 的 JSON，不要代码围栏：\n${fs.readFileSync(argv[schemaIndex+1],'utf8')}`;
       const selectedId=agent.agent||'codex';
       const config=getConnectionConfig(selectedId);
+      if(builtin&&agent.profileId&&config.profileId!==agent.profileId)throw Error('当前模型配置已切换，请重新开始任务');
       if(agent.method&&agent.method!==config.mode)throw Error('所选智能体的接法已改变，请重新开始任务');
       let text:string;
-      if(config.mode==='cli'){
+      if(config.mode==='cli'||builtin){
         const status=await getConnectionStatus(selectedId,connectionDeps);
-        if(!connectionReadyForLight(status)||status.executable!==agent.executable)throw Error('所选智能体未接通，或程序位置已改变');
-        const launch=await resolveAgentConnectionLaunch(selectedId,options.env);
-        const work=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-light-'));
-        const lastMessage=path.join(work,'answer.txt');
+        if(!connectionReadyForLight(status)||!builtin&&status.executable!==agent.executable)throw Error('所选智能体未接通，或程序位置已改变');
+        const launch=await resolveAgentConnectionLaunch(selectedId,options.env,connectionDeps,agent.model,agent.profileId);
+        const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-light-'));
+        const cwdIndex=argv.indexOf('-C');
+        const work=builtin&&cwdIndex>=0?path.resolve(argv[cwdIndex+1]):scratch;
+        const images=builtin?argv.flatMap((arg,i)=>arg==='--image'||arg==='-i'?[path.resolve(work,argv[i+1])]:[]):[];
+        const projectRoot=work;
+        const lastMessage=path.join(scratch,'answer.txt');
         let timer:ReturnType<typeof setTimeout>|undefined,unsubscribe:(()=>void)|undefined,abort:(()=>void)|undefined;
         try{
           options.signal?.throwIfAborted();
-          const filmAgent:ResolvedFilmAgent={...launch,...agent,agent:selectedId};
-          record.method='cli';if(agent.transport)record.transport=agent.transport;
-          const proc=startFilmAgent(filmAgent,filmAgentArgs(filmAgent,{work,lastMessage,model:agent.model,effort:agent.effort,network:false}),{cwd:work,env:launch.env,prompt,lastMessage,onEvent:event=>{
+          const filmAgent:ResolvedFilmAgent={...launch,...agent,agent:selectedId,...(selectedId==='deepseek'?{model:launch.model}:{})};
+          record.method=config.mode;if(agent.transport)record.transport=agent.transport;
+          const proc=startFilmAgent(filmAgent,filmAgentArgs(filmAgent,{work,lastMessage,model:agent.model,effort:agent.effort,network:false}),{cwd:work,projectRoot,env:launch.env,prompt,lastMessage,images,readOnly:argv.includes('read-only'),onEvent:event=>{
             if(event.type==='acp.model'&&typeof event.model==='string'){record.reportedModel=event.model;record.model=event.model;record.modelSelection=event.modelSelection==='selected'?'selected':'default';if(agent.model!=='default'&&agent.model!==event.model)record.requested={agent:selectedId,model:agent.model,effort:agent.effort};}
             if(event.type==='acp.error'){record.errorKind=typeof event.kind==='string'?event.kind:undefined;record.errorExcerpt=typeof event.excerpt==='string'?event.excerpt:undefined;}
             if((event.type==='acp.completed'||event.type==='acp.usage')&&event.usage)record.usage=event.usage as AgentRun['usage'];
@@ -107,7 +120,7 @@ export async function runAgent(agent: ResolvedAgent, args: string[], options: Ag
           if(result.code!==0)throw Error(result.stderr||'智能体没有完成这项工作');
           if(!fs.existsSync(lastMessage))throw Error('智能体没有返回文字结果');
           text=fs.readFileSync(lastMessage,'utf8');options.onStdout?.(text);
-        }finally{if(timer)clearTimeout(timer);if(abort)options.signal?.removeEventListener('abort',abort);unsubscribe?.();fs.rmSync(work,{recursive:true,force:true});}
+        }finally{if(timer)clearTimeout(timer);if(abort)options.signal?.removeEventListener('abort',abort);unsubscribe?.();fs.rmSync(scratch,{recursive:true,force:true});}
       }else{record.method='api';text=await runConnectionText(selectedId,prompt,agent.model,options.signal,connectionDeps);}
       if(output)fs.writeFileSync(output,text.replace(/^```(?:json)?\s*\n?|\n?```$/g,''));
       record.status='completed';return {stdout:text,stderr:''};
@@ -123,7 +136,7 @@ export async function runAgent(agent: ResolvedAgent, args: string[], options: Ag
     const stdoutBuffer=launch?bufferedAgentOutput(redact,writeStdout):undefined;
     let result:Awaited<ReturnType<typeof runWithClosedStdin>>;
     try{
-      result=await runWithClosedStdin(agent.executable,argv,{...options,env:launch?.env??installations.sanitizeAgentEnv({...installations.loginEnvironment(),...options.env}),
+      result=await runWithClosedStdin(agent.executable,argv,{...options,env:launch?.env??installations.loginEnvironment({...process.env,...options.env}),
         onStderr:chunk=>stderrBuffer?stderrBuffer.push(chunk):writeStderr(chunk),
         onStdout:chunk=>stdoutBuffer?stdoutBuffer.push(chunk):writeStdout(chunk),
       });
@@ -137,7 +150,7 @@ export async function runAgent(agent: ResolvedAgent, args: string[], options: Ag
     return result;
   } catch (error) {
     const failure=classifyAgentFailure(error);
-    if(failure.kind==='credentials')markAgentCredentialsRejected(agent.agent||'codex',method,revision);
+    if(failure.kind==='credentials'&&!(agent.agent==='deepseek'&&method==='cli'))markAgentCredentialsRejected(agent.agent||'codex',method,revision);
     record.errorKind=record.errorKind||failure.kind;
     record.errorExcerpt=record.errorExcerpt||failure.excerpt;
     record.status = 'failed'; record.error = failure.kind!=='other'?failure.message:unified&&method==='api' ? 'API 调用失败，请检查连接、模型和任务要求（密钥及原始响应未记录）' : redactAcpText(error instanceof Error ? error.message : String(error));

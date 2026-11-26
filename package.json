@@ -1,6 +1,6 @@
 {
   "name": "opentake-standard",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
@@ -16,7 +16,7 @@
     "dev": "vite",
     "build:app": "npm run build:live && node desktop/build-app.mjs",
     "build:installer": "npm run build && node desktop/build-installer.mjs",
-    "test:desktop": "node --test desktop/*.test.cjs",
+    "test:desktop": "node --test desktop/*.test.cjs && node --test desktop/builtin-agent/*.test.mjs",
     "test:release": "node --test scripts/*.test.mjs",
     "prepare:windows-runtimes": "node scripts/prepare-windows-runtimes.mjs",
     "build:openscreen": "npm --prefix vendor/openscreen run build:linkreader",

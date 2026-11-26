@@ -1,4 +1,5 @@
 import platform from '../platform.ts';
+import {deepseekHarnessRoute,possibleDeepseekAuthReply,deepseekAuthReply,deepseekNoKey,deepseekKeyRejected,deepseekAccountRejected,deepseekLoginHint,deepseekInvalidKeyHint,deepseekFallbackHint,deepseekBothRejectedHint,deepseekPartialTurnHint,deepseekModelHint,deepseekSwitchHint,type DeepseekProvider} from '../deepseek-harness.ts';
 import {spawnAgentProcess} from '../agent-launch.ts';
 /** ACP v1 stdio transport. Provider programs retain their own login; no credentials are read here.
  * https://agentclientprotocol.com/protocol/v1/tool-calls
@@ -15,6 +16,7 @@ import {descendants, type CodexProcess} from './codex.ts';
 import {advance, applyCodexEvent, type EventOutcome, type Usage} from './events.ts';
 
 type Obj=Record<string,unknown>;
+const clientRequestMethods=new Set(['session/request_permission','fs/read_text_file','fs/write_text_file']);
 const object=(v:unknown):Obj=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Obj:{};
 /** Account identifiers and secrets never belong in user-visible errors or diagnostic excerpts. */
 export function redactAcpText(value:string):string {
@@ -31,6 +33,9 @@ export function noAgentResponse(agent:AgentConnectionId):AgentFailure {
 }
 export function classifyAgentFailure(error:unknown):AgentFailure {
  const text=(error instanceof Error?error.message:typeof error==='string'?error:JSON.stringify(error))||'';
+ for(const message of [deepseekBothRejectedHint,deepseekPartialTurnHint,deepseekInvalidKeyHint,deepseekLoginHint,deepseekModelHint,deepseekSwitchHint]){
+  if(text.trim()===message)return {kind:message===deepseekModelHint||message===deepseekSwitchHint?'other':'credentials',message,excerpt:message};
+ }
  // A possible cause in the fixed no-response explanation must not be reclassified as confirmed quota/plan failure.
  const silent=CONNECTION_DEFINITIONS.find(agent=>agent.kind==='agent'&&text.startsWith(`${agent.name}没有回应`));
  if(silent)return noAgentResponse(silent.id as AgentConnectionId);
@@ -118,7 +123,7 @@ export function applyAcpEvent(steps:GeneralStep[],event:Obj,at:string):EventOutc
  return {steps};
 }
 
-export type AcpOptions={agent:AgentConnectionId;cwd:string;projectRoot?:string;env:NodeJS.ProcessEnv;prompt:string;model?:string;eventLog?:string;lastMessage?:string;images?:string[];onEvent:(event:Obj)=>void;redact?:(text:string)=>string;timeoutMs?:number};
+export type AcpOptions={agent:AgentConnectionId;cwd:string;projectRoot?:string;readOnly?:boolean;env:NodeJS.ProcessEnv;prompt:string;model?:string;eventLog?:string;lastMessage?:string;images?:string[];onEvent:(event:Obj)=>void;redact?:(text:string)=>string;timeoutMs?:number};
 export function startAcpAgent(executable:string,args:readonly string[],options:AcpOptions):CodexProcess {
  assertAgentExecutionAllowed(options.agent);
  // ACP never hosts Codex/Claude adapters; check file identity too so an alias cannot evade the switch.
@@ -127,9 +132,14 @@ export function startAcpAgent(executable:string,args:readonly string[],options:A
  const root=path.resolve(options.projectRoot||options.cwd);
  if(!acpPathInside(root,options.cwd))throw Error('ACP 工作目录必须位于工程目录内');
  const child=spawnAgentProcess(executable,[...args],{cwd:options.cwd,env:options.env,stdio:['pipe','pipe','pipe'],detached:process.platform!=='win32'});
- const secretSafe=(text:string)=>options.redact?options.redact(text):text;
+ const cardKey=options.agent==='deepseek'?options.env.DEEPSEEK_API_KEY:undefined;
+ const secretSafe=(text:string)=>{
+  const value=cardKey?text.split(cardKey).join('[已隐藏密钥]'):text;
+  return options.redact?options.redact(value):value;
+ };
  const safe=(text:string)=>redactAcpText(secretSafe(text));
  let closed=false,stopping=false,completed=false,hasOutput=false,hasToolActivity=false,sessionId='',text='',stderr='',buffer='',sequence=0,killTimer:ReturnType<typeof setTimeout>|undefined;
+ let heldReply='';
  let shutdownTree:number[]=[];
  const pending=new Map<number,{resolve:(v:Obj)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
  const tools=new Map<string,Obj>();
@@ -154,12 +164,23 @@ export function startAcpAgent(executable:string,args:readonly string[],options:A
    const waiter=pending.get(Number(message.id));if(!waiter)return;pending.delete(Number(message.id));clearTimeout(waiter.timer);
    if(message.error){const e=object(message.error);waiter.reject(Error(`${e.code===-32000?'auth_required':e.code??''} ${e.message??''} ${JSON.stringify(e.data??'')}`))}else waiter.resolve(object(message.result));return;
   }
+  const isRequest=message.id!==undefined;
+  if(isRequest&&!clientRequestMethods.has(message.method)){
+   send({jsonrpc:'2.0',id:message.id,error:{code:-32601,message:'Method not found'}});
+   return;
+  }
+  if(!isRequest&&message.method!=='session/update')return;
   const params=object(message.params);
-  if(params.sessionId!==sessionId||!sessionId){if(message.id!==undefined)send({jsonrpc:'2.0',id:message.id,error:{code:-32602,message:'Unknown session'}});return;}
+  if(params.sessionId!==sessionId||!sessionId){if(isRequest)send({jsonrpc:'2.0',id:message.id,error:{code:-32602,message:'Unknown session'}});return;}
   if(message.method==='session/update'){
    const update=object(params.update),id=String(update.toolCallId||'');
    if(update.sessionUpdate==='tool_call'||update.sessionUpdate==='tool_call_update')hasToolActivity=true;
    const content=object(update.content);
+   if(options.agent==='deepseek'&&update.sessionUpdate==='agent_message_chunk'&&!text&&content.type==='text'&&typeof content.text==='string'){
+    const joined=heldReply+content.text;
+    if(possibleDeepseekAuthReply(joined)){heldReply=joined;return;}
+    content.text=joined;heldReply='';
+   }
    if(['agent_message_chunk','agent_thought_chunk'].includes(String(update.sessionUpdate))){
     if(content.type==='text'&&typeof content.text==='string'&&content.text.trim())hasOutput=true;
     else if(['image','audio','resource_link'].includes(String(content.type))&&Object.keys(content).some(key=>key!=='type'&&typeof content[key]==='string'&&String(content[key]).trim()))hasOutput=true;
@@ -173,35 +194,114 @@ export function startAcpAgent(executable:string,args:readonly string[],options:A
   if(message.method==='session/request_permission'){
    hasToolActivity=true;
    const tool=normalizeAcpTool({...tools.get(String(object(params.toolCall).toolCallId||'')),...object(params.toolCall)},options.cwd),decision=acpPermissionDecision(root,tool,options.cwd);
-   const opts=(Array.isArray(params.options)?params.options:[]).map(object),selected=opts.find(o=>o.kind===(decision.allowed&&!stopping?'allow_once':'reject_once'));
-   emit({type:'acp.permission',allowed:!!selected&&decision.allowed&&!stopping,reason:decision.reason,toolCallId:String(tool.toolCallId||'').slice(0,80)});
+   const blockedByReadOnly=options.readOnly&&!['read','search'].includes(String(tool.kind));
+   const allowed=decision.allowed&&!blockedByReadOnly&&!stopping;
+   const opts=(Array.isArray(params.options)?params.options:[]).map(object),selected=opts.find(o=>o.kind===(allowed?'allow_once':'reject_once'));
+   emit({type:'acp.permission',allowed:!!selected&&allowed,reason:blockedByReadOnly?'本次任务只允许读取工程文件':decision.reason,toolCallId:String(tool.toolCallId||'').slice(0,80)});
    send({jsonrpc:'2.0',id:message.id,result:{outcome:selected?{outcome:'selected',optionId:selected.optionId}:{outcome:'cancelled'}}});return;
   }
   if(message.method==='fs/read_text_file'||message.method==='fs/write_text_file'){
    hasToolActivity=true;
-   const file=String(params.path||''),allowed=path.isAbsolute(file)&&acpPathInside(root,file)&&!stopping;
+   const file=String(params.path||''),allowed=(!options.readOnly||message.method==='fs/read_text_file')&&path.isAbsolute(file)&&acpPathInside(root,file)&&!stopping;
    emit({type:'acp.permission',allowed,reason:allowed?'允许工程内文件操作':'拒绝工程目录外的访问'});
    if(!allowed){send({jsonrpc:'2.0',id:message.id,error:{code:-32000,message:'Project boundary denied'}});return;}
    try{let result:Obj={};if(message.method==='fs/read_text_file'){if(fs.statSync(file).size>4*1024*1024)throw Error('文件过大');let content=fs.readFileSync(file,'utf8');if(typeof params.line==='number')content=content.split('\n').slice(Math.max(0,params.line-1),typeof params.limit==='number'?Math.max(0,params.line-1)+params.limit:undefined).join('\n');result={content};}else{if(typeof params.content!=='string'||params.content.length>4*1024*1024)throw Error('文件内容无效');fs.writeFileSync(file,params.content);}send({jsonrpc:'2.0',id:message.id,result});}catch{send({jsonrpc:'2.0',id:message.id,error:{code:-32603,message:'Project file operation failed'}});}return;
   }
-  if(message.id!==undefined)send({jsonrpc:'2.0',id:message.id,error:{code:-32601,message:'Unsupported client method'}});
  };
  child.stdout!.setEncoding('utf8');child.stdout!.on('data',(chunk:string)=>{if(closed)return;buffer+=chunk;if(buffer.length>4*1024*1024){fail('ACP 消息过大');return;}let at:number;while((at=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,at);buffer=buffer.slice(at+1);if(!line.trim())continue;try{void handle(object(JSON.parse(line))).catch(fail)}catch{fail('ACP 返回格式不正确')}}});
  void (async()=>{
   const init=await rpc('initialize',{protocolVersion:1,clientCapabilities:{fs:{readTextFile:true,writeTextFile:true},terminal:false},clientInfo:{name:'opentake',version:'1'}});
   if(init.protocolVersion!==1)throw Error('ACP 协议版本暂不支持');if(stopping)return;
-  const session=await rpc('session/new',{cwd:options.cwd,mcpServers:[]});sessionId=String(session.sessionId||'');if(!sessionId)throw Error('ACP 没有返回有效会话');emit({type:'acp.session',sessionId});if(stopping){send({jsonrpc:'2.0',method:'session/cancel',params:{sessionId}});return;}
-  const configs=(Array.isArray(session.configOptions)?session.configOptions:[]).map(object),config=configs.find(c=>c.category==='model'&&c.type==='select');
-  const models=object(session.models);let actual=String(config?.currentValue||models.currentModelId||'default'),selected=false;
+  let provider:DeepseekProvider=options.agent==='deepseek'&&options.env.DEEPSEEK_API_KEY?'deepseek-official':'deepseek-account';
+  let rejectedKey=false;
+  const session=await rpc('session/new',{cwd:options.cwd,mcpServers:[],...(options.agent==='builtin'?{projectRoot:root}:{})}).catch(error=>{
+   if(options.agent==='deepseek'&&!stopping){
+    if(provider==='deepseek-official'&&deepseekKeyRejected(error)){
+     emit({type:'acp.deepseek-key-rejected'});throw Error(deepseekBothRejectedHint);
+    }
+    if(provider==='deepseek-account'&&deepseekAccountRejected(error)){
+     emit({type:'acp.deepseek-account-rejected'});throw Error(deepseekLoginHint);
+    }
+   }
+   throw error;
+  });
+  sessionId=String(session.sessionId||'');if(!sessionId)throw Error('ACP 没有返回有效会话');emit({type:'acp.session',sessionId});if(stopping){send({jsonrpc:'2.0',method:'session/cancel',params:{sessionId}});return;}
   const requested=options.model||'default';
-  const configValues=config?(Array.isArray(config.options)?config.options:[]).map(object).flatMap(o=>Array.isArray(o.options)?o.options.map(object):[o]):[],catalogued=Array.isArray(models.availableModels)&&models.availableModels.some(m=>object(m).modelId===requested);
-  if(requested!=='default'&&config&&(configValues.some(o=>o.value===requested)||!catalogued)){const values=configValues;if(!values.some(o=>o.value===requested))throw Error('所选模型不在智能体可用模型列表中，请修改工程模型设置');await rpc('session/set_config_option',{sessionId,configId:config.id,value:requested});actual=requested;selected=true;}
-  else if(requested!=='default'&&Array.isArray(models.availableModels)){if(!models.availableModels.some(m=>object(m).modelId===requested))throw Error('所选模型不在智能体可用模型列表中，请修改工程模型设置');await rpc('session/set_model',{sessionId,modelId:requested});actual=requested;selected=true;}
-  emit({type:'acp.model',model:actual,modelSelection:selected?'selected':'default',requestedModel:requested});if(stopping)return;
+  let configOptions=session.configOptions;
+  const selectDeepseek=async(fallback=false)=>{
+   let route=deepseekHarnessRoute(configOptions,provider,fallback?'default':requested);
+   if(!route)throw Error(fallback?deepseekBothRejectedHint:deepseekLoginHint);
+   if(fallback&&requested!=='default'&&route.models.some(model=>model.id===requested)){
+    route=deepseekHarnessRoute(configOptions,provider,requested)!;
+   }
+   if(fallback||!route.current){
+    const response=await rpc('session/set_config_option',{sessionId,configId:route.configId,value:route.value});
+    if(response.configOptions!==undefined){
+     configOptions=response.configOptions;
+     if(!deepseekHarnessRoute(configOptions,provider,route.model)?.current)throw Error(deepseekSwitchHint);
+    }
+   }
+   if(stopping)return;
+   emit({type:'acp.model',model:route.model,modelSelection:fallback||!route.current||requested!=='default'?'selected':'default',requestedModel:requested});
+
+  };
+  if(options.agent!=='deepseek'){
+   const configs=(Array.isArray(session.configOptions)?session.configOptions:[]).map(object),config=configs.find(c=>c.category==='model'&&c.type==='select');
+   const models=object(session.models);let actual=String(config?.currentValue||models.currentModelId||'default'),selected=false;
+   const configValues=config?(Array.isArray(config.options)?config.options:[]).map(object).flatMap(o=>Array.isArray(o.options)?o.options.map(object):[o]):[],catalogued=Array.isArray(models.availableModels)&&models.availableModels.some(m=>object(m).modelId===requested);
+   if(requested!=='default'&&config&&(configValues.some(o=>o.value===requested)||!catalogued)){const values=configValues;if(!values.some(o=>o.value===requested))throw Error('所选模型不在智能体可用模型列表中，请修改工程模型设置');await rpc('session/set_config_option',{sessionId,configId:config.id,value:requested});actual=requested;selected=true;}
+   else if(requested!=='default'&&Array.isArray(models.availableModels)){if(!models.availableModels.some(m=>object(m).modelId===requested))throw Error('所选模型不在智能体可用模型列表中，请修改工程模型设置');await rpc('session/set_model',{sessionId,modelId:requested});actual=requested;selected=true;}
+   emit({type:'acp.model',model:actual,modelSelection:selected?'selected':'default',requestedModel:requested});if(stopping)return;
+  }
   const prompt=options.prompt+(options.images?.length?`\n\n请读取以下工程内参考图片：\n${options.images.filter(p=>acpPathInside(root,p)).join('\n')}`:'');
-  const result=await rpc('session/prompt',{sessionId,prompt:[{type:'text',text:prompt}]},options.timeoutMs??60*60*1000);
+  const blocks:Obj[]=[{type:'text',text:options.agent==='builtin'?options.prompt:prompt}];
+  if(options.agent==='builtin')for(const file of options.images||[]){
+   if(!acpPathInside(root,file)||fs.statSync(file).size>16*1024*1024)throw Error('参考图超出工程范围或文件过大');
+   const mimeType=({'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp'} as Record<string,string>)[path.extname(file).toLowerCase()];
+   if(!mimeType)throw Error('参考图格式不支持');
+   blocks.push({type:'image',mimeType,data:fs.readFileSync(file).toString('base64')});
+  }
+  const promptSession=()=>rpc('session/prompt',{sessionId,prompt:blocks},options.timeoutMs??60*60*1000);
+  const deepseekTurn=async()=>{
+   for(;;){
+    try{
+     if(stopping)throw Error('已停止');
+     await selectDeepseek(rejectedKey);
+     if(stopping)throw Error('已停止');
+     const response=await promptSession();
+     if(heldReply){
+      const reply=heldReply;heldReply='';
+      const auth=deepseekAuthReply(reply);
+      if(auth==='unauthorized')throw Error('HTTP 401 Unauthorized');
+      if(auth==='invalid-key')throw Error('invalid API key');
+      if(auth==='missing-key')throw Error(deepseekLoginHint);
+      if(auth==='login')throw Error('authentication required');
+      text+=reply;hasOutput||=!!reply.trim();emit({type:'acp.message',text:reply});
+     }
+     return response;
+    }catch(error){
+     if(stopping)throw error;
+     if(provider==='deepseek-account'){
+      if(deepseekAccountRejected(error)||deepseekKeyRejected(error)){
+       emit({type:'acp.deepseek-account-rejected'});
+       throw Error(rejectedKey?deepseekBothRejectedHint:deepseekLoginHint);
+      }
+      throw error;
+     }
+     if(!deepseekKeyRejected(error))throw deepseekNoKey(error)?Error(deepseekLoginHint):error;
+     emit({type:'acp.deepseek-key-rejected'});
+     if(hasOutput||hasToolActivity||(heldReply.trim()&&!deepseekAuthReply(heldReply)))throw Error(deepseekPartialTurnHint);
+     heldReply='';
+     if(!deepseekHarnessRoute(configOptions,'deepseek-account'))throw Error(deepseekBothRejectedHint);
+     rejectedKey=true;
+     provider='deepseek-account';
+    }
+   }
+  };
+  const result=options.agent==='deepseek'?await deepseekTurn():await promptSession();
   if(stopping)return;if(result.stopReason!=='end_turn')throw Error(`ACP 本轮未完成：${String(result.stopReason||'unknown')}`);
   if(!hasOutput&&!hasToolActivity){const failure=noAgentResponse(options.agent);throw Object.assign(Error(failure.message),failure);}
+  if(options.agent==='deepseek')emit({type:'acp.deepseek-route',provider,keyRejected:rejectedKey,message:rejectedKey?deepseekFallbackHint:provider==='deepseek-account'?'使用 DeepSeek 桌面版账号':'使用 DeepSeek API 密钥'});
   if(options.lastMessage)fs.writeFileSync(options.lastMessage,secretSafe(text));const usage=reportedUsage(result.usage);emit({type:'acp.completed',text:secretSafe(text),...(usage?{usage}:{})});completed=true;shutdown();
  })().catch(fail);
  return {child,done,stop};

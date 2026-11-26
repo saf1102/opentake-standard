@@ -6,7 +6,7 @@ const vm=require('node:vm');
 
 test('Mac assembly never includes Windows native capture executables from a shared checkout',()=>{
  const source=fs.readFileSync(path.join(__dirname,'builder.config.cjs'),'utf8');
- const load=platform=>{const context={module:{exports:{}},process:{platform}};vm.runInNewContext(source,context);return context.module.exports};
+ const load=platform=>{const context={module:{exports:{}},process:{platform},require};vm.runInNewContext(source,context);return context.module.exports};
  assert.ok(load('win32').files.includes('native/windows/wgc-capture.exe'));
  assert.ok(!load('darwin').files.some(file=>file.startsWith('native/windows/')));
  assert.equal(load('darwin').mac.identity,null);

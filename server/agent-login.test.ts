@@ -85,11 +85,21 @@ test('登录包装只记录真实退出码，带空格引号的程序路径也�
    const deps:LoginDependencies={...f.deps,detect:async()=>executable,complete:async id=>{completed++;f.setConnected();return f.deps.status!(id)},run:async script=>{
     if(!script.includes('do script'))return 'finished';
     const command=JSON.parse(script.match(/set loginTab to do script ("[^\n]+")/)![1]);
-    resultPath=command.match(/> '([^']+exit-code)'$/)![1];
+    resultPath=command.match(/> '([^']+exit-code)'; fi$/)![1];
     if(process.platform==='win32')await promisify(execFile)(path.join(process.env.SystemRoot!,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-Command',windowsAgentScript(executable,['login'],resultPath)]);else await promisify(execFile)('/bin/sh',['-c',command]);return '23:/dev/ttys023';
    }};
    await manager.start('kimi',deps);assert.equal(fs.readFileSync(resultPath,'utf8').trim(),String(code));
    await manager.check('kimi',deps);assert.equal(completed,code===0?1:0);assert.equal(fs.existsSync(path.dirname(resultPath)),false);
   }
  }finally{fs.rmSync(root,{recursive:true,force:true})}
+});
+
+test('CodeBuddy 输入 /login 后仍在交互终端，重新检查能解除本次登录前的凭据拒绝',async()=>{
+ const f=fixture(),manager=createAgentLoginManager();let probes=0;
+ const deps:LoginDependencies={...f.deps,status:async id=>({...await f.deps.status!(id),authRejectedAt:'fixture-time',revision:7}),
+  complete:async(id,revision,waiting)=>{probes++;assert.equal(id,'codebuddy');assert.equal(revision,7);assert.equal(waiting?.(),true);f.setConnected();return f.deps.status!(id)}};
+ await manager.start('codebuddy',deps);
+ const result=await manager.check('codebuddy',deps);
+ assert.equal(probes,1);assert.equal(result.waiting,false);assert.equal(result.connection.connected,true);
+ assert.doesNotMatch(f.commands[0],/'-p'|session\/prompt/);
 });

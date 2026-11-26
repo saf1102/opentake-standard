@@ -1,4 +1,5 @@
 import platform from './platform.ts';
+import {deepseekHarnessRoute,deepseekKeyRejected,deepseekNoKey,deepseekAuthReply,deepseekAccountRejected,deepseekInvalidKeyHint,deepseekLoginHint,deepseekModelHint,deepseekSwitchHint} from './deepseek-harness.ts';
 import {execFileAsync} from './proc.ts';
 import {spawnAgentProcess} from './agent-launch.ts';
 import fs from 'node:fs';
@@ -8,7 +9,7 @@ import {spawn} from 'node:child_process';
 
 import type {CliAuthState,ConnectionModel} from '../shared/agent-connections.ts';
 
-export type AuthProbeResult={state:CliAuthState;message:string;checkedAt?:string;models?:ConnectionModel[];acpModelSelection?:boolean};
+export type AuthProbeResult={state:CliAuthState;message:string;checkedAt?:string;models?:ConnectionModel[];acpModelSelection?:boolean;deepseekRoute?:'official'|'account';deepseekVerified?:boolean;deepseekKeyRejected?:boolean;deepseekAccountRejected?:boolean};
 export const AUTH_CONNECTED_TTL=10*60*1000;
 export const AUTH_RETRY_TTL=15*1000;
 
@@ -33,48 +34,127 @@ export function createAuthProbeCache(now:()=>number=Date.now){
  return {check,remember,forget:(key:string)=>{cached.delete(key);generations.set(key,(generations.get(key)||0)+1)}};
 }
 
-/** ACP v1 login-only handshake. No prompt, tools, filesystem access or MCP servers are offered.
- * Kimi 等可在未登录时建立 session；成功只说明握手可用。运行时凭据拒绝优先，
- * agent-connections 会锁定「还没登录」，重新完成登录并探测成功前不得用握手覆盖。 */
-export async function probeAcpAuthentication(executable:string,args:readonly string[],options:{env?:NodeJS.ProcessEnv;timeoutMs?:number;signal?:AbortSignal;tempRoot?:string}={}):Promise<AuthProbeResult>{
+type DshProbe={useKey:boolean;keyRejected:boolean;verify:boolean;model:string};
+type AcpResult={protocolVersion?:number;sessionId?:string;models?:unknown;configOptions?:unknown;stopReason?:string};
+type Request=(method:string,params:Record<string,unknown>)=>Promise<AcpResult>;
+type AcpError={code?:number;message?:string;data?:unknown};
+function authRequired(error:unknown){
+ const rpc=error as AcpError;
+ return rpc?.code===-32000||/auth(?:entication)?[_ -]required|not logged in|please (?:log|sign) in/i.test(rpc?.message??'');
+}
+async function checkHarnessSession(session:AcpResult,options:DshProbe,request:Request,reply:{text:string;keyRejected:boolean}):Promise<AuthProbeResult>{
+ let keyRejected=options.keyRejected;
+ let configOptions=session.configOptions;
+ let provider=options.useKey?'deepseek-official' as const:'deepseek-account' as const;
+ for(;;){
+  const usingKey=provider==='deepseek-official';
+  const warning=keyRejected?deepseekInvalidKeyHint:'';
+  let route;
+  try{route=deepseekHarnessRoute(configOptions,provider,options.model)}
+  catch{
+   const available=deepseekHarnessRoute(configOptions,provider);
+   if(keyRejected&&!usingKey)route=available;
+   else return {state:'unknown',message:warning+deepseekModelHint,models:available?.models,acpModelSelection:!!available};
+  }
+  if(!route)return {state:'needs-login',message:warning+deepseekLoginHint,deepseekKeyRejected:keyRejected};
+  const selection={deepseekRoute:usingKey?'official' as const:'account' as const,models:route.models,acpModelSelection:true};
+  try{
+   if(!route.current||options.useKey&&!usingKey){
+    const selected=await request('session/set_config_option',{sessionId:session.sessionId,configId:route.configId,value:route.value});
+    if(selected.configOptions!==undefined)configOptions=selected.configOptions;
+    if(selected.configOptions!==undefined&&!deepseekHarnessRoute(configOptions,provider,route.model)?.current)return {...selection,state:'unknown',message:warning+deepseekSwitchHint,deepseekKeyRejected:keyRejected};
+   }
+   if(options.verify){
+    reply.text='';
+    const response=await request('session/prompt',{sessionId:session.sessionId,prompt:[{type:'text',text:'只回复 OK。'}]});
+    const authReply=deepseekAuthReply(reply.text);
+    if(authReply==='invalid-key'||authReply==='unauthorized')throw {code:401,message:'Credentials rejected'};
+    if(authReply==='missing-key')throw Error(deepseekLoginHint);
+    if(authReply==='login')throw {code:-32000,message:'Authentication required'};
+    const text=reply.text.trim();
+    if(response.stopReason!=='end_turn'||!text||/^(?:(?:api |http |provider )?(?:error|failure)\b|access denied\b|unauthorized\b|forbidden\b|操作失败|请求失败|认证失败|错误[：:])/i.test(text))throw Error('invalid probe reply');
+   }
+   const label=usingKey?'API 密钥':'DeepSeek 桌面账号';
+   const models=deepseekHarnessRoute(configOptions,provider,route.model)?.models??route.models;
+   const message=keyRejected?'已改用 DeepSeek 桌面账号':('当前使用'+label);
+   return {state:'connected',...selection,models,deepseekKeyRejected:keyRejected,deepseekVerified:options.verify,message:warning+message+(options.verify?'，已验证。':'，可点「检查」验证。')};
+  }catch(error){
+   if(usingKey&&deepseekKeyRejected(error)){keyRejected=true;reply.keyRejected=true;provider='deepseek-account';continue;}
+   if(usingKey&&(authRequired(error)||deepseekNoKey(error)||error instanceof Error&&error.message===deepseekLoginHint))return {...selection,state:'needs-login',message:deepseekLoginHint};
+   if(!usingKey&&(authRequired(error)||deepseekAccountRejected(error)))return {...selection,state:'needs-login',message:warning+deepseekLoginHint,deepseekKeyRejected:keyRejected,deepseekAccountRejected:true};
+   return {...selection,state:'unknown',message:warning+'DeepSeek Harness 未能完成检查，请重新检查',deepseekKeyRejected:keyRejected};
+  }
+ }
+}
+
+/** Login probes advertise no tools. A user-initiated Harness check also verifies one short reply. */
+export async function probeAcpAuthentication(executable:string,args:readonly string[],options:{env?:NodeJS.ProcessEnv;timeoutMs?:number;signal?:AbortSignal;tempRoot?:string;deepseek?:DshProbe}={}):Promise<AuthProbeResult>{
  if(options.signal?.aborted)return {state:'unknown',message:'检查已取消'};
  const cwd=fs.mkdtempSync(path.join(options.tempRoot??os.tmpdir(),'opentake-auth-'));
  try{return await new Promise<AuthProbeResult>(resolve=>{
   let child:ReturnType<typeof spawn>;
   try{child=spawnAgentProcess(executable,[...args],{cwd,env:options.env,stdio:['pipe','pipe','ignore'],detached:process.platform!=='win32'});}catch{resolve({state:'unknown',message:'没查到，命令行未能启动'});return;}
-  let buffer='',bytes=0,finished=false,phase:'initialize'|'session'='initialize',answer:AuthProbeResult|undefined,killTimer:ReturnType<typeof setTimeout>|undefined;
+  let buffer='',bytes=0,finished=false,answer:AuthProbeResult|undefined,killTimer:ReturnType<typeof setTimeout>|undefined;
+  let id=0,sessionId:string|undefined;
+  const reply={text:'',keyRejected:options.deepseek?.keyRejected??false};
+  let pending:{id:number;resolve:(response:AcpResult)=>void;reject:(error:unknown)=>void}|undefined;
   const terminate=(signal:NodeJS.Signals)=>{try{if(child.pid)platform.killTree(child.pid,signal);else child.kill(signal)}catch{/* already exited */}};
-  const clean=()=>{clearTimeout(timeout);if(killTimer)clearTimeout(killTimer);options.signal?.removeEventListener('abort',abort);resolve(answer??{state:'unknown',message:'没查到，命令行提前退出'});};
+  const clean=()=>{clearTimeout(timeout);if(killTimer)clearTimeout(killTimer);options.signal?.removeEventListener('abort',abort);finished=true;pending?.reject(Error('closed'));const result:AuthProbeResult=answer??{state:'unknown',message:'没查到，命令行提前退出'};
+   resolve(reply.keyRejected&&!result.deepseekKeyRejected?{...result,deepseekKeyRejected:true,message:deepseekInvalidKeyHint+result.message}:result);
+  };
   const finish=(result:AuthProbeResult)=>{if(finished)return;finished=true;answer=result;clearTimeout(timeout);child.stdin?.end();terminate('SIGTERM');killTimer=setTimeout(()=>terminate('SIGKILL'),500);};
   const abort=()=>finish({state:'unknown',message:'检查已取消'});
   const timeout=setTimeout(()=>finish({state:'unknown',message:'没查到，检查超时，请重新检查'}),options.timeoutMs??30000);
   options.signal?.addEventListener('abort',abort,{once:true});
   if(options.signal?.aborted)abort();
-  child.once('error',()=>{finished=true;answer={state:'unknown',message:'没查到，命令行未能启动'};clean()});
+  child.once('error',()=>{answer={state:'unknown',message:'没查到，命令行未能启动'};clean()});
   child.once('close',clean);
   child.stdin?.on('error',()=>finish({state:'unknown',message:'没查到，连接已中断'}));
   const send=(value:unknown)=>{if(!finished)child.stdin?.write(JSON.stringify(value)+'\n')};
+  const request:Request=(method,params)=>new Promise((resolve,reject)=>{
+   if(finished){reject(Error('closed'));return}
+   pending={id:++id,resolve,reject};send({jsonrpc:'2.0',id,method,params});
+  });
   child.stdout?.setEncoding('utf8');
   child.stdout?.on('data',(chunk:string)=>{
    if(finished)return;bytes+=Buffer.byteLength(chunk);if(bytes>1024*1024){finish({state:'unknown',message:'没查到，命令行返回异常'});return;}
    buffer+=chunk;let end:number;
    while((end=buffer.indexOf('\n'))!==-1&&!finished){
     const line=buffer.slice(0,end);buffer=buffer.slice(end+1);if(!line.trim())continue;
-    let response:{jsonrpc?:string;id?:number|string;method?:string;error?:{code?:number;message?:string};result?:{protocolVersion?:number;sessionId?:string;models?:unknown;configOptions?:unknown}};
+    let response:{jsonrpc?:string;id?:number|string;method?:string;params?:{sessionId?:string;update?:{sessionUpdate?:string;content?:{type?:string;text?:string}}};error?:AcpError;result?:AcpResult};
     try{response=JSON.parse(line)}catch{finish({state:'unknown',message:'没查到，ACP 返回格式不正确'});break;}
     if(response===null||typeof response!=='object'||response.jsonrpc!=='2.0'){finish({state:'unknown',message:'没查到，ACP 返回格式不正确'});break;}
-    // Never execute a server-initiated tool/permission request while checking login.
-    if(response.method){if(response.id!==undefined)send({jsonrpc:'2.0',id:response.id,error:{code:-32601,message:'Login check does not provide client methods'}});continue;}
-    if(response.id!==(phase==='initialize'?1:2))continue;
-    if(response.error){finish(response.error.code===-32000||/auth(?:entication)?[_ -]required/i.test(response.error.message??'')?{state:'needs-login',message:'还没登录'}:{state:'unknown',message:/EPERM|EACCES|operation not permitted|permission denied/i.test(response.error.message??'')?'没查到，本机权限不足，请重新检查':'没查到，ACP 检查失败，请重新检查'});break;}
-    if(response.id===1){
-     if(response.result?.protocolVersion!==1){finish({state:'pending',message:'这个 ACP 版本待适配，可改用 API 密钥'});break;}
-     phase='session';
-     send({jsonrpc:'2.0',id:2,method:'session/new',params:{cwd,mcpServers:[]}});
-    }else finish(typeof response.result?.sessionId==='string'&&response.result.sessionId.length>0?{state:'connected',message:'已接通',...acpSessionModelInfo(response.result)}:{state:'unknown',message:'没查到，没有返回有效会话'});
+    if(typeof response.method==='string'){
+     if(response.id!==undefined)send({jsonrpc:'2.0',id:response.id,error:{code:-32601,message:'Login check does not provide client methods'}});
+     else if(options.deepseek?.verify&&response.method==='session/update'&&sessionId&&sessionId===response.params?.sessionId){
+      const update=response.params.update;
+      if(update?.sessionUpdate==='agent_message_chunk'&&update.content?.type==='text'&&typeof update.content.text==='string')reply.text+=update.content.text;
+     }
+     continue;
+    }
+    if(pending&&response.id===pending.id){
+     const waiter=pending;pending=undefined;
+     if(response.error)waiter.reject(response.error);else waiter.resolve(response.result??{});
+    }
    }
   });
-  send({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:1,clientCapabilities:{fs:{readTextFile:false,writeTextFile:false},terminal:false},clientInfo:{name:'opentake-login-check',version:'1'}}});
+  void (async()=>{
+   const init=await request('initialize',{protocolVersion:1,clientCapabilities:{fs:{readTextFile:false,writeTextFile:false},terminal:false},clientInfo:{name:'opentake-login-check',version:'1'}});
+   if(init.protocolVersion!==1){finish({state:'pending',message:'这个 ACP 版本待适配，可改用 API 密钥'});return;}
+   const session=await request('session/new',{cwd,mcpServers:[]});sessionId=session.sessionId;
+   if(typeof sessionId!=='string'||!sessionId){finish({state:'unknown',message:'没查到，没有返回有效会话'});return;}
+   finish(options.deepseek?await checkHarnessSession(session,options.deepseek,request,reply):{state:'connected',message:'已接通',...acpSessionModelInfo(session)});
+  })().catch((error:AcpError)=>{
+   if(options.deepseek?.useKey&&deepseekKeyRejected(error)){
+    finish({state:'needs-login',deepseekKeyRejected:true,message:deepseekInvalidKeyHint+deepseekLoginHint});
+   }else if(options.deepseek&&!options.deepseek.useKey&&(deepseekAccountRejected(error)||authRequired(error))){
+    finish({state:'needs-login',deepseekAccountRejected:true,message:deepseekLoginHint});
+   }else if(authRequired(error)){
+    finish({state:'needs-login',message:options.deepseek?deepseekLoginHint:'还没登录'});
+   }else{
+    finish({state:'unknown',message:/EPERM|EACCES|operation not permitted|permission denied/i.test(error?.message??'')?'没查到，本机权限不足，请重新检查':'没查到，ACP 检查失败，请重新检查'});
+   }
+  });
  });}finally{fs.rmSync(cwd,{recursive:true,force:true})}
 }
 

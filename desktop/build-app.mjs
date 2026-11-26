@@ -1,3 +1,5 @@
+import builtin from './builtin-payload.cjs';
+import {stageBuiltinAgent} from './builtin-agent/build.mjs';
 import localSignature from './sign-local-app.cjs';
 import platform from './platform.cjs';
 import releaseContract from './release-contract.cjs';
@@ -34,6 +36,8 @@ if(target==='mac'&&fs.existsSync(receiptFile)){
  }
  if(fs.existsSync(path.join(root,'.git'))){const result=spawnSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'});if(result.status!==0||result.stdout.trim())throw Error('源码工作区不干净，请交给智能体更新');}
 }
+await stageBuiltinAgent(builtin.resource.from);
+if(fs.existsSync(receiptFile))builtin.record(receiptFile);
 const run=(command,args)=>{const r=spawnSync(command,args,{cwd:root,stdio:'inherit',env:{...process.env,CSC_IDENTITY_AUTO_DISCOVERY:'false'}});if(r.error)throw r.error;if(r.status!==0)throw Error(command+' 失败')};
 if(target==='mac'){
 // electronDist is explicit: never label an arm64 Electron bundle as Intel (or vice versa).
@@ -43,6 +47,7 @@ for(const size of [16,32,128,256,512])for(const scale of [1,2])run('sips',['-z',
 run('iconutil',['-c','icns',icons,'-o','release/OpenTake.icns']);
 run(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/builder.config.cjs','--mac','dir','--'+macArch,'--publish','never']);
 const app=path.join(root,'release',platform.macAppDirectory(macArch),'OpenTake Standard.app');
+for(const file of builtin.resource.filter)fs.accessSync(path.join(app,'Contents/Resources',builtin.resource.to,file));
 run('/usr/bin/lipo',[path.join(app,'Contents/MacOS/OpenTake Standard'),'-verify_arch',macArch==='x64'?'x86_64':'arm64']);
 // The receipt must still match what was packaged, or the next one-click update would report the app as modified.
 if(fs.existsSync(receiptFile)){const {receiptMatches}=await import('./client-update.cjs');const version=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version;if(!receiptMatches(path.join(app,'Contents/Resources/app'),version,true))throw Error('打包后的 App 与源码来源记录对不上，停止构建');}

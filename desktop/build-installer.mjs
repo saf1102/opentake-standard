@@ -1,3 +1,5 @@
+import builtin from './builtin-payload.cjs';
+import {stageBuiltinAgent} from './builtin-agent/build.mjs';
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +18,8 @@ if(process.platform==='darwin'){
 if(process.platform!=='win32'||process.arch!=='x64')throw Error('此安装器仅用于 Windows x64。');
 await prepareWindowsRuntimes({root:runtimePaths.windowsRuntimeRoot(root)});
 windowsSource.writeWindowsSourceReceipt(root);
+await stageBuiltinAgent(builtin.resource.from);
+builtin.record(path.join(root,'release-source.json'));
 await prepareRuntimeManifest(root);
 const result=spawnSync(process.execPath,['node_modules/electron-builder/cli.js','--config','desktop/installer.builder.config.cjs','--win','nsis','--x64','--publish','never'],
  {cwd:root,stdio:'inherit',env:distribution.unsignedBuildEnvironment(process.env)});

@@ -38,3 +38,7 @@ npm run build:installer
 Intel 产物为 `release/OpenTake-Standard-1.1.3-mac-x64.dmg`，本机 App 为 `release/mac/OpenTake Standard.app`；Apple 芯片路径保持 `release/mac-arm64/OpenTake Standard.app`。Intel 包仍为本机临时签名，未公证。
 
 Intel CI 标签按 [GitHub 官方 runner 文档](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) 选择 `macos-15-intel`（x64）；Apple 芯片继续使用 `macos-14`。
+
+## 内置智能体
+
+源码测试前运行 `npm --prefix desktop/builtin-agent ci --omit=optional --ignore-scripts` 安装锁定依赖。装配时将 Pi 和实际使用的依赖编译为离线入口，同时收集许可原文。安装后无需另装 Pi 或运行 npm。最终用户在接入卡填写兼容模型的密钥。

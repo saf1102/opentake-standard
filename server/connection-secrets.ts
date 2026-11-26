@@ -4,7 +4,8 @@ import {windowsConnectionSecretStore} from './windows-connection-secrets.ts';
 import {agentSettingsFile} from './agent-settings.ts';
 import {spawn} from 'node:child_process';
 import type {ConnectionId} from '../shared/agent-connections.ts';
-export type ConnectionSecretStore={read(id:ConnectionId):Promise<string>;write(id:ConnectionId,key:string):Promise<void>;remove(id:ConnectionId):Promise<void>};
+export type SecretId=ConnectionId | `builtin-${string}`;
+export type ConnectionSecretStore={read(id:SecretId):Promise<string>;write(id:SecretId,key:string):Promise<void>;remove(id:SecretId):Promise<void>};
 export type SecurityRun=(args:string[],stdin?:string)=>Promise<{code:number;stdout:string}>;
 const runSecurity:SecurityRun=(args,stdin)=>new Promise((resolve,reject)=>{
  const child=spawn('/usr/bin/security',args,{stdio:[stdin===undefined?'ignore':'pipe','pipe','ignore']});let stdout='';
@@ -15,8 +16,8 @@ const runSecurity:SecurityRun=(args,stdin)=>new Promise((resolve,reject)=>{
 export function connectionSecretStore(run:SecurityRun=runSecurity,platform=process.platform):ConnectionSecretStore {
  const scope=crypto.createHash('sha256').update(process.env.LINKREADER_CONNECTION_SETTINGS_FILE||agentSettingsFile()).digest('hex').slice(0,16);
  if(platform==='win32'&&run===runSecurity)return windowsConnectionSecretStore(path.join(path.dirname(process.env.LINKREADER_CONNECTION_SETTINGS_FILE||agentSettingsFile()),'connection-secrets',scope),scope);
- const service=(id:ConnectionId)=>`opentake.connection.${scope}.${id}`;
- const args=(action:string,id:ConnectionId)=>[action,'-a','opentake','-s',service(id)];
+ const service=(id:SecretId)=>`opentake.connection.${scope}.${id}`;
+ const args=(action:string,id:SecretId)=>[action,'-a','opentake','-s',service(id)];
  const requireMac=()=>{if(platform!=='darwin')throw Error('当前系统尚未适配统一接入钥匙串；不会把密钥存入明文文件');};
  return {
  async read(id){requireMac();const result=await run([...args('find-generic-password',id),'-w']).catch(()=>{throw Error('读不了系统钥匙串，请检查访问权限');});if(result.code===44)return '';if(result.code!==0)throw Error('读不了系统钥匙串，请检查访问权限');return result.stdout.trim();},
