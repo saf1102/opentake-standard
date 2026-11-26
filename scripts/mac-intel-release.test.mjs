@@ -6,11 +6,13 @@ import path from 'node:path';
 import release from '../desktop/release-contract.cjs';
 import {prepareMacIntelRelease} from './prepare-mac-intel-release.mjs';
 import {publishMacIntelDraft} from './publish-mac-intel-draft.mjs';
+// Follow the repository version so the contract keeps working after each version bump.
+const VERSION=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;
 async function fixture(){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'intel-draft-')),artifacts=path.join(root,'artifacts'),out=path.join(root,'out');
  fs.mkdirSync(artifacts);fs.mkdirSync(path.join(root,'desktop'));
- const commit='a'.repeat(40),tag=release.macIntelTag('1.1.3','2026110401'),filename='OpenTake-Standard-1.1.3-mac-x64.dmg';
- fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({version:'1.1.3'}));
+ const commit='a'.repeat(40),tag=release.macIntelTag(VERSION,'2026110401'),filename=`OpenTake-Standard-${VERSION}-mac-x64.dmg`;
+ fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({version:VERSION}));
  fs.writeFileSync(path.join(root,'desktop/windows-version.json'),JSON.stringify({windowsBuild:2026110306}));
  fs.writeFileSync(path.join(root,'release-source.json'),JSON.stringify({commit,tag}));
  fs.writeFileSync(path.join(artifacts,filename),'fake DMG for contract tests');
@@ -18,7 +20,7 @@ async function fixture(){
  return {root,artifacts,out,commit,tag,receipt,cleanup:()=>fs.rmSync(root,{recursive:true,force:true})};
 }
 test('Intel receipt records x64 and independent tag without incrementing Windows build',async()=>{
- const f=await fixture();try{assert.equal(f.receipt.arch,'x64');assert.equal(f.receipt.tag,'desktop-mac-x64-v1.1.3-2026110401');assert.equal(f.receipt.desktopBuild,2026110306);await assert.rejects(release.writeInstallerReceipt(f.root,path.join(f.artifacts,f.receipt.filename),'darwin','arm64'),/Intel-only/);}finally{f.cleanup()}
+ const f=await fixture();try{assert.equal(f.receipt.arch,'x64');assert.equal(f.receipt.tag,`desktop-mac-x64-v${VERSION}-2026110401`);assert.equal(f.receipt.desktopBuild,2026110306);await assert.rejects(release.writeInstallerReceipt(f.root,path.join(f.artifacts,f.receipt.filename),'darwin','arm64'),/Intel-only/);}finally{f.cleanup()}
  assert.throws(()=>release.macIntelTag('1.1.3','1'),/date/);assert.equal(release.isMacIntelTag('desktop-v1.1.3-2026110306','1.1.3'),false);
 });
 test('Intel bundle excludes update manifests and draft creation explicitly preserves Latest',async()=>{
