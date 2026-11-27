@@ -9,6 +9,11 @@ import {Dialog,DialogContent,DialogDescription,DialogTitle} from '@/components/u
 import {connectionRequest,connectionDefinition,isRelay,notifyConnectionsChanged,type ConnectionView,type ConnectionMode,type ConnectionModel,type ConnectionId} from '../connections';
 import './connection-settings.css';
 import {AgentConnectionDetails,AgentUsageTable} from './AgentConnectionDetails';
+/** 账号登录要看套餐：套餐不含时登录也会成功，出片才被拒。接通时的一句话测试会查出来，这里先说清楚。 */
+const PLAN_NOTES:Partial<Record<string,string>>={
+ kimi:'账号登录要求你的 Kimi 套餐包含 Kimi Code。没有的话，可以改用 API 密钥，或在内置智能体里选 Kimi。',
+ qwen:'会员账号要 Plus 或 Pro 才包含 Qwen Code。也可以在终端里选「千问AI平台」填 API 密钥，或在内置智能体里选通义千问（百炼）。',
+};
 const deepseekPreset={mode:'api' as const,baseUrl:DEEPSEEK_CODEX_URL,model:DEEPSEEK_CODEX_MODEL};
 type Props={startWithDeepseek?:boolean;onOpenCodex?:()=>void;initialMode?:ConnectionMode;connection:ConnectionView;onChanged:(view:ConnectionView)=>void;onBusyChange?:(busy:boolean)=>void;onDirtyChange?:(dirty:boolean)=>void};
 export function ConnectionEditor({connection,onChanged,onBusyChange,onDirtyChange,initialMode,startWithDeepseek,onOpenCodex}:Props){
@@ -30,7 +35,7 @@ export function ConnectionEditor({connection,onChanged,onBusyChange,onDirtyChang
  const save=async(value=draft,confirmSubscriptionRisk=false)=>{const next=await connectionRequest<ConnectionView>(connection.id,'PUT',{...(connection.id==='builtin'?{profileId:value.profileId,profileName:value.profileName,format:value.format}:{}),mode:value.mode,enabled:value.enabled,baseUrl:value.baseUrl,model:value.model,...(value.cliPath!==connection.cliPath?{cliPath:value.cliPath}:{}),...(key?{apiKey:key}:{}),...(confirmSubscriptionRisk?{confirmSubscriptionRisk:true}:{})});editing.current=false;setDraft(next);onChanged(next);setKey('');notifyConnectionsChanged(next);return next;};
  const enable=(enabled:boolean)=>{if(enabled&&draft.mode==='cli'){setConfirm(true);return;}void act(async()=>{await save({...draft,enabled})});};
  const mode=(value:ConnectionMode)=>{if(value==='cli'&&connection.id==='claude'&&draft.enabled){setDraft(d=>({...d,mode:value,enabled:false}));setConfirm(true);}else setDraft(d=>({...d,mode:value}));};
- const checkButton=<button type="button" className={connection.id==='builtin'?'connection-builtin-primary':undefined} disabled={busy||accountBusy||(draft.mode==='cli'&&(!draft.enabled||connection.cliAuthState==='pending'))||(draft.mode==='api'&&!!definition.apiReason)} onClick={()=>void act(async()=>{await save();const result=await connectionRequest<{ok:boolean;error?:string;connection:ConnectionView}>(`${connection.id}/test`,'POST',{});onChanged(result.connection);notifyConnectionsChanged(result.connection);if(!result.ok)setError(result.error||'连接失败')})}>{busy?'正在处理…':draft.mode==='cli'?'重新检查':'测试连接'}</button>;
+ const checkButton=<button type="button" className={connection.id==='builtin'?'connection-builtin-primary':undefined} disabled={busy||accountBusy||(draft.mode==='cli'&&(!draft.enabled||connection.cliAuthState==='pending'))||(draft.mode==='api'&&(!!definition.apiReason||(!connection.hasKey&&!key.trim())))} title={draft.mode==='api'&&!connection.hasKey&&!key.trim()?'先填入 API 密钥':undefined} onClick={()=>void act(async()=>{await save();const result=await connectionRequest<{ok:boolean;error?:string;connection:ConnectionView}>(`${connection.id}/test`,'POST',{});onChanged(result.connection);notifyConnectionsChanged(result.connection);if(!result.ok)setError(result.error||'连接失败')})}>{busy?'正在处理…':draft.mode==='cli'?'重新检查':'测试连接'}</button>;
  const harness=connection.id==='deepseek'&&draft.mode==='cli';
  const harnessModels=connection.mode==='cli'&&!key?draft.models:[];
  const keyField=<><label htmlFor={`connection-${connection.id}-key`}>{harness?'DeepSeek API 密钥（可选）':'密钥'}</label><div className="connection-key"><input id={`connection-${connection.id}-key`} type="password" autoComplete="new-password" value={key} placeholder={draft.hasKey?'已存在系统钥匙串 · 留空不修改':'只保存在系统钥匙串'} disabled={busy} onChange={e=>setKey(e.target.value)}/>{draft.hasKey&&<button type="button" disabled={busy} onClick={()=>void act(async()=>{const next=await connectionRequest<ConnectionView>(`${connection.id}/key`,'DELETE');setKey('');setDraft(d=>({...d,hasKey:false}));onChanged(next);notifyConnectionsChanged(next)})}>删除密钥</button>}</div></>;
@@ -62,6 +67,7 @@ export function ConnectionEditor({connection,onChanged,onBusyChange,onDirtyChang
    {connection.kind==='agent'&&!definition.apiReason&&<p className="connection-note">测试可能发送一次极短请求，服务商可能计费。</p>}
    {definition.apiReason&&<p className="connection-warning">待适配：{definition.apiReason}</p>}
   </>:<><div className="connection-fields"><label htmlFor={`connection-${connection.id}-cli`}>命令行</label><input id={`connection-${connection.id}-cli`} value={draft.cliPath} placeholder={connection.executable||'留空自动检测命令行'} disabled={busy} onChange={e=>setDraft(d=>({...d,cliPath:e.target.value}))}/></div>{connection.cliPath&&<button type="button" disabled={busy||dirty} onClick={()=>void act(async()=>{const next=await connectionRequest<ConnectionView>(connection.id,'PUT',{cliPath:''});setDraft(next);onChanged(next);notifyConnectionsChanged(next)})}>改回自动查找</button>}<p className="connection-note">{connection.cliInstalled?'本机已找到命令行':'本机还没有找到命令行'} · <a href={connection.installPage||definition.page} target="_blank" rel="noreferrer">官方安装说明 ↗</a></p>
+   {PLAN_NOTES[connection.id]&&<p className="connection-note">{PLAN_NOTES[connection.id]}</p>}
    {harness&&<>
     <div className="connection-fields">{keyField}
      <label htmlFor="connection-deepseek-harness-model">出片模型</label>

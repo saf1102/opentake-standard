@@ -82,3 +82,11 @@ test('portable project recovers only the explicit missing-rollout resume failure
  assert.equal(missingCodexRollout('Error: thread/resume: thread/resume failed: no rollout found for thread id test'),true);
  for(const text of ['rate limit','authentication failed','thread/resume: network error','no rollout found for thread id test']) assert.equal(missingCodexRollout(text),false);
 });
+
+test('进度说明只显示中文：智能体写的英文原话不上界面，保留上一条中文说明', () => {
+  const at = '2026-11-27T00:00:00.000Z'
+  let steps = applyProgress(initialSteps('topic', 'first'), { step: 'code', detail: '正在写画面' }, at, () => undefined)
+  steps = applyProgress(steps, { step: 'code', detail: "Now let's check the project." }, at, () => undefined)
+  assert.equal(steps.find(s => s.id === 'code')?.detail, '正在写画面')
+  assert.equal(steps.find(s => s.id === 'code')?.state, 'running')
+})

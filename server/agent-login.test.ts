@@ -59,13 +59,14 @@ test('旧登录检查的迟到成功不能删掉取消后新建的等待',async(
  assert.equal((await manager.check('kimi',f.deps)).waiting,true);
 });
 
-test('重新登录必须命令成功退出再探测；关闭、失败与取消不能解除运行时拒绝',async()=>{
- for(const exitCode of [undefined,1,0]){
+test('登录终端结束后不看退出码，一律用一句话测试确认；取消不探测',async()=>{
+ // Kimi 在 Windows 上登录成功后退出时会崩一下，退出码非 0；能不能用只由一句话测试决定。
+ for(const [exitCode,verified] of [[undefined,false],[1,true],[1,false],[0,true]] as const){
   const f=fixture(),manager=createAgentLoginManager();let completed=0;
-  const deps={...f.deps,exitCode:()=>exitCode,complete:async(id:ConnectionId)=>{completed++;f.setConnected();return f.deps.status!(id)}};
+  const deps={...f.deps,exitCode:()=>exitCode,complete:async(id:ConnectionId)=>{completed++;if(verified)f.setConnected();return f.deps.status!(id)}};
   await manager.start('kimi',deps);f.setTerminal('finished');
   const result=await manager.check('kimi',deps);
-  assert.equal(completed,exitCode===0?1:0);assert.equal(result.connection.connected,exitCode===0);
+  assert.equal(completed,1);assert.equal(result.connection.connected,verified);
   assert.match(f.commands[0],/printf '%s'/,'只采集退出码，不读取终端输出');
  }
  const f=fixture(),manager=createAgentLoginManager();let completed=0;
@@ -74,7 +75,7 @@ test('重新登录必须命令成功退出再探测；关闭、失败与取消�
  assert.equal(completed,0);
 });
 
-test('登录包装只记录真实退出码，带空格引号的程序路径也能恢复并清理临时目录',async()=>{
+test('登录包装如实记录退出码，带空格引号的程序路径也能恢复并清理临时目录',async()=>{
  const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
  const {execFile}=await import('node:child_process'),{promisify}=await import('node:util');
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-login-wrapper-')),executable=path.join(root,"Sa's fake kimi"+(process.platform==='win32'?'.exe':''));
@@ -89,7 +90,7 @@ test('登录包装只记录真实退出码，带空格引号的程序路径也�
     if(process.platform==='win32')await promisify(execFile)(path.join(process.env.SystemRoot!,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-Command',windowsAgentScript(executable,['login'],resultPath)]);else await promisify(execFile)('/bin/sh',['-c',command]);return '23:/dev/ttys023';
    }};
    await manager.start('kimi',deps);assert.equal(fs.readFileSync(resultPath,'utf8').trim(),String(code));
-   await manager.check('kimi',deps);assert.equal(completed,code===0?1:0);assert.equal(fs.existsSync(path.dirname(resultPath)),false);
+   await manager.check('kimi',deps);assert.equal(completed,1);assert.equal(fs.existsSync(path.dirname(resultPath)),false);
   }
  }finally{fs.rmSync(root,{recursive:true,force:true})}
 });

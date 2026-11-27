@@ -140,7 +140,7 @@ function NetworkAsk({ request, busy, onAnswer }: { request: { reason: string; ho
   const card = useRef<HTMLDivElement>(null)
   useEffect(() => { card.current?.focus({ preventScroll: true }) }, [])
   return <div ref={card} className="ge-ask" role="alertdialog" aria-modal="false" aria-labelledby="ge-ask-title" aria-describedby="ge-ask-reason" tabIndex={-1}>
-    <h5 id="ge-ask-title"><Globe size={16} aria-hidden="true" />Codex 想联网</h5>
+    <h5 id="ge-ask-title"><Globe size={16} aria-hidden="true" />智能体想联网</h5>
     <p id="ge-ask-reason">{request.reason}</p>
     {copy.hosts && <div className="host"><GlobeLock size={13} aria-hidden="true" /><span>只访问 <b>{copy.hosts}</b> · {copy.keep}</span></div>}
     <div className="row">

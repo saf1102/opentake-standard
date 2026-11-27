@@ -77,16 +77,19 @@ if(r.method==='session/prompt'){if(JSON.stringify(r.params).includes('WAIT_FOR_C
   await runAgent(agent,['exec','--output-schema',schema,'--output-last-message',output,'翻译为中文'],{timeout:5000});
   assert.deepEqual(JSON.parse(fs.readFileSync(output,'utf8')),{text:'你好'});
   const record=recentAgentRuns()[0];assert.equal(record.agent,'kimi');assert.equal(record.method,'cli');assert.equal(record.transport,'acp');assert.equal(record.status,'completed');
-  const requests=fs.readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));const prompt=requests.find(r=>r.method==='session/prompt');assert.match(JSON.stringify(prompt.params),/JSON Schema/);assert.equal(fs.existsSync(prompt.cwd),false,'临时文字工作目录已清理');
+  const requests=fs.readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));const prompts=requests.filter(r=>r.method==='session/prompt');assert.ok(prompts.length<=2);if(prompts.length===2)assert.match(JSON.stringify(prompts[0].params),/只回复 OK/,'第一次接通先做一句话测试');const prompt=prompts.at(-1);assert.match(JSON.stringify(prompt.params),/JSON Schema/);assert.equal(fs.existsSync(prompt.cwd),false,'临时文字工作目录已清理');
   const controller=new AbortController();const pending=runAgent(agent,['exec','--output-last-message',path.join(dir,'cancelled.json'),'WAIT_FOR_CANCEL'],{timeout:5000,signal:controller.signal});
   const start=Date.now();while(!fs.readFileSync(log,'utf8').includes('WAIT_FOR_CANCEL')){assert.ok(Date.now()-start<4000);await new Promise(r=>setTimeout(r,20));}controller.abort();await assert.rejects(pending,/abort|取消/i);assert.equal(fs.existsSync(path.join(dir,'cancelled.json')),false);assert.match(fs.readFileSync(log,'utf8'),/session\/cancel/);
   await assert.rejects(runAgent(agent,['exec','MODEL_BUSY'],{timeout:5000}),/这个模型现在繁忙/);
   assert.equal((await getConnectionStatus('kimi')).connected,true,'繁忙不清登录状态');
   assert.equal(recentAgentRuns()[0].errorKind,'busy');
   await assert.rejects(runAgent(agent,['exec','REJECT_AUTH'],{timeout:5000}),/缺少有效登录凭据/);
-  const rejected=await refreshAgentConnection('kimi');
-  assert.equal(rejected.connected,false);assert.equal(rejected.cliAuthState,'needs-login','空会话仍会成功，但不能覆盖真实prompt认证拒绝');
+  const rejected=await getConnectionStatus('kimi');
+  assert.equal(rejected.connected,false);assert.equal(rejected.cliAuthState,'needs-login','空会话仍会成功，后台查询不能覆盖真实prompt认证拒绝');
   assert.equal(recentAgentRuns()[0].errorKind,'credentials');
+  // 用户点「重新检查」会做一句话测试；这个假程序能正常回话，所以确认恢复。
+  const recovered=await refreshAgentConnection('kimi');assert.equal(recovered.connected,true);
+  fs.writeFileSync(process.env.LINKREADER_CONNECTION_SETTINGS_FILE!,JSON.stringify({kimi:{...defaultConnection('kimi'),cliPath:fake,authRejectedAt:new Date().toISOString()}}));
   fs.writeFileSync(process.env.LINKREADER_CONNECTION_SETTINGS_FILE!,JSON.stringify({kimi:{...defaultConnection('kimi'),cliPath:fake,mode:'api',connected:true,hasKey:true}}));
   await assert.rejects(validateModuleAgentChoice('generalEditing',{agent:'kimi',model:'default',effort:'none'}),/已适配的命令行/,'Kimi API 轻活不能误当出片接法');
   await assert.rejects(validateModuleAgentChoice('screenEditing',{agent:'kimi',model:'default',effort:'none'}),/待适配/);

@@ -2,6 +2,7 @@ import platform from './platform.ts';
 import {deepseekHarnessRoute,deepseekKeyRejected,deepseekNoKey,deepseekAuthReply,deepseekAccountRejected,deepseekInvalidKeyHint,deepseekLoginHint,deepseekModelHint,deepseekSwitchHint} from './deepseek-harness.ts';
 import {execFileAsync} from './proc.ts';
 import {spawnAgentProcess} from './agent-launch.ts';
+import {classifyAgentFailure} from './agent-failure.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,7 +10,7 @@ import {spawn} from 'node:child_process';
 
 import type {CliAuthState,ConnectionModel} from '../shared/agent-connections.ts';
 
-export type AuthProbeResult={state:CliAuthState;message:string;checkedAt?:string;models?:ConnectionModel[];acpModelSelection?:boolean;deepseekRoute?:'official'|'account';deepseekVerified?:boolean;deepseekKeyRejected?:boolean;deepseekAccountRejected?:boolean};
+export type AuthProbeResult={state:CliAuthState;message:string;checkedAt?:string;models?:ConnectionModel[];acpModelSelection?:boolean;deepseekRoute?:'official'|'account';deepseekVerified?:boolean;deepseekKeyRejected?:boolean;deepseekAccountRejected?:boolean;verified?:boolean};
 export const AUTH_CONNECTED_TTL=10*60*1000;
 export const AUTH_RETRY_TTL=15*1000;
 
@@ -87,8 +88,30 @@ async function checkHarnessSession(session:AcpResult,options:DshProbe,request:Re
  }
 }
 
+export const VERIFY_PROMPT='只回复 OK。';
+/** 接通时的一句话测试：只开会话不够（有的智能体不登录也能开会话，套餐不含也能开），要让它真回一句话。 */
+function verifyFailure(error:unknown,info:Pick<AuthProbeResult,'models'|'acpModelSelection'>):AuthProbeResult{
+ const failure=classifyAgentFailure(error);
+ // 套餐、额度先于「要登录」判断：Kimi 的「套餐不含」报错也带 auth_required。
+ if(failure.kind==='model-plan'||failure.kind==='quota'||failure.kind==='rate-limit'||failure.kind==='busy')return {state:'unknown',message:failure.message,...info};
+ if(failure.kind==='credentials'||authRequired(error))return {state:'needs-login',message:'还没登录',...info};
+ return {state:'unknown',message:'一句话测试没通过：智能体没有正常回复，请重新检查',...info};
+}
+async function verifyAgentReply(session:AcpResult,request:Request,reply:{text:string}):Promise<AuthProbeResult>{
+ const info=acpSessionModelInfo(session);
+ reply.text='';
+ try{
+  const response=await request('session/prompt',{sessionId:session.sessionId,prompt:[{type:'text',text:VERIFY_PROMPT}]});
+  const text=reply.text.trim();
+  // 有的智能体把服务端错误当成普通回复文字返回，所以文字本身也要过一遍失败分类。
+  if(text&&classifyAgentFailure(text).kind!=='other')return verifyFailure(text,info);
+  if(response.stopReason==='end_turn'&&text)return {state:'connected',message:'已接通，一句话测试通过',verified:true,...info};
+  return {state:'unknown',message:'一句话测试没通过：智能体没有正常回复，请重新检查',...info};
+ }catch(error){return verifyFailure(error,info)}
+}
+
 /** Login probes advertise no tools. A user-initiated Harness check also verifies one short reply. */
-export async function probeAcpAuthentication(executable:string,args:readonly string[],options:{env?:NodeJS.ProcessEnv;timeoutMs?:number;signal?:AbortSignal;tempRoot?:string;deepseek?:DshProbe}={}):Promise<AuthProbeResult>{
+export async function probeAcpAuthentication(executable:string,args:readonly string[],options:{env?:NodeJS.ProcessEnv;timeoutMs?:number;signal?:AbortSignal;tempRoot?:string;deepseek?:DshProbe;verify?:boolean}={}):Promise<AuthProbeResult>{
  if(options.signal?.aborted)return {state:'unknown',message:'检查已取消'};
  const cwd=fs.mkdtempSync(path.join(options.tempRoot??os.tmpdir(),'opentake-auth-'));
  try{return await new Promise<AuthProbeResult>(resolve=>{
@@ -104,7 +127,7 @@ export async function probeAcpAuthentication(executable:string,args:readonly str
   };
   const finish=(result:AuthProbeResult)=>{if(finished)return;finished=true;answer=result;clearTimeout(timeout);child.stdin?.end();terminate('SIGTERM');killTimer=setTimeout(()=>terminate('SIGKILL'),500);};
   const abort=()=>finish({state:'unknown',message:'检查已取消'});
-  const timeout=setTimeout(()=>finish({state:'unknown',message:'没查到，检查超时，请重新检查'}),options.timeoutMs??30000);
+  const timeout=setTimeout(()=>finish({state:'unknown',message:'没查到，检查超时，请重新检查'}),options.timeoutMs??(options.verify||options.deepseek?.verify?60000:30000));
   options.signal?.addEventListener('abort',abort,{once:true});
   if(options.signal?.aborted)abort();
   child.once('error',()=>{answer={state:'unknown',message:'没查到，命令行未能启动'};clean()});
@@ -126,7 +149,7 @@ export async function probeAcpAuthentication(executable:string,args:readonly str
     if(response===null||typeof response!=='object'||response.jsonrpc!=='2.0'){finish({state:'unknown',message:'没查到，ACP 返回格式不正确'});break;}
     if(typeof response.method==='string'){
      if(response.id!==undefined)send({jsonrpc:'2.0',id:response.id,error:{code:-32601,message:'Login check does not provide client methods'}});
-     else if(options.deepseek?.verify&&response.method==='session/update'&&sessionId&&sessionId===response.params?.sessionId){
+     else if((options.deepseek?.verify||options.verify)&&response.method==='session/update'&&sessionId&&sessionId===response.params?.sessionId){
       const update=response.params.update;
       if(update?.sessionUpdate==='agent_message_chunk'&&update.content?.type==='text'&&typeof update.content.text==='string')reply.text+=update.content.text;
      }
@@ -143,12 +166,14 @@ export async function probeAcpAuthentication(executable:string,args:readonly str
    if(init.protocolVersion!==1){finish({state:'pending',message:'这个 ACP 版本待适配，可改用 API 密钥'});return;}
    const session=await request('session/new',{cwd,mcpServers:[]});sessionId=session.sessionId;
    if(typeof sessionId!=='string'||!sessionId){finish({state:'unknown',message:'没查到，没有返回有效会话'});return;}
-   finish(options.deepseek?await checkHarnessSession(session,options.deepseek,request,reply):{state:'connected',message:'已接通',...acpSessionModelInfo(session)});
+   finish(options.deepseek?await checkHarnessSession(session,options.deepseek,request,reply):options.verify?await verifyAgentReply(session,request,reply):{state:'connected',message:'已接通',...acpSessionModelInfo(session)});
   })().catch((error:AcpError)=>{
    if(options.deepseek?.useKey&&deepseekKeyRejected(error)){
     finish({state:'needs-login',deepseekKeyRejected:true,message:deepseekInvalidKeyHint+deepseekLoginHint});
    }else if(options.deepseek&&!options.deepseek.useKey&&(deepseekAccountRejected(error)||authRequired(error))){
     finish({state:'needs-login',deepseekAccountRejected:true,message:deepseekLoginHint});
+   }else if(!options.deepseek&&classifyAgentFailure(error).kind!=='other'){
+    finish(verifyFailure(error,{}));
    }else if(authRequired(error)){
     finish({state:'needs-login',message:options.deepseek?deepseekLoginHint:'还没登录'});
    }else{

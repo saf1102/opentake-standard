@@ -118,7 +118,7 @@ test('Windows 每轮重读注册表，展开新变量，忽略未展开和相对
  const file='C:\\test folder\\agent.ps1',args=['--name','a&b'];
  const launch=require('./agent-launch.cjs').agentLaunch(file,args,{env:second.env},'win32');
  assert.equal(launch.options.env.PATH,second.env.PATH);assert.equal(launch.options.shell,false);assert.match(launch.file,/\\powershell\.exe$/i);
- assert.deepEqual(launch.args,['-NoLogo','-NoProfile','-File',file,...args]);
+ assert.deepEqual(launch.args,['-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',file,...args]);
 });
 test('按平台从 Node 版本管理器找到并启动命令，验证登录环境和版本探测缓存',()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'task57-shell-'));

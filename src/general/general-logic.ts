@@ -179,7 +179,7 @@ export function runNotices(before: ReadonlyMap<string, GeneralRunState | undefin
     const previous = before.get(project.id), state = project.runState
     if (previous === state) continue
     const name = `《${project.name}》`
-    if (state === 'needs-network') notices.push({ id: project.id, kind: 'needs-network', title: 'Codex 想联网', body: `${name}要你决定一下，答应了才会联网` })
+    if (state === 'needs-network') notices.push({ id: project.id, kind: 'needs-network', title: '智能体想联网', body: `${name}要你决定一下，答应了才会联网` })
     else if (state === 'done' && runStateActive(previous)) notices.push({ id: project.id, kind: 'done', title: `${name}做好了`, body: project.versions > 0 ? `${versionName(project.versions)}已经出片，点开看看` : '已经出片，点开看看' })
     else if (state === 'failed' && runStateActive(previous)) notices.push({ id: project.id, kind: 'failed', title: `${name}没做完`, body: '点开看看是哪一步出了问题' })
   }

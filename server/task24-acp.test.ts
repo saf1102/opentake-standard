@@ -99,9 +99,10 @@ test('任务24：权限拒绝越界、符号链接、无路径、扩展和永久
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 });
 test('任务24：额度、凭据、套餐错误独立；临时429不是额度用完',()=>{
- for(const [raw,kind] of [['insufficient_quota 429','quota'],['balance insufficient','quota'],['missing API key','credentials'],['auth_required','credentials'],['403 当前订阅不含此模型','model-plan'],['429 rate_limit_exceeded','rate-limit'],['broken','other']])assert.equal(classifyAgentFailure(raw).kind,kind,raw);
+ for(const [raw,kind] of [['insufficient_quota 429','quota'],['balance insufficient','quota'],['missing API key','credentials'],['auth_required','credentials'],['403 当前订阅不含此模型','model-plan'],['auth_required Authentication required: Your current subscription does not have access to Kimi Code right now. Upgrade your plan to keep coding with Kimi Code','model-plan'],['当前套餐不包含 Qwen Code。升级到 Plus 或 Pro 即可开始编码','model-plan'],['429 rate_limit_exceeded','rate-limit'],['broken','other']])assert.equal(classifyAgentFailure(raw).kind,kind,raw);
  assert.doesNotMatch(redactAcpText('email=test@example.org token=private-value Bearer secret'),/test@example|private-value|Bearer secret/);
  assert.ok(classifyAgentFailure('a'.repeat(2000)).excerpt.length<=240);
+ assert.match(classifyAgentFailure('-32603 模型一次要写的内容太长，被服务商截断，续写两次仍未完成。可以换一个单次输出更长的模型再试。').message,/^模型一次要写的内容太长/);
 });
 
 test('任务24：旧版models选择与不可用模型提前停止，不偷偷换模型',async()=>{

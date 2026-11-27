@@ -167,7 +167,7 @@ test('Windows 安装把已确认的本家命令交给可见 PowerShell，拒绝�
     calls++;
     if(command.startsWith('irm ')){
      assert.match(file,/WindowsPowerShell\\v1\.0\\powershell\.exe$/i);
-     assert.deepEqual(args,['-NoLogo','-NoProfile','-Command',command]);
+     assert.deepEqual(args,['-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-Command',command]);
     }else if(id==='copilot'){assert.equal(file,'winget.exe');assert.deepEqual(args,['install','GitHub.Copilot']);}
     else{assert.equal(file,'npm.cmd');assert.deepEqual(args,['install','-g','opencode-ai']);}
     return 777;
@@ -257,7 +257,7 @@ test('WorkBuddy 一键安装在可见终端运行官方命令，找到独立 CLI
   const connection=()=>view('codebuddy',{cliInstalled:found,connected,cliAuthState:connected?'connected':'needs-login'});
   const deps:AgentManagementDeps={platform,arch:'arm64',assertAllowed:()=>{},pollMs:60000,detect:async()=>undefined,
    startWindowsTerminal:async(exe,args,resultDir)=>{
-    installCount++;assert.match(exe,/powershell\.exe$/i);assert.deepEqual(args,['-NoLogo','-NoProfile','-Command',command]);
+    installCount++;assert.match(exe,/powershell\.exe$/i);assert.deepEqual(args,['-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-Command',command]);
     fs.writeFileSync(path.join(resultDir,'exit-code'),'0');return 12345;
    },
    terminal:async script=>{if(!script.includes('do script'))return 'finished';installCount++;assert.ok(script.includes(command));return '23:/dev/ttys023'},

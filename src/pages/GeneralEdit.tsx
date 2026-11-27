@@ -13,7 +13,10 @@ import {
 } from '@/general/general-logic'
 import { useGeneralStart } from '@/general/general-start'
 import { GeneralEntrance, type EntryKey } from '@/general/GeneralEntrance'
-import { CodexMark, NavSlot, NewSteps } from '@/general/GeneralBits'
+import { CodexMark, NavSlot, NewSteps, Spinner } from '@/general/GeneralBits'
+import { AgentMark } from '@/studio/components/AgentMark'
+import { UNIFIED_AGENTS } from '@/general/platform'
+import { agentShortName } from '@/general/agent-name'
 import '@/workspace/style-library/style-library.css'
 import '@/general/general.css'
 
@@ -79,6 +82,9 @@ function IntakeStep({ style, kind, draft, setDraft, onChangeStyle }: {
 }) {
   const picker = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
+  // 「系统默认」实际落到哪一家，由选择器算好告诉这里，开始页按它显示名字和图标。
+  const [resolvedAgent, setResolvedAgent] = useState<GeneralAgentChoice['agent']>()
+  const who = draft.agent?.agent || resolvedAgent
   const { busy, busyLabel, error, environment, start: begin } = useGeneralStart()
   const blocker = startBlocker(kind, { files: draft.files.length, text: draft.text })
 
@@ -159,8 +165,8 @@ function IntakeStep({ style, kind, draft, setDraft, onChangeStyle }: {
 
       <div className="ge-go">
         <div>
-          <div className="ge-who"><CodexMark /><span><b>Codex</b> 来做</span>
-            <AgentControls agent={draft.agent} onAgent={agent => setDraft(current => ({ ...current, agent }))} disabled={!!busy}
+          <div className="ge-who">{UNIFIED_AGENTS ? <>{who ? <AgentMark id={who} size={22} /> : <Spinner size={22} />}<span><b>{agentShortName(who)}</b> 来做</span></> : <><CodexMark /><span><b>Codex</b> 来做</span></>}
+            <AgentControls agent={draft.agent} onAgent={agent => setDraft(current => ({ ...current, agent }))} disabled={!!busy} onResolvedAgent={setResolvedAgent}
               network={draft.network} onNetwork={network => setDraft(current => ({ ...current, network }))} />
           </div>
           <div className="ge-safe"><FolderLock size={13} aria-hidden="true" />{draft.network ? '只读写这个工程的文件夹；会上网找素材，软件、插件、代码不下载' : '只读写这个工程的文件夹，不联网；要联网会先问你'}</div>

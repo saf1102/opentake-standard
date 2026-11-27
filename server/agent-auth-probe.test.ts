@@ -192,29 +192,35 @@ test('Kimi 带逗号的 thinking 模型在接入设置、模块设置和工程�
  }
 });
 
-test('运行时凭据拒绝立即清缓存并持久锁定未登录，刷新不能用匿名 ACP 会话覆盖',async()=>{
+test('运行时凭据拒绝立即清缓存并持久锁定；后台查询不解锁，重新检查和登录用一句话测试确认，匿名会话不能假恢复',async()=>{
  const {markAgentCredentialsRejected,onAgentCredentialsRejected,onAgentConnectionStatusChanged,testUnifiedConnection,completeAgentLogin}=await import('./agent-connections.ts');
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-auth-rejected-')),old=process.env.LINKREADER_CONNECTION_SETTINGS_FILE;
  process.env.LINKREADER_CONNECTION_SETTINGS_FILE=path.join(root,'connections.json');
- let probes=0,events=0,loggedIn=true;
- const deps:ConnectionDependencies={detect:async id=>`/fixture/${id}`,cliTest:async()=>{probes++;return {connected:loggedIn}}};
+ // 匿名会话总能打开（只开会话的探测永远成功）；只有一句话测试能看出真的能不能用。
+ let plain=0,verified=0,events=0,loggedIn=true;
+ const deps:ConnectionDependencies={detect:async id=>`/fixture/${id}`,cliTest:async(_id,_exe,verify)=>{if(verify){verified++;return {connected:loggedIn}}plain++;return {connected:true}}};
  const off=onAgentCredentialsRejected(id=>{assert.equal(id,'kimi');assert.ok(getConnectionConfig(id).authRejectedAt);events++});
  const statusEvents:{id:string;revision:number}[]=[];const offStatus=onAgentConnectionStatusChanged(event=>statusEvents.push(event));
  try{
-  assert.equal((await getConnectionStatus('kimi',deps)).connected,true);assert.equal(probes,1);
+  assert.equal((await getConnectionStatus('kimi',deps)).connected,true);assert.equal(verified,1,'第一次接通做一句话测试');
+  assert.equal(getConnectionConfig('kimi').connected,true,'测试通过后记下已确认接通');
+  await refreshAgentConnection('kimi',deps);assert.equal(verified,1,'确认过以后后台查询不再重复测试');
   markAgentCredentialsRejected('kimi','api');assert.equal(events,0,'旧API任务不污染当前CLI');
   markAgentCredentialsRejected('kimi','cli');assert.equal(events,1);markAgentCredentialsRejected('kimi','cli');assert.equal(events,1,'重复回调幂等');
   assert.equal(getConnectionConfig('kimi').connected,false);
-  for(const get of [getConnectionStatus,refreshAgentConnection]){
-   const view=await get('kimi',deps);assert.equal(view.connected,false);assert.equal(view.cliAuthState,'needs-login');assert.equal(view.cliAuthMessage,'还没登录');assert.equal(view.cliLoginAvailable,true);
-  }
-  assert.equal((await testUnifiedConnection('kimi',deps)).ok,false);assert.equal(probes,1,'普通强制刷新仍不能假恢复');
+  loggedIn=false;const before=verified;
+  const background=await getConnectionStatus('kimi',deps);assert.equal(background.connected,false);assert.equal(background.cliAuthMessage,'还没登录');assert.equal(verified,before,'后台查询不探测');
+  const refreshed=await refreshAgentConnection('kimi',deps);assert.equal(refreshed.connected,false);assert.equal(refreshed.cliAuthState,'needs-login');assert.equal(refreshed.cliLoginAvailable,true);assert.equal(verified,before+1,'重新检查做一句话测试');
+  assert.equal((await testUnifiedConnection('kimi',deps)).ok,false,'匿名会话不能让测试连接通过');
   const persisted=JSON.parse(fs.readFileSync(process.env.LINKREADER_CONNECTION_SETTINGS_FILE!,'utf8'));assert.ok(persisted.kimi.authRejectedAt,'重启后保留拒绝证据');
   const revision=getConnectionConfig('kimi').revision;
-  loggedIn=false;assert.equal((await completeAgentLogin('kimi',revision,deps)).connected,false);assert.ok(getConnectionConfig('kimi').authRejectedAt);
-  loggedIn=true;assert.equal((await completeAgentLogin('kimi',revision,deps)).connected,true);assert.equal(getConnectionConfig('kimi').authRejectedAt,undefined);assert.equal(probes,3);
-  assert.equal(statusEvents.length,2);assert.ok(statusEvents[1].revision>statusEvents[0].revision);assert.deepEqual(Object.keys(statusEvents[1]).sort(),['id','revision']);
+  assert.equal((await completeAgentLogin('kimi',revision,deps)).connected,false);assert.ok(getConnectionConfig('kimi').authRejectedAt);
+  loggedIn=true;assert.equal((await completeAgentLogin('kimi',revision,deps)).connected,true);assert.equal(getConnectionConfig('kimi').authRejectedAt,undefined);
+  assert.ok(statusEvents.length>=3);assert.ok(statusEvents.at(-1)!.revision>statusEvents[0].revision);assert.deepEqual(Object.keys(statusEvents.at(-1)!).sort(),['id','revision']);
   markAgentCredentialsRejected('kimi','cli',0);assert.equal(getConnectionConfig('kimi').authRejectedAt,undefined,'迟到的旧任务不能撤销新登录');
+  // 重新检查也能解锁：再被拒一次后，用户登录好了直接点「重新检查」。
+  markAgentCredentialsRejected('kimi','cli');assert.ok(getConnectionConfig('kimi').authRejectedAt);
+  const recovered=await refreshAgentConnection('kimi',deps);assert.equal(recovered.connected,true);assert.equal(getConnectionConfig('kimi').authRejectedAt,undefined);
  }finally{off();offStatus();if(old===undefined)delete process.env.LINKREADER_CONNECTION_SETTINGS_FILE;else process.env.LINKREADER_CONNECTION_SETTINGS_FILE=old;fs.rmSync(root,{recursive:true,force:true})}
 });
 
@@ -321,7 +327,8 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
    const methods=()=>fs.readFileSync(trace,'utf8').trim().split(/\s+/).filter(Boolean);
    const status=await refreshAgentConnection('codebuddy',deps);
    assert.equal(status.cliAuthState,'connected',`${status.cliAuthMessage}；假 CLI 已启动=${!!fs.statSync(log).size}，已收到 ${JSON.stringify(methods())}；进程记录 ${fs.readFileSync(lifecycle,'utf8').trim()}`);
-   assert.deepEqual(methods(),['initialize','session/new']);
+   // 还没确认接通过时会多做一次一句话测试（session/prompt）；确认后只开会话。
+   assert.deepEqual(methods().slice(0,2),['initialize','session/new']);assert.ok(methods().length===2||methods()[2]==='session/prompt'&&methods().length===3,JSON.stringify(methods()));
    const launch=await resolveAgentConnectionLaunch('codebuddy',undefined,deps);
    const agent={...launch,agent:'codebuddy' as const,effort:'medium'};
    const cli=filmAgentArgs(agent,{work:root,lastMessage:'',network:false,model:'default',effort:'medium'});
@@ -335,4 +342,42 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
    assert.deepEqual(agentRegionEnvironment('qwen',{}),{});
   }
  }finally{if(old===undefined)delete process.env.LINKREADER_CONNECTION_SETTINGS_FILE;else process.env.LINKREADER_CONNECTION_SETTINGS_FILE=old;fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('一句话测试：真回一句话才算接通；套餐不含不当成没登录；错误文字当回复也能识别',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-acp-verify-'));
+ try{
+  const script=path.join(root,'fake.mjs'),log=path.join(root,'requests.jsonl');
+  fs.writeFileSync(script,`import fs from 'node:fs';import readline from 'node:readline';
+const scenario=process.argv[2],log=process.argv[3];
+const send=value=>console.log(JSON.stringify({jsonrpc:'2.0',...value}));
+readline.createInterface({input:process.stdin}).on('line',line=>{const request=JSON.parse(line);fs.appendFileSync(log,JSON.stringify(request)+'\\n');
+ if(request.method==='initialize')return send({id:request.id,result:{protocolVersion:1}});
+ if(request.method==='session/new')return send({id:request.id,result:{sessionId:'s1'}});
+ const say=text=>send({method:'session/update',params:{sessionId:'s1',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text}}}});
+ if(scenario==='ok'){say('OK');return send({id:request.id,result:{stopReason:'end_turn'}});}
+ if(scenario==='plan')return send({id:request.id,error:{code:-32000,message:'auth_required Authentication required: Your current subscription does not have access to Kimi Code right now. Upgrade your plan'}});
+ if(scenario==='login')return send({id:request.id,error:{code:-32000,message:'Authentication required'}});
+ if(scenario==='text-plan'){say('当前套餐不包含 Qwen Code。升级到 Plus 或 Pro 即可开始编码。');return send({id:request.id,result:{stopReason:'end_turn'}});}
+ if(scenario==='silent')return send({id:request.id,result:{stopReason:'end_turn'}});
+});`);
+  for(const [scenario,state,message,verified] of [
+   ['ok','connected',/一句话测试通过/,true],
+   ['plan','unknown',/订阅套餐不包含/,undefined],
+   ['login','needs-login',/还没登录/,undefined],
+   ['text-plan','unknown',/订阅套餐不包含/,undefined],
+   ['silent','unknown',/没有正常回复/,undefined],
+  ] as const){
+   fs.writeFileSync(log,'');
+   const result=await probeAcpAuthentication(process.execPath,[script,scenario,log],{tempRoot:root,timeoutMs:5000,verify:true});
+   assert.equal(result.state,state,scenario);assert.match(result.message,message,scenario);assert.equal(result.verified,verified,scenario);
+   const requests=fs.readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));
+   assert.deepEqual(requests.map(item=>item.method),['initialize','session/new','session/prompt'],scenario);
+   assert.equal(requests[2].params.prompt[0].text,'只回复 OK。');
+  }
+  fs.writeFileSync(log,'');
+  const plain=await probeAcpAuthentication(process.execPath,[script,'ok',log],{tempRoot:root,timeoutMs:5000});
+  assert.equal(plain.state,'connected');assert.equal(plain.verified,undefined,'不要求测试时只开会话');
+  assert.deepEqual(fs.readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line).method),['initialize','session/new']);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

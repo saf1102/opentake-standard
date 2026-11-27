@@ -151,7 +151,8 @@ function directLaunch(file,args,options,platform) {
  const systemRoot = Object.entries(env).find(([key]) => key.toLowerCase() === 'systemroot')?.[1] || 'C:\\Windows';
  if (/\.ps1$/i.test(file)) {
   return {file:path.win32.join(systemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'),
-   args:['-NoLogo','-NoProfile','-File',file,...args],options:{...options,env,shell:false}};
+   // 新用户默认禁止运行 .ps1；只对这次启动的进程放行，不改系统设置。
+   args:['-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',file,...args],options:{...options,env,shell:false}};
  }
  const percent = 'OPENTAKE_LITERAL_' + randomUUID().replaceAll('-', '');
  env[percent] = '%';

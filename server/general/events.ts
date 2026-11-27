@@ -109,7 +109,9 @@ export type Progress = { step?: string; detail?: string; thumbs?: string[]; prog
 export function applyProgress(steps: GeneralStep[], progress: Progress, at: string, toUrl: (rel: string) => string | undefined): GeneralStep[] {
   const id = progress.step as GeneralStepId;
   if (!AGENT_STEPS.includes(id)) return steps;
-  let next = advance(steps, id, at, progress.detail ? clip(progress.detail) : undefined);
+  // 进度说明是给用户看的中文；智能体（尤其是用英文思考的模型）偶尔写英文原话，这种不显示，保留上一条说明。
+  const detail = progress.detail && /[\u4e00-\u9fff]/.test(progress.detail) ? clip(progress.detail) : undefined
+  let next = advance(steps, id, at, detail);
   const target = next.find(s => s.id === id)!;
   const patch: Partial<GeneralStep> = {};
   if (Array.isArray(progress.thumbs)) { const urls = progress.thumbs.map(String).map(toUrl).filter((u): u is string => !!u).slice(0, 24); if (urls.length) patch.thumbs = urls; }

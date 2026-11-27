@@ -229,7 +229,7 @@ export function GeneralStage({ project, posterFallback, picked, onPickVersion, r
 
   return <main className="ge-stage" data-aspect={project.settings.aspect} aria-label="预览">
     <div className="ge-group">
-      {active && <div className="ge-lock" role="status"><Lock size={13} aria-hidden="true" />Codex 正在做片，手动编辑先锁住<span>· 停止后可以接着改</span></div>}
+      {active && <div className="ge-lock" role="status"><Lock size={13} aria-hidden="true" />智能体正在做片，手动编辑先锁住<span>· 停止后可以接着改</span></div>}
       <div ref={frame} className="ge-frame" data-sketch={mode === 'sketch' || undefined} data-armed={(armed && mode === 'player') || undefined}
         onPointerDown={event => {
           if (mode !== 'player' || event.button !== 0 || !selectKey(event)) return

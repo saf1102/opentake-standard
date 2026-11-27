@@ -4,13 +4,18 @@ import {useEffect,useState} from 'react';
 import {connectionRequest,type ConnectionView} from '../connections';
 import {connectionMethodLabel,LIGHT_AGENT_MODULES,connectionReadyForLight,connectionReadyForFilm,type AgentConnectionId} from '../../../shared/agent-connections';
 import type {AgentModule} from '../agent-settings';
+/** 选不到时说清楚原因：录屏编辑目前只能用 Codex 或内置智能体，别让人对着空框猜。 */
+export function emptyChoice(module:AgentModule|undefined,count:number){
+ if(count)return '所选智能体未接通';
+ return module==='screenEditing'?'需先接通 Codex 或内置智能体':'还没有可用的智能体，请先接通';
+}
 /** 仅列已接通且当前工作能实际使用的智能体。 */
 export function AgentPicker({work,value='codex',module,onChange}:{work:string;value?:AgentConnectionId;module?:AgentModule;onChange?:(id:AgentConnectionId)=>void}){
  const [connections,setConnections]=useState<ConnectionView[]>([]);
  useEffect(()=>{if(!UNIFIED_AGENTS)return;let active=true;const load=()=>void connectionRequest<{connections:ConnectionView[]}>().then(result=>{if(active)setConnections(result.connections)}).catch(()=>{if(active)setConnections([])});load();window.addEventListener('opentake-connections-changed',load);return()=>{active=false;window.removeEventListener('opentake-connections-changed',load)}},[]);
  const choices=connections.filter(c=>module==='generalEditing'?connectionReadyForFilm(c):!!module&&(LIGHT_AGENT_MODULES as readonly string[]).includes(module)?connectionReadyForLight(c):c.id==='builtin'&&builtinSupportsModule(module)?connectionReadyForFilm(c):c.kind==='agent'&&c.id==='codex'&&c.connected&&c.enabled&&c.cliInstalled);
  if(!UNIFIED_AGENTS)return <LegacyAgentPicker work={work}/>;
- return <select className="agent-picker" aria-label={`${work}使用的 Agent`} value={value} onChange={e=>onChange?.(e.target.value as AgentConnectionId)}>{!choices.some(c=>c.id===value)&&<option value={value} disabled>所选智能体未接通</option>}{choices.map(c=><option key={c.id} value={c.id}>{c.name} · {connectionMethodLabel(c)}{c.id!=='builtin'&&!c.cliInstalled?' · 仅轻活':''}</option>)}</select>;
+ return <select className="agent-picker" aria-label={`${work}使用的 Agent`} value={value} onChange={e=>onChange?.(e.target.value as AgentConnectionId)}>{!choices.some(c=>c.id===value)&&<option value={value} disabled>{emptyChoice(module,choices.length)}</option>}{choices.map(c=><option key={c.id} value={c.id}>{c.name} · {connectionMethodLabel(c)}{c.id!=='builtin'&&!c.cliInstalled?' · 仅轻活':''}</option>)}</select>;
 }
 
 import {ChevronDown} from 'lucide-react';

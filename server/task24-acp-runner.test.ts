@@ -22,7 +22,7 @@ test('任务24：实际runner走ACP预检、共享工具、模型记录、失败
  let active:string|undefined;
  try{
   const id=fresh();active=id;startFirst(id);await wait(id,()=>findGeneral(id).project.run?.state==='failed');
-  const {project,dir}=findGeneral(id);assert.match(project.run!.error||'',/当前订阅不包含/);assert.equal(project.run!.agent,'kimi');assert.equal(project.run!.transport,'acp');assert.equal(project.run!.model,'real-default');assert.equal(project.run!.modelSelection,'default');
+  const {project,dir}=findGeneral(id);assert.match(project.run!.error||'',/订阅套餐不包含/);assert.equal(project.run!.agent,'kimi');assert.equal(project.run!.transport,'acp');assert.equal(project.run!.model,'real-default');assert.equal(project.run!.modelSelection,'default');
   assert.equal(fs.existsSync(path.join(dir,'work','.opentake','bin',process.platform==='win32'?'film.cmd':'film')),true);
   const prompt=fs.readFileSync(path.join(dir,'work','prompt.txt'),'utf8');assert.match(prompt,/同题15秒模拟/);assert.match(prompt,/\.opentake[\\/]guide-/);
   const calls=fs.readFileSync(path.join(dir,'work','calls.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));assert.equal(calls.find(c=>c.method==='session/new').params.cwd,path.join(dir,'work'));assert.equal(calls.some(c=>c.method==='session/set_model'),false);

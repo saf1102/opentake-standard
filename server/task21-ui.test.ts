@@ -96,7 +96,7 @@ test('S03：离开工程后完成、失败、联网提醒持续工作，短暂�
       state.run = 'running'; await h.act(() => window.dispatchEvent(new h.dom.window.Event('general-runs-changed')));
       state.run = next; await h.act(() => window.dispatchEvent(new h.dom.window.Event('general-runs-changed')));
     }
-    assert.equal(state.notices.length, 3); assert.match(state.notices[0], /做好了/); assert.match(state.notices[1], /没做完/); assert.equal(state.notices[2], 'Codex 想联网');
+    assert.equal(state.notices.length, 3); assert.match(state.notices[0], /做好了/); assert.match(state.notices[1], /没做完/); assert.equal(state.notices[2], '智能体想联网');
   } finally {await h.close();}
 });
 

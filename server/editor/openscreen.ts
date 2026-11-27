@@ -1,4 +1,4 @@
-import { windowsExecutableCandidates, skipExecutableVersionProbe, windowsVersionSupported } from "./openscreen-platform.ts";
+import { windowsExecutableCandidates, skipExecutableVersionProbe, windowsVersionSupported, bundledWindowsVersion } from "./openscreen-platform.ts";
 export * from "./openscreen-capture.ts";
 import {cleanupPathSync} from '../file-ops.ts';
 import {StringDecoder} from 'node:string_decoder';
@@ -92,7 +92,7 @@ function versionOf(executable: string) {
     }
   }
 
-  if (skipExecutableVersionProbe()) return undefined;
+  if (skipExecutableVersionProbe()) return bundledWindowsVersion(executable);
   for (const args of [["--version"], ["version"], ["--help"]]) {
     const result = spawnSync(executable, args, { encoding: "utf8", timeout: 5_000 });
     const match = `${result.stdout || ""}\n${result.stderr || ""}`.match(/(?:OpenScreen|Openscreen)?\s*v?(\d+\.\d+(?:\.\d+)?)/i);

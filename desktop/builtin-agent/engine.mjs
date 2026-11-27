@@ -73,13 +73,25 @@ function projectTools(root,cwd) {
   const shell = process.platform === 'win32' ? createPowerShellToolDefinition(cwd,shellOptions) : createBashToolDefinition(cwd,shellOptions);
   return [read,write,shell];
 }
+// 单次输出上限按服务商官方文档设置；未核实的服务商保持 8192，被截断时由下面的续写处理。
+// DeepSeek：https://api-docs.deepseek.com/api/create-chat-completion（max_tokens 上限 384K）
+// 千问 qwen3-vl：https://help.aliyun.com/zh/model-studio/vision-model（最大输出约 32K）
+export function outputLimit(config) {
+  let host = '';
+  try { host = new URL(config.baseUrl).hostname.toLowerCase(); } catch {}
+  if (host === 'api.deepseek.com') return 32768;
+  if (/(^|\.)dashscope(?:-intl)?\.aliyuncs\.com$/.test(host) && /^qwen3-vl/i.test(config.id || '')) return 32768;
+  return 8192;
+}
+export const LENGTH_FAILURE = '模型输出达到长度上限，未完成本次任务';
+export const LENGTH_CONTINUE = '你上一条输出超过了单次输出上限，被截断并已撤回。请把要写的内容拆成几个较小的文件，或分几次写入，然后接着完成任务。';
 export async function createEditorAgent(config,cwd,root,permission,update) {
   checkedPath(root,cwd);
   const spec = Object.hasOwn(protocols,config.protocol) && protocols[config.protocol];
   if (!spec || !config.key || !config.id || !config.baseUrl) throw Error('请先配置接口、密钥和模型');
   const [api,stream] = spec;
   const model = {api,id:config.id,name:config.id,provider:'opentake',baseUrl:config.baseUrl,
-    input:['text','image'],reasoning:false,contextWindow:128000,maxTokens:8192,
+    input:['text','image'],reasoning:false,contextWindow:128000,maxTokens:outputLimit(config),
     cost:{input:0,output:0,cacheRead:0,cacheWrite:0}};
   const agent = new Agent({
     initialState:{systemPrompt:projectPrompt(root) + (cwd === root ? '' : '\n\n' + projectInstructions(cwd)),model,tools:projectTools(root,cwd),thinkingLevel:'off'},
@@ -100,7 +112,9 @@ export async function createEditorAgent(config,cwd,root,permission,update) {
     if (event.type === 'message_end' && event.message.role === 'assistant') {
       const msg = event.message;
       if (msg.stopReason === 'error') failure = msg.errorMessage || '模型请求失败';
-      if (msg.stopReason === 'length') failure = '模型输出达到长度上限，未完成本次任务';
+      // SDK 遇到截断的工具调用会自己要求模型重发；之后正常结束的回复说明已经恢复，不能再按截断判失败。
+      if (msg.stopReason === 'length') failure = LENGTH_FAILURE;
+      else if (failure === LENGTH_FAILURE && msg.stopReason !== 'error' && msg.stopReason !== 'aborted') failure = undefined;
       if (msg.stopReason === 'aborted') cancelled = true;
       for(const block of msg.content) if(block.type === 'text' && block.text)
         update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:block.text}});
@@ -116,6 +130,14 @@ export async function createEditorAgent(config,cwd,root,permission,update) {
     async prompt(text,images) {
       failure = undefined; cancelled = false; usage = {inputTokens:0,outputTokens:0,cachedReadTokens:0};
       await agent.prompt(text,images);
+      // 截断的那条回复可能带着残缺的工具调用，撤回后提示模型拆小再写；最多续写两次。
+      for (let retry = 0; failure === LENGTH_FAILURE && !cancelled && retry < 2; retry++) {
+        const messages = agent.state.messages;
+        if (messages.at(-1)?.role === 'assistant') agent.state.messages = messages.slice(0,-1);
+        failure = undefined;
+        await agent.prompt(LENGTH_CONTINUE);
+      }
+      if (failure === LENGTH_FAILURE) failure = '模型一次要写的内容太长，被服务商截断，续写两次仍未完成。可以换一个单次输出更长的模型再试。';
       if (failure || agent.state.errorMessage) throw Error(failure || agent.state.errorMessage);
       return {stopReason:cancelled?'cancelled':'end_turn',usage};
     },

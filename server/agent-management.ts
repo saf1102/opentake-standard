@@ -149,7 +149,9 @@ export function createAgentManagement(){
     if(action==='install-and-login'&&getConnectionConfig(id).mode!=='cli')await saveAgentConnection(id,{mode:'cli'});
     command=official;
     if(host==='win32'){
-     if(official.startsWith('irm '))nativeCommand={executable:systemPowerShell(),args:['-NoLogo','-NoProfile','-Command',official]};
+     // 新建的 Windows 用户默认不允许运行 .ps1；官方安装脚本会运行自己生成的 .ps1 自检（MiniMax 因此装不上）。
+     // -ExecutionPolicy Bypass 只作用于这个安装窗口的进程，不改系统设置。
+     if(official.startsWith('irm '))nativeCommand={executable:systemPowerShell(),args:['-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-Command',official]};
      if(official==='winget install GitHub.Copilot')nativeCommand={executable:'winget.exe',args:['install','GitHub.Copilot']};
     }
    }else if(action==='upgrade'){

@@ -183,3 +183,44 @@ for(const [protocol,events,endpoint] of [
   const text=f.updates.filter(update=>update.sessionUpdate==='agent_message_chunk').map(update=>update.content.text).join('');
   assert.equal(text,answer);
 });
+
+function truncated(res,delta){
+  res.writeHead(200,{'content-type':'text/event-stream'});
+  const chunk={id:'local',model:'local-vision',object:'chat.completion.chunk',choices:[{index:0,delta:{role:'assistant',...delta},finish_reason:null}]};
+  const done={...chunk,choices:[{index:0,delta:{},finish_reason:'length'}],usage:{prompt_tokens:4,completion_tokens:2,total_tokens:6}};
+  res.end('data: '+JSON.stringify(chunk)+'\n\ndata: '+JSON.stringify(done)+'\n\ndata: [DONE]\n\n');
+}
+
+test('写文件被截断后模型重发成功，本轮按完成计算',async t=>{
+  const f=await fixture(t,(res,count)=>count===1
+    ?truncated(res,{tool_calls:[{index:0,id:'call-cut',type:'function',function:{name:'write',arguments:'{"path":"page.html","content":"<html>'}}]})
+    :chatReply(res,count===2?{name:'write',args:{path:'page.html',content:'<p>短</p>'}}:null));
+  const result=await f.session();
+  assert.equal(result.stopReason,'end_turn');
+  assert.equal(await fs.readFile(path.join(f.cwd,'page.html'),'utf8'),'<p>短</p>');
+  assert.equal(f.requests.length,3);
+});
+
+test('最后一条文字回复被截断时撤回并提示拆小续写',async t=>{
+  const f=await fixture(t,(res,count)=>count===1?truncated(res,{content:'CUT-TEXT 很长的说明'}):chatReply(res,null));
+  const result=await f.session();
+  assert.equal(result.stopReason,'end_turn');
+  const retry=JSON.stringify(f.requests[1].body.messages);
+  assert.match(retry,/被截断并已撤回/);
+  assert.doesNotMatch(retry,/CUT-TEXT/);
+});
+
+test('一直被截断时给出能看懂的失败原因',async t=>{
+  const f=await fixture(t,res=>truncated(res,{content:'CUT-TEXT'}));
+  await assert.rejects(f.session(),/被服务商截断，续写两次仍未完成/);
+  assert.equal(f.requests.length,3);
+});
+
+test('输出上限按服务商设置，未核实的保持 8192',async()=>{
+  const {outputLimit}=await import('./engine.mjs');
+  assert.equal(outputLimit({baseUrl:'https://api.deepseek.com',id:'deepseek-flash'}),32768);
+  assert.equal(outputLimit({baseUrl:'https://dashscope.aliyuncs.com/compatible-mode/v1',id:'qwen3-vl-plus'}),32768);
+  assert.equal(outputLimit({baseUrl:'https://dashscope.aliyuncs.com/compatible-mode/v1',id:'qwen-max'}),8192);
+  assert.equal(outputLimit({baseUrl:'https://api.deepseek.com.evil.example',id:'x'}),8192);
+  assert.equal(outputLimit({baseUrl:'not a url',id:'x'}),8192);
+});

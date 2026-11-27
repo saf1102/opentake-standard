@@ -72,7 +72,7 @@ export function validateConnectionBaseUrl(value:string){
  if(url.protocol!=='https:'&&!(url.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(url.hostname)))throw Error('接口地址必须使用 HTTPS（本机测试地址除外）');
  return url.origin+url.pathname.replace(/\/{2,}/g,'/').replace(/\/+$/,'');
 }
-export type ConnectionDependencies={validatedPath?:string;discoveryEnv?:NodeJS.ProcessEnv;store?:ConnectionSecretStore;fetcher?:typeof fetch;detect?:(id:ConnectionId,config:ConnectionConfig)=>Promise<string|undefined>;cliTest?:(id:ConnectionId,executable:string)=>Promise<{connected:boolean;models?:ConnectionModel[]}>;timeoutMs?:number;version?:(file:string)=>Promise<string|undefined>};
+export type ConnectionDependencies={validatedPath?:string;discoveryEnv?:NodeJS.ProcessEnv;store?:ConnectionSecretStore;fetcher?:typeof fetch;detect?:(id:ConnectionId,config:ConnectionConfig)=>Promise<string|undefined>;cliTest?:(id:ConnectionId,executable:string,verify?:boolean)=>Promise<{connected:boolean;models?:ConnectionModel[]}>;timeoutMs?:number;version?:(file:string)=>Promise<string|undefined>};
 export async function detectConnectionExecutable(id:ConnectionId,config:ConnectionConfig=getConnectionConfig(id),env?:NodeJS.ProcessEnv,refresh=false){
  const otherAgentPath=(candidate:string|undefined)=>candidate&&!isClaudeExecutable(candidate,env??process.env,getConnectionConfig('claude').cliPath)?candidate:undefined;
  if(id==='dreamina'&&!config.cliPath)return otherAgentPath(serviceCliPath(id));
@@ -125,11 +125,17 @@ export function recordDeepseekRouteVerified(expectedRevision:number,route:'offic
  authCache.forget(authKey('deepseek'));emitConnectionStatus('deepseek',expectedRevision);
 }
 async function cliAuthentication(id:ConnectionId,config:ConnectionConfig,executable:string,deps:ConnectionDependencies,force=false,afterLogin=false,verifyHarness=false):Promise<AuthProbeResult>{
- if(id!=='deepseek'&&config.authRejectedAt&&!afterLogin)return {state:'needs-login',message:'还没登录',checkedAt:config.authRejectedAt};
- const key=authKey(id)+(verifyHarness?'#verify':''),signature=authSignature(config,executable);
+ const rejected=id!=='deepseek'&&!!config.authRejectedAt;
+ // 被拒标记只挡后台的自动查询；用户点「重新检查」或刚登录完，就用一句话测试真查一次，不能永远卡在「还没登录」。
+ if(rejected&&!afterLogin&&!force)return {state:'needs-login',message:'还没登录',checkedAt:config.authRejectedAt};
+ // 一句话测试：明确要求、刚登录完、被拒后重查，或这家还没确认接通过时做。只开会话不够：
+ // 有的智能体不登录也能开会话，套餐不含也能开，要等出片才发现。
+ const verify=id==='deepseek'?verifyHarness:verifyHarness||afterLogin||rejected||config.connected!==true;
+ const key=authKey(id)+(verify?'#verify':''),signature=authSignature(config,executable);
  return authCache.check(key,signature,async()=>{
   assertAgentExecutionAllowed(id);
-  if(deps.cliTest)return (await deps.cliTest(id,executable)).connected?{state:'connected',message:'已接通'}:{state:'needs-login',message:'还没登录'};
+  // 测试替身：verify 为真时代表做了一句话测试。
+  if(deps.cliTest)return (await deps.cliTest(id,executable,verify)).connected?{state:'connected',message:'已接通',...(verify?{verified:true}:{})}:{state:'needs-login',message:'还没登录'};
   if(id!=='codex'&&id!=='claude'&&!agentAcpArgs(id))return {state:'pending',message:connectionDefinition(id).cliReason||'命令行登录检查待适配，可改用 API 密钥'};
   const controller=new AbortController();authControllers.set(key,controller);
   try{
@@ -141,7 +147,7 @@ async function cliAuthentication(id:ConnectionId,config:ConnectionConfig,executa
     return await probeAcpAuthentication(executable,agentAcpArgs(id)!,{env:childEnv,signal:controller.signal,timeoutMs:deps.timeoutMs,deepseek:{useKey:!!childEnv.DEEPSEEK_API_KEY,keyRejected:!!config.deepseekKeyRejected,verify:verifyHarness,model:verifyHarness?config.model:'default'}});
    }
    if(id==='cursor'||id==='opencode')return await probeAgentStatusCommand(executable,[...connectionDefinition(id).authStatusArgs!],{env,signal:controller.signal,timeoutMs:deps.timeoutMs});
-   if(agentAcpArgs(id))return await probeAcpAuthentication(executable,agentAcpArgs(id)!,{env,signal:controller.signal,timeoutMs:deps.timeoutMs});
+   if(agentAcpArgs(id))return await probeAcpAuthentication(executable,agentAcpArgs(id)!,{env,signal:controller.signal,timeoutMs:deps.timeoutMs,verify});
    try{
     assertAgentExecutionAllowed(id);const result=await execFileAsync(executable,id==='claude'?['auth','status','--json']:['login','status'],{env,signal:controller.signal,timeout:deps.timeoutMs??8000,maxBuffer:65536});
     if(id==='claude'){try{const value=JSON.parse(result.stdout);if(value.loggedIn===true)return {state:'connected',message:'已接通'};if(value.loggedIn===false)return {state:'needs-login',message:'还没登录'};}catch{}return {state:'unknown',message:'没查到，请重新检查'};}
@@ -229,6 +235,12 @@ async function connectionStatus(id:ConnectionId,deps:ConnectionDependencies,forc
    auth={...auth,state:'needs-login',message:(config.deepseekKeyRejected?deepseekInvalidKeyHint:'')+deepseekLoginHint};
   }
   if(config.mode==='cli')connected=auth?.state==='connected';
+  // 一句话测试通过：记下已确认接通，清掉旧的被拒标记，之后的后台查询不再重复测试。
+  if(id!=='deepseek'&&config.mode==='cli'&&executable&&auth?.verified&&auth.state==='connected'&&(config.connected!==true||config.authRejectedAt)&&getConnectionConfig(id).revision===config.revision){
+   const next={...config,revision:(config.revision||0)+1,authRejectedAt:undefined,connected:true,checkedAt:auth.checkedAt,message:'已接通'};
+   persist(id,next);authCache.remember(authKey(id),authSignature(next,executable),auth);emitConnectionStatus(id,next.revision);
+   return connectionStatus(id,deps);
+  }
  }
  if(id==='deepseek'&&config.mode==='cli'&&auth?.deepseekKeyRejected&&!config.deepseekKeyRejected){
   recordDeepseekKeyRejection(config.revision??0);
@@ -250,11 +262,21 @@ export async function listAgentConnections(includeServices=true,deps:ConnectionD
  const definitions=CONNECTION_DEFINITIONS.filter(item=>includeServices||item.kind==='agent');
  return {connections:await Promise.all(definitions.map(item=>connectionStatus(item.id,deps,refresh)))};
 }
+/** 控制台网址误填成接口地址时改成官方接口地址（只改已核实的几处）。 */
+export function correctProviderBaseUrl(value:string){
+ const text=value.trim();
+ let url:URL;try{url=new URL(text.includes('://')?text:'https://'+text)}catch{return text}
+ if(/^platform\.deepseek\.com$/i.test(url.hostname))return 'https://api.deepseek.com';
+ return text;
+}
 export function saveAgentConnection(id:ConnectionId,input:unknown,deps:ConnectionDependencies={}){
  return id==='builtin'?serializeBuiltin(()=>saveConnection(id,input,deps)):saveConnection(id,input,deps);
 }
 async function saveConnection(id:ConnectionId,input:unknown,deps:ConnectionDependencies={}){
  const patch=z.object({profileId:z.string().optional(),profileName:z.string().trim().min(1).max(80).optional(),format:z.enum(['auto','responses','chat','anthropic']).optional(),mode:z.enum(['cli','api']).optional(),enabled:z.boolean().optional(),baseUrl:z.string().optional(),model:z.string().regex(/^[\w.\/:_,-]+$/).optional(),cliPath:z.string().max(4096).optional(),apiKey:z.string().optional(),confirmSubscriptionRisk:z.boolean().optional()}).strict().parse(input);
+ // 复制密钥常带上前后空格或换行；DeepSeek 用户常把控制台地址 platform.deepseek.com 当成接口地址。
+ if(typeof patch.apiKey==='string')patch.apiKey=patch.apiKey.trim();
+ if(typeof patch.baseUrl==='string')patch.baseUrl=correctProviderBaseUrl(patch.baseUrl);
  const previous=getConnectionConfig(id),next={...previous,...patch,revision:(previous.revision||0)+1};delete (next as Record<string,unknown>).apiKey;delete (next as Record<string,unknown>).confirmSubscriptionRisk;
  if(id==='builtin'){
   if(next.profileId!==previous.profileId||next.mode!=='api'||next.cliPath)throw Error('内置智能体配置已改变，请重开设置');
@@ -371,8 +393,8 @@ export async function testUnifiedConnection(id:ConnectionId,deps:ConnectionDepen
    assertAgentExecutionAllowed(id);
    const executable=await (deps.detect??detectExecutable)(id,config);if(!executable)throw Error('本机没有命令行，请先安装');cliExecutable=executable;
    if(id==='dreamina'){await testServiceCli(id);}
-   else {cliAuth=await cliAuthentication(id,config,executable,deps,true,false,id==='deepseek');if(cliAuth.state!=='connected')throw Error(cliAuth.message);}
-   message=id==='deepseek'?cliAuth!.message:'账号连接正常；未运行生成任务';
+   else {cliAuth=await cliAuthentication(id,config,executable,deps,true,false,true);if(cliAuth.state!=='connected')throw Error(cliAuth.message);}
+   message=id==='deepseek'||cliAuth?.verified?cliAuth!.message:'账号连接正常；未运行生成任务';
   }else{
    const request=await savedProbeRequest(id,config,deps,status=>{httpStatus=status});
    message=await probeApiConnection(id,config,request,async()=>{

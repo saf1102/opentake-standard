@@ -6,7 +6,7 @@ import {promisify} from 'node:util';
 import installations from './agent-installation.ts';
 import {startWindowsAgentTerminal,windowsAgentTerminalState} from './windows-agent-terminal.ts';
 import {type ConnectionId, type ConnectionView} from '../shared/agent-connections.ts';
-import {assertAgentExecutionAllowed, getConnectionConfig, getConnectionStatus, detectConnectionExecutable, refreshAgentConnection, completeAgentLogin, agentLoginArgs, agentRegionEnvironment} from './agent-connections.ts';
+import {assertAgentExecutionAllowed, getConnectionConfig, getConnectionStatus, detectConnectionExecutable, completeAgentLogin, agentLoginArgs, agentRegionEnvironment} from './agent-connections.ts';
 
 const execFileAsync=promisify(execFile);
 type TerminalRun=(script:string)=>Promise<string>;
@@ -19,7 +19,6 @@ const quoteShell=(value:string)=>`'${value.replace(/'/g,`'\\''`)}'`;
 const quoteApple=(value:string)=>`"${value.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`;
 type Session={tty:string;windowId:number;resultDir:string;revision?:number;windowsPid?:number};
 const removeResult=(session:Session)=>fs.rmSync(session.resultDir,{recursive:true,force:true});
-const loginExitCode=(file:string)=>{try{const value=fs.readFileSync(file,'utf8').trim();return /^\d{1,3}$/.test(value)?Number(value):undefined}catch{return undefined}};
 /** 只跟踪本次打开的终端标签；从不读取终端文字或对方账号文件。 */
 export function createAgentLoginManager(){
  const sessions=new Map<ConnectionId,Session>();
@@ -47,10 +46,10 @@ export function createAgentLoginManager(){
   if(!['closed','finished'].includes(result))throw Error('没查到终端状态，请重新检查或取消等待');
   if(sessions.get(id)!==session)return {waiting:false,connection:await status(id,deps)};
   sessions.delete(id);
-  const succeeded=(deps.exitCode??loginExitCode)(path.join(session.resultDir,'exit-code'))===0;
   removeResult(session);
-  // Closing the Terminal or a failed login must not turn an anonymous ACP session back into a login.
-  return {waiting:false,connection:await (succeeded?(deps.complete??((agent,revision)=>completeAgentLogin(agent,revision)))(id,session.revision):(deps.refresh??refreshAgentConnection)(id))};
+  // 不看退出码：Kimi 在 Windows 上登录成功后退出时会崩一下（退出码非 0）。
+  // completeAgentLogin 用一句话测试确认真的能用，匿名会话、没登录、套餐不含都过不了，所以不会误判成已接通。
+  return {waiting:false,connection:await (deps.complete??((agent,revision)=>completeAgentLogin(agent,revision)))(id,session.revision)};
  }
  async function start(id:ConnectionId,deps:LoginDependencies={}){
   (deps.assertAllowed??assertAgentExecutionAllowed)(id);

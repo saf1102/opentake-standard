@@ -264,3 +264,15 @@ test('Codex 的 DeepSeek 官方预设选择支持 Responses 的模型，订阅�
  await assert.rejects(resolveAgentConnectionLaunch('codex',undefined,deps),/请选 deepseek-flash/);
  await assert.rejects(saveAgentConnection('codex',{baseUrl:'https://relay.invalid/v1'},deps),/新服务商的 API 密钥/);
 }));
+
+test('保存密钥自动去掉前后空格和换行；DeepSeek 控制台地址改成接口地址',()=>fixture(async(deps,_dir,keys)=>{
+ const {correctProviderBaseUrl}=await import('./agent-connections.ts');
+ assert.equal(correctProviderBaseUrl('https://platform.deepseek.com/api_keys'),'https://api.deepseek.com');
+ assert.equal(correctProviderBaseUrl(' platform.deepseek.com '),'https://api.deepseek.com');
+ assert.equal(correctProviderBaseUrl('https://api.deepseek.com'),'https://api.deepseek.com');
+ assert.equal(correctProviderBaseUrl('https://relay.example/v1'),'https://relay.example/v1');
+ await saveAgentConnection('kimi',{mode:'api',apiKey:`  ${KEY}\r\n`,model:'kimi-fixture'},deps);
+ assert.equal(keys.get('kimi'),KEY);
+ await saveAgentConnection('deepseek',{mode:'api',apiKey:KEY,baseUrl:'https://platform.deepseek.com/'},deps);
+ assert.equal(getConnectionConfig('deepseek').baseUrl,'https://api.deepseek.com');
+}));

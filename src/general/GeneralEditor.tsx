@@ -151,7 +151,7 @@ function FootageSource({ clip, media, layers, onPatch }: { clip: TimelineClip; m
  * moves some other way (hf-speed.ts on the server says which) only trims.
  */
 function SceneSpeed({ clip, track, speedable, onPatch, hint }: { clip: TimelineClip; track: TimelineTrack; speedable: boolean; onPatch: (change: (c: TimelineClip) => void) => void; hint?: boolean }) {
-  if (!speedable) return <p className="ge-insp-note">这段动画的写法不能变速：拖右边缘只会截取。要整段加快，让 Codex 用 CSS 动画或逐帧脚本重做这一段。</p>
+  if (!speedable) return <p className="ge-insp-note">这段动画的写法不能变速：拖右边缘只会截取。要整段加快，让智能体用 CSS 动画或逐帧脚本重做这一段。</p>
   const span = sceneSpan(clip)
   const next = track.clips.filter(c => c.id !== clip.id && c.start >= clip.start + 1e-6).sort((a, b) => a.start - b.start)[0]
   return <>
@@ -239,12 +239,12 @@ function ClipInspector({ timeline, clipId, presets, segments, media, layers, spe
       ? `音量和淡入淡出在时间线的片段上直接拖；整条${track.name}的音量在左边轨道头调。${track.kind !== 'music' ? '挪动画面时，它跟着所属的那段画面走。' : ''}`
       : `音量在时间线左边的轨道头调，按分贝调整整条${track.name}。`}</p>}
     {canSplitSounds(clip, track) && <div className="ge-insp-actions"><button type="button" className="ge-insp-btn" onClick={() => onSplitSounds(clip)}><Scissors size={14} aria-hidden />按声音切开</button></div>}
-    {track.kind === 'page' && clip.params.hf !== true && <p className="ge-insp-note">这是 Codex 做的{track.name}。里面的字和图形，在预览上单击可以移动、调大小、旋转，双击可以改字；要换整段画面，让 Codex 重做这一段。</p>}
-    {clip.params.hf === true && clip.params.line !== true && (track.kind === 'page' || track.kind === 'subtitle') && <p className="ge-insp-note">这是 Codex 做的{track.name}。里面的字在预览上双击可以直接改；要换整段画面，让 Codex 重做这一段。</p>}
+    {track.kind === 'page' && clip.params.hf !== true && <p className="ge-insp-note">这是智能体做的{track.name}。里面的字和图形，在预览上单击可以移动、调大小、旋转，双击可以改字；要换整段画面，让智能体重做这一段。</p>}
+    {clip.params.hf === true && clip.params.line !== true && (track.kind === 'page' || track.kind === 'subtitle') && <p className="ge-insp-note">这是智能体做的{track.name}。里面的字在预览上双击可以直接改；要换整段画面，让智能体重做这一段。</p>}
     {clip.params.line === true && <p className="ge-insp-note">字幕一句一条：可以挪、裁两头、删、复制；字在这里改，或在预览上双击改。样子跟着这条片子的字幕页走。</p>}
     <div className="ge-insp-actions">
-      {segment && <button type="button" className="ge-insp-btn" onClick={() => onRedoSegment(segment, segmentIndex)}><Wand2 size={14} aria-hidden />让 Codex 重做这一段</button>}
-      <button type="button" className="ge-insp-btn" onClick={() => onAsk(`改「${track.name}」里的「${clip.name}」（${range}）：`)}><MessageSquare size={14} aria-hidden />跟 Codex 说说这个片段</button>
+      {segment && <button type="button" className="ge-insp-btn" onClick={() => onRedoSegment(segment, segmentIndex)}><Wand2 size={14} aria-hidden />让智能体重做这一段</button>}
+      <button type="button" className="ge-insp-btn" onClick={() => onAsk(`改「${track.name}」里的「${clip.name}」（${range}）：`)}><MessageSquare size={14} aria-hidden />跟智能体说说这个片段</button>
     </div>
   </div>
 }
@@ -461,8 +461,8 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
   }
 
   const generalTools = <div className="ge-tl-tools">
-    {segmentAt >= 0 && <button type="button" title="把这一段交给 Codex 重做" onClick={() => redoSegment(layers.segments[segmentAt], segmentAt)}>
-      <Wand2 aria-hidden />让 Codex 重做 · {layers.segments[segmentAt].name || `第 ${segmentAt + 1} 段`}
+    {segmentAt >= 0 && <button type="button" title="把这一段交给智能体重做" onClick={() => redoSegment(layers.segments[segmentAt], segmentAt)}>
+      <Wand2 aria-hidden />让智能体重做 · {layers.segments[segmentAt].name || `第 ${segmentAt + 1} 段`}
     </button>}
     {edited && <span className="ge-tl-saved" role="status">{saving ? '正在保存…' : '改动已保存'}</span>}
     {edited && <button type="button" title="撤销（⌘Z）" onClick={undo}><RotateCcw aria-hidden />撤销</button>}
@@ -475,7 +475,7 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
         motionLibrary={<div className="ge-lib-style">
           {style?.poster && <img src={style.poster} alt="" draggable={false} />}
           <b>{styleNameOf(project.styleId, style)}</b>
-          <small>这一条片子的风格。换风格请跟 Codex 说。</small>
+          <small>这一条片子的风格。换风格请跟智能体说。</small>
         </div>}
         onUpload={upload}
         onRemove={async asset => { try { onProject(await generalApi.removeMedia(project.id, asset.id)) } catch (failure) { toast.error(`没能移除：${errorText(failure)}`) } }}
@@ -585,7 +585,7 @@ export function GeneralEditor({ project, version, style, chat, onAsk, onRedoSegm
       onUndo={undo} onRedo={redo} onSplit={noop} onInsertDirectorGap={noop} onEditDirectorSlot={noop} onOpenDirectorSlot={noop}
       onDelete={() => {
         const ids = selected.filter(id => { const hit = findClip(layers.timeline, id); return hit && !hit.track.locked && (hit.track.kind !== 'page' || hit.clip.params.hf === true) })
-        if (!ids.length) { if (selected.length) toast('锁定轨道或画面页不能删除，请先解锁或让 Codex 重做这一段'); return }
+        if (!ids.length) { if (selected.length) toast('锁定轨道或画面页不能删除，请先解锁或让智能体重做这一段'); return }
         commit(t => { for (const track of t.tracks) track.clips = track.clips.filter(c => !ids.includes(c.id)) })
         setSelected([])
       }}

@@ -260,7 +260,7 @@ export default function GeneralProject() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="preview-style-menu">
-            <DropdownMenuLabel>Codex 交的版本</DropdownMenuLabel>
+            <DropdownMenuLabel>智能体交的版本</DropdownMenuLabel>
             <DropdownMenuRadioGroup value={String(shown?.n ?? '')} onValueChange={value => pickVersion(Number(value))}>
               {[...project.versions].reverse().map(version => <DropdownMenuRadioItem key={version.n} value={String(version.n)}>{versionName(version.n)}</DropdownMenuRadioItem>)}
             </DropdownMenuRadioGroup>

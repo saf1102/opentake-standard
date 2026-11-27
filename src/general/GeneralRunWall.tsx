@@ -9,6 +9,7 @@ import type { GeneralProject } from './general-contract'
 import { elapsedLabel, latestRenderFrame, runActive, stepRows, type StepRow } from './general-logic'
 import { generalEditorApi } from './general-api'
 import './general-runwall.css'
+import { agentShortName } from './agent-name'
 
 type Picture = { image?: string; grid?: string[]; text?: string }
 
@@ -79,7 +80,8 @@ export function GeneralRunWall({ project, poster }: { project: GeneralProject; p
   const step = working >= 0 ? rows[working] : undefined
   const started = run ? Date.parse(run.startedAt) : now
   const repair = run?.repairReason ? `第 ${run.round ?? 2} 轮：修正 ${run.repairReason}` : undefined
-  const title = run?.state === 'done' ? '片子已交付' : run?.state === 'needs-network' ? 'Codex 在等你决定要不要联网' : step ? `Codex 正在${step.title.replace(/^正在/, '')}` : 'Codex 正在做片'
+  const who = agentShortName(run?.agent)
+  const title = run?.state === 'done' ? '片子已交付' : run?.state === 'needs-network' ? `${who}在等你决定要不要联网` : step ? `${who}正在${step.title.replace(/^正在/, '')}` : `${who}正在做片`
   const elapsed = (row: StepRow) => {
     const s = run?.steps.find(x => x.id === row.id)
     if (!s?.startedAt) return ''
