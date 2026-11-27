@@ -297,10 +297,15 @@ test('CodeBuddy 登录探测与工程工作进程收到同一地区与 ACP 参�
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-region-'));
  const old=process.env.LINKREADER_CONNECTION_SETTINGS_FILE;
  try{
-  const log=path.join(root,'calls.jsonl'),trace=path.join(root,'methods.log');
+  const log=path.join(root,'calls.jsonl'),trace=path.join(root,'methods.log'),lifecycle=path.join(root,'stdio.log');
   const file=fakeNodeCli(path.join(root,'codebuddy'),`const fs=require('node:fs');
+const record=event=>fs.appendFileSync(${JSON.stringify(lifecycle)},event+'\\n');
+process.on('exit',code=>record('exit '+code));
+process.on('uncaughtExceptionMonitor',error=>record(error.name));
+process.stdin.on('end',()=>record('stdin EOF'));
 fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),region:process.env.CODEBUDDY_INTERNET_ENVIRONMENT})+'\\n');
 require('node:readline').createInterface({input:process.stdin}).on('line',line=>{
+ record('line first code point '+line.codePointAt(0));
  const m=JSON.parse(line),sessionId='fixture';
  fs.appendFileSync(${JSON.stringify(trace)},m.method+'\\n');
  if(m.method==='session/prompt')console.log(JSON.stringify({jsonrpc:'2.0',method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'完成'}}}}));
@@ -312,10 +317,10 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
    process.env.LINKREADER_CONNECTION_SETTINGS_FILE=path.join(root,'settings-'+String(region));
    const discoveryEnv={PATH:process.env.PATH,...(process.platform==='win32'?{SystemRoot:process.env.SystemRoot}:{}),...(region===undefined?{}:{CODEBUDDY_INTERNET_ENVIRONMENT:region})};
    const deps={detect:async()=>file,discoveryEnv};
-   fs.writeFileSync(log,'');fs.writeFileSync(trace,'');
+   fs.writeFileSync(log,'');fs.writeFileSync(trace,'');fs.writeFileSync(lifecycle,'');
    const methods=()=>fs.readFileSync(trace,'utf8').trim().split(/\s+/).filter(Boolean);
    const status=await refreshAgentConnection('codebuddy',deps);
-   assert.equal(status.cliAuthState,'connected',`${status.cliAuthMessage}；假 CLI 已启动=${!!fs.statSync(log).size}，已收到 ${JSON.stringify(methods())}`);
+   assert.equal(status.cliAuthState,'connected',`${status.cliAuthMessage}；假 CLI 已启动=${!!fs.statSync(log).size}，已收到 ${JSON.stringify(methods())}；进程记录 ${fs.readFileSync(lifecycle,'utf8').trim()}`);
    assert.deepEqual(methods(),['initialize','session/new']);
    const launch=await resolveAgentConnectionLaunch('codebuddy',undefined,deps);
    const agent={...launch,agent:'codebuddy' as const,effort:'medium'};
