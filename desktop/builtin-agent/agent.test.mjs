@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import {realpathSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
@@ -95,7 +96,8 @@ test('锁定 SDK 的实际 ACP 子进程读取工程指令、写文件、看图�
   assert.equal(result.stopReason,'end_turn');
   assert.equal(await fs.readFile(path.join(f.root,'字幕.txt'),'utf8'),'镜头一');
   assert.deepEqual(f.permissions.map(x=>x.kind),['edit','read','execute']);
-  assert.equal(f.permissions[2].rawInput.cwd,await fs.realpath(f.cwd));
+  // Windows may spell the same folder with a short 8.3 name (RUNNER~1); compare the canonical long paths.
+  assert.equal(realpathSync.native(f.permissions[2].rawInput.cwd),realpathSync.native(f.cwd));
   assert.deepEqual(result.usage,{inputTokens:16,outputTokens:8,cachedReadTokens:0});
   const transcript=JSON.stringify(f.requests[0].body);
   assert.match(transcript,/PROJECT-INSTRUCTION/);
