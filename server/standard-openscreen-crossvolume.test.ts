@@ -32,15 +32,29 @@ async function fixture(t:any){
  const keys=['LINK_READER_PROJECTS_DIR','LINKREADER_SYSTEM_SETTINGS_FILE','OPENSCREEN_BIN','OPENSCREEN_USER_DATA_DIR','LINKREADER_BIN_DIR'];
  const old=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
  Object.assign(process.env,{LINK_READER_PROJECTS_DIR:sourceRoot,LINKREADER_SYSTEM_SETTINGS_FILE:path.join(sourceRoot,'settings.json'),OPENSCREEN_BIN:process.execPath,OPENSCREEN_USER_DATA_DIR:path.join(sourceRoot,'profile')});
- // VideoToolbox cannot create a compression session inside the macOS sandbox.
- // Keep the real FFmpeg process, filters and output path, but use its built-in
- // MPEG-4 encoder in this filesystem regression. This is NOT H.264/VT acceptance.
- const actualFfmpeg=ffmpegPath(),actualFfprobe=ffprobePath(),bin=path.join(sourceRoot,'test-bin');
- fs.mkdirSync(bin);
- fs.writeFileSync(path.join(bin,'ffmpeg'),`#!${process.execPath}
-const cp=require('node:child_process');let args=process.argv.slice(2);if(args.includes('h264_videotoolbox')){const drop=new Set(['-allow_sw','-prio_speed','-profile:v','-q:v']);const out=[];for(let i=0;i<args.length;i++){if(drop.has(args[i])){i++;continue}out.push(args[i]==='h264_videotoolbox'?'mpeg4':args[i])}args=out}const child=cp.spawn(${JSON.stringify(actualFfmpeg)},args,{stdio:'inherit'});process.on('SIGTERM',()=>child.kill('SIGTERM'));child.on('error',()=>process.exit(1));child.on('close',code=>process.exit(code??1));`,{mode:0o755});
- fs.symlinkSync(actualFfprobe,path.join(bin,'ffprobe'));
- process.env.LINKREADER_BIN_DIR=bin;
+ // Windows uses the locked pair in place, with its adjacent DLLs. Only macOS
+ // needs a wrapper to run this filesystem test without a VideoToolbox session.
+ if(process.platform==='darwin'){
+  const actualFfmpeg=ffmpegPath(),actualFfprobe=ffprobePath(),bin=path.join(sourceRoot,'test-bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin,'ffmpeg'),`#!${process.execPath}
+const {spawn}=require('node:child_process');
+let args=process.argv.slice(2);
+if(args.includes('h264_videotoolbox')){
+ const drop=new Set(['-allow_sw','-prio_speed','-profile:v','-q:v']),out=[];
+ for(let i=0;i<args.length;i++){
+  if(drop.has(args[i])){i++;continue}
+  out.push(args[i]==='h264_videotoolbox'?'mpeg4':args[i]);
+ }
+ args=out;
+}
+const child=spawn(${JSON.stringify(actualFfmpeg)},args,{stdio:'inherit'});
+process.on('SIGTERM',()=>child.kill('SIGTERM'));
+child.on('error',()=>process.exit(1));child.on('close',code=>process.exit(code??1));
+`,{mode:0o755});
+  fs.symlinkSync(actualFfprobe,path.join(bin,'ffprobe'));
+  process.env.LINKREADER_BIN_DIR=bin;
+ }
  const children:ReturnType<typeof cp.spawn>[]=[],outputs:string[]=[],stagingDevices:number[]=[];
  let mode='success';
  const originalSpawn=cp.spawn;
@@ -88,6 +102,7 @@ for(const preset of ['quick','jianying'] as const){
   const media=preset==='quick'?done.outputFile:path.join(done.outputFile,'Resources/成片.mp4');
   const previousHash=hash(media);
   const info=JSON.parse(cp.execFileSync(ffprobePath(),['-v','error','-show_streams','-of','json',media],{encoding:'utf8'}));
+  assert.equal(info.streams[0].codec_name,preset==='quick'&&process.platform==='win32'?'h264':'mpeg4');
   assert.equal(info.streams[0].width,160);assert.equal(info.streams[0].height,90);
   if(preset==='jianying'){
    assert.ok(fs.existsSync(path.join(done.outputFile,'draft_content.json')));
@@ -99,7 +114,7 @@ for(const preset of ['quick','jianying'] as const){
   assert.notEqual(first.outputDir,second.outputDir,'versioned 输出目录保持唯一');
   assert.equal(hash(media),previousHash,'再次导出保留首个成品');
   f.assertClean();
-  t.diagnostic(JSON.stringify({sourceDevice:fs.statSync(f.folder).dev,targetDevice:fs.statSync(f.destination).dev,preset,encoderFixture:preset==='quick'?'mpeg4 replaces VideoToolbox only':'real Python draft builder',mediaSha256:previousHash,probe:info.streams.map((v:any)=>({codec:v.codec_name,width:v.width,height:v.height,fps:v.avg_frame_rate}))}));
+  t.diagnostic(JSON.stringify({sourceDevice:fs.statSync(f.folder).dev,targetDevice:fs.statSync(f.destination).dev,preset,encoderFixture:preset==='jianying'?'real Python draft builder':process.platform==='win32'?'Windows Media Foundation':'mpeg4 replaces VideoToolbox only',mediaSha256:previousHash,probe:info.streams.map((v:any)=>({codec:v.codec_name,width:v.width,height:v.height,fps:v.avg_frame_rate}))}));
  });
  test(`真实跨卷 ${preset} 中途取消清理两边暂存且保留旧成品`,{skip},async t=>{
   const f=await fixture(t),old=path.join(f.destination,'原有成品.mp4');fs.writeFileSync(old,'original-complete');

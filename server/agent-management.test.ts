@@ -1,3 +1,4 @@
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -194,9 +195,9 @@ test('统一表单先验证手动路径，验证失败保留原程序和密钥',
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'task57-pin-')),old=process.env.LINKREADER_CONNECTION_SETTINGS_FILE;
  process.env.LINKREADER_CONNECTION_SETTINGS_FILE=path.join(root,'connections.json');
  try{
-  const good=path.join(root,'qwen'),bad=path.join(root,'wrong'),writes:string[]=[];
-  fs.writeFileSync(good,'#!/bin/sh\necho "qwen 1.2.3" >&2\n',{mode:0o700});
-  fs.writeFileSync(bad,'#!/bin/sh\necho "fixture private text"\n',{mode:0o700});
+  const good=fakeNodeCli(path.join(root,'qwen'),"console.error('qwen 1.2.3')");
+  const bad=fakeNodeCli(path.join(root,'wrong'),"console.log('fixture private text')");
+  const writes:string[]=[];
   const deps={detect:async()=>undefined,store:{write:async()=>{writes.push('write')},read:async()=>'',remove:async()=>{}}};
   await saveAgentConnection('qwen',{cliPath:good},deps);
   await assert.rejects(saveAgentConnection('qwen',{cliPath:bad,apiKey:'fixture-only'},deps),/未能回答 --version/);

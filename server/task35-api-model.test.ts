@@ -35,7 +35,7 @@ test('任务35：第三方缺模型在检测及启动前拒绝，工程显式模
   save(id,{baseUrl:'https://relay.example/v1'});let detects=0;
   await assert.rejects(resolveAgentConnectionLaunch(id,{}, {...deps,detect:async()=>{detects++;return '/fixture/agent'}}),new RegExp(message));assert.equal(detects,0);
   const film={agent:id,method:'api' as const,executable:'/must-not-start',model:'default',effort:'medium'};
-  const filmError=id==='claude'&&process.platform==='win32'?/Windows 的 Claude Code 出片暂未适配/:new RegExp(message);
+  const filmError=id==='claude'&&process.platform==='win32'?/Windows 上暂不能出片，请先用 Codex 等其他智能体/:new RegExp(message);
   assert.throws(()=>filmAgentArgs(film,{work:'/fixture',lastMessage:'/fixture/out',model:'default',effort:'medium',network:false}),filmError);
   assert.throws(()=>startFilmAgent(film,[],{cwd:'/fixture',env:{},prompt:'',onEvent:()=>{}}),filmError);
   const explicit=await resolveAgentConnectionLaunch(id,{},deps,'project-model');assert.equal(explicit.model,'project-model');

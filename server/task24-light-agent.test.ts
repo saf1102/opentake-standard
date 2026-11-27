@@ -14,7 +14,7 @@ import {startFilmAgent} from './general/agent-adapter.ts';
 test('任务24：选择规则只接受已接通且有对应接法的智能体，API轻活与CLI出片边界独立',()=>{
  const view=(id:ConnectionId,patch:Partial<ConnectionView>={}):ConnectionView=>({...defaultConnection(id),...connectionDefinition(id),cliInstalled:true,connected:true,enabled:true,state:'connected',relay:false,...patch});
  for(const id of ['codex','claude','kimi','minimax','copilot','cursor','opencode','qwen','codebuddy'] as const){
-  assert.equal(connectionReadyForFilm(view(id)),true,id);assert.equal(connectionReadyForLight(view(id)),true,id);
+  assert.equal(connectionReadyForFilm(view(id)),id!=='claude'||process.platform!=='win32',id);assert.equal(connectionReadyForLight(view(id)),true,id);
   assert.equal(connectionReadyForFilm(view(id,{connected:false})),false);assert.equal(connectionReadyForLight(view(id,{connected:false})),false);
   assert.equal(connectionReadyForFilm(view(id,{enabled:false})),false);assert.equal(connectionReadyForLight(view(id,{enabled:false})),false);
  }

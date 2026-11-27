@@ -7,7 +7,7 @@ for (const platform of ['MacIntel','Win32']) test(`任务17：${platform} 工程
  Object.defineProperty(dom.window.navigator,'platform',{value:platform,configurable:true});
  const oldFetch=globalThis.fetch;let app:any,claudeEnabled=true,connectionRequests=0;const picked:unknown[]=[];
  try {
-  const outfile=path.join(temp,'harness.mjs');await build({stdin:{contents:`import React,{act} from 'react';import {createRoot} from 'react-dom/client';import {AgentPicker} from './src/general/AgentPicker';import {defaultAgentSettings} from './src/studio/agent-settings';export {act,createRoot,defaultAgentSettings};export const picker=(onChange)=><AgentPicker onChange={onChange}/>;`,resolveDir:root,loader:'tsx'},outfile,jsx:'automatic',bundle:true,platform:'node',format:'esm',packages:'external',logLevel:'silent'});
+  const outfile=path.join(temp,'harness.mjs');await build({stdin:{contents:`import React,{act} from 'react';import {createRoot} from 'react-dom/client';import {AgentPicker} from './src/general/AgentPicker';import {defaultAgentSettings} from './src/studio/agent-settings';export {act,createRoot,defaultAgentSettings};export const picker=(onChange)=><AgentPicker onChange={onChange}/>;`,resolveDir:root,loader:'tsx'},outfile,jsx:'automatic',define:{'globalThis.process':'undefined'},bundle:true,platform:'node',format:'esm',packages:'external',logLevel:'silent'});
   const h=await import(pathToFileURL(outfile).href);const settings=h.defaultAgentSettings();
   globalThis.fetch=(async(input:any)=>{const url=String(input);let result:unknown;
    if(url.endsWith('/agent-settings'))result={settings,catalog:{models:[{id:'m',name:'模型M',efforts:['medium'],defaultEffort:'medium',isDefault:true}]},runs:[]};
@@ -20,11 +20,16 @@ for (const platform of ['MacIntel','Win32']) test(`任务17：${platform} 工程
    return Response.json({ok:true,result});}) as typeof fetch;
   app=h.createRoot(document.getElementById('root'));await h.act(async()=>{app.render(h.picker((next:unknown)=>picked.push(next)));await new Promise(r=>setTimeout(r,5))});
   await h.act(async()=>{(document.querySelector('button') as HTMLButtonElement).click();await new Promise(r=>setTimeout(r,5))});
-  assert.match(document.body.textContent||'',/Claude Code/);assert.doesNotMatch(document.body.textContent||'',/DeepSeek/);
+  assert.doesNotMatch(document.body.textContent||'',/DeepSeek/);
   const kimi=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Kimi'));assert.equal(kimi,undefined,'任务24只列可出片接法；这个Kimi仅API且未安装');
-  const claude=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Claude Code'));assert.ok(claude);await h.act(async()=>claude.click());assert.deepEqual(picked.at(-1),{agent:'claude',model:'default',effort:'medium'});
+  const option=(name:string)=>[...document.querySelectorAll('button')].find(b=>b.querySelector('b')?.textContent===name);
+  const windows=platform==='Win32';
+  assert.equal(!!option('Claude Code'),!windows);
+  const choice=option(windows?'Codex':'Claude Code');assert.ok(choice);assert.equal(choice.disabled,false);
+  await h.act(async()=>choice.click());
+  assert.deepEqual(picked.at(-1),{agent:windows?'codex':'claude',model:'default',effort:'medium'});
   claudeEnabled=false;await h.act(async()=>{window.dispatchEvent(new dom.window.Event('opentake-connections-changed'));await new Promise(r=>setTimeout(r,5))});assert.doesNotMatch(document.body.textContent||'',/Claude Code/);
-  assert.ok(connectionRequests>0);
+  assert.ok(connectionRequests>=2);
   await h.act(async()=>app.unmount());app=null;
  }finally{if(app)app.unmount();globalThis.fetch=oldFetch;dom.window.close();for(const [key,value] of saved){if(value)Object.defineProperty(globalThis,key,value);else delete (globalThis as any)[key]}fs.rmSync(temp,{recursive:true,force:true});}
 });

@@ -43,7 +43,12 @@ test('任务17：部署和录屏页同用结构化结果，Windows不添加新�
 });
 test('任务17：两版部署智能体行按统一接入状态判断，Claude API就绪可出片，关闭和仅API轻活不算就绪',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'task17-deploy-agents-'));const outfile=path.join(dir,'check.mjs');
- try{await build({entryPoints:[path.join(root,'server/onboarding-agents.ts')],outfile,bundle:true,platform:'node',format:'esm',packages:'external',logLevel:'silent',plugins:[{name:'fixture',setup(b){b.onResolve({filter:/agent-connections\.ts$/},a=>a.path.startsWith('./')?{path:a.path,namespace:'fixture'}:undefined);b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`export const listAgentConnections=async()=>{throw Error('本测试不得访问真实接入')};`,loader:'js'}))}}]});const c=await import(pathToFileURL(outfile).href);const ready=connection({id:'claude',name:'Claude Code',mode:'api'});assert.equal(c.agentCheckResult([ready]).state,'ok');assert.match(c.agentCheckResult([ready]).text,/Claude Code 已接通/);assert.equal(c.agentCheckResult([{...ready,enabled:false}]).state,'act');assert.equal(c.agentCheckResult([{...ready,cliInstalled:false}]).state,'act');assert.match(c.agentCheckResult([{...ready,cliInstalled:false}]).agents[0].status,/仅限轻活/);}finally{fs.rmSync(dir,{recursive:true,force:true})}
+ try{await build({entryPoints:[path.join(root,'server/onboarding-agents.ts')],outfile,bundle:true,platform:'node',format:'esm',packages:'external',logLevel:'silent',plugins:[{name:'fixture',setup(b){b.onResolve({filter:/agent-connections\.ts$/},a=>a.path.startsWith('./')?{path:a.path,namespace:'fixture'}:undefined);b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`export const listAgentConnections=async()=>{throw Error('本测试不得访问真实接入')};`,loader:'js'}))}}]});const c=await import(pathToFileURL(outfile).href);const ready=connection({id:'claude',name:'Claude Code',mode:'api'});const row=c.agentCheckResult([ready]);
+  if(process.platform==='win32'){
+   assert.equal(row.state,'act');assert.equal(row.action.target,'agents');assert.match(row.text,/接通 Codex/);
+   assert.equal(c.agentCheckResult([connection({id:'codex',name:'Codex'})]).state,'ok');
+  }else{assert.equal(row.state,'ok');assert.match(row.text,/Claude Code 已接通/)}
+  assert.equal(c.agentCheckResult([{...ready,enabled:false}]).state,'act');assert.equal(c.agentCheckResult([{...ready,cliInstalled:false}]).state,'act');assert.match(c.agentCheckResult([{...ready,cliInstalled:false}]).agents[0].status,/仅限轻活/);}finally{fs.rmSync(dir,{recursive:true,force:true})}
 });
 
 test('Windows首次智能体选择可开始、跳过和重开；仍不显示macOS录屏权限引导',async()=>{

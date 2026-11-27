@@ -58,13 +58,31 @@ test('补查自定义和默认包管理器、商店别名和命令优先级',()=
  assert.equal(installation.agentFileStatus(alias,'win32',{lstatSync(){return {isSymbolicLink:()=>true}},statSync(){throw Error('alias stat should not run')}}),'executable');
 });
 
-test('PE32 和 PE32+ 的窗口程序在探测前排除，控制台程序保留',t=>{
+test('Windows 普通文件即使可读也不能作为智能体程序',()=>{
+ const io={statSync:()=>({isFile:()=>true}),accessSync(){}};
+ for(const name of ['claude','claude.txt','claude.cjs','claude.mjs'])
+  assert.equal(installation.agentFileStatus('C:\\fixture\\'+name,'win32',io),'invalid',name);
+ for(const name of ['claude.CMD','claude.bat','claude.ps1'])
+  assert.equal(installation.agentFileStatus('C:\\fixture\\'+name,'win32',io),'executable',name);
+});
+
+function peHeader(format=0x20b,subsystem=3,flags=2){
+ const bytes=Buffer.alloc(256);
+ bytes.writeUInt16LE(0x5a4d);bytes.writeUInt32LE(128,60);bytes.writeUInt32LE(0x4550,128);
+ bytes.writeUInt16LE(100,148);bytes.writeUInt16LE(flags,150);bytes.writeUInt16LE(format,152);bytes.writeUInt16LE(subsystem,220);
+ return bytes;
+}
+
+test('PE32 和 PE32+ 只接受控制台程序，拒绝窗口程序、DLL 和改名的文本',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'task57-pe-'));t.after(()=>fs.rmSync(dir,{force:true,recursive:true}));
+ const file=path.join(dir,'claude.exe');
  for(const format of [0x10b,0x20b])for(const subsystem of [2,3]){
-  const file=path.join(dir,format+'-'+subsystem+'.exe'),bytes=Buffer.alloc(256);
-  bytes.writeUInt16LE(0x5a4d);bytes.writeUInt32LE(128,60);bytes.writeUInt32LE(0x4550,128);
-  bytes.writeUInt16LE(100,148);bytes.writeUInt16LE(format,152);bytes.writeUInt16LE(subsystem,220);fs.writeFileSync(file,bytes,{mode:0o755});
+  fs.writeFileSync(file,peHeader(format,subsystem),{mode:0o755});
   assert.equal(installation.agentFileStatus(file,'win32'),subsystem===2?'invalid':'executable');
+ }
+ for(const payload of ['not an executable',peHeader(0x20b,3,0x2002)]){
+  fs.writeFileSync(file,payload);
+  assert.equal(installation.detectAgent('claude',{configured:file,platform:'win32',env:{PATH:''}}).state,'invalid');
  }
 });
 
@@ -95,7 +113,7 @@ test('Codex UTF-8 启动保留中文、引号和控制符的原始参数；拒�
  }
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'task57-denied-'));t.after(()=>fs.rmSync(dir,{force:true,recursive:true}));
  const root=path.join(dir,'WindowsApps','OpenAI.Codex_2.0_x64__fixture');
- const file=path.join(root,'app','resources','codex.exe');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'fixture',{mode:0o755});
+ const file=path.join(root,'app','resources','codex.exe');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,peHeader(),{mode:0o755});
  const options={home:dir,env:{PATH:path.join(dir,'empty')},applicationDirs:[],configured:file,versionSpawn:()=>({error:{code:'EACCES'}})};
  assert.equal(installation.detectAgent('codex',options).notice,storeAccessHint);assert.equal(installation.storeCodexAccessNotice(file),storeAccessHint);
  assert.throws(()=>installation.resolveAgent('codex',file,options),/npm install -g @openai\/codex/);
@@ -174,7 +192,7 @@ test('转发到内置程序的批处理、PowerShell 和 Mac 命令别名都不�
 
 test('用户给 Codex 改名后版本检查和正式启动也经过 UTF-8 脚本',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'task57-manual-utf8-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
- const file=path.join(dir,'自定.exe');fs.writeFileSync(file,'fixture',{mode:0o755});
+ const file=path.join(dir,'自定.exe');fs.writeFileSync(file,peHeader(),{mode:0o755});
  const options={platform:'win32',home:dir,env:{PATH:''},configured:file,versionSpawn(_file,_args,opts){
   assert.deepEqual(JSON.parse(opts.env.OT_UTF8_REQUEST).args,['--version']);return {status:0,stdout:'codex-cli 1.0.0'};
  }};

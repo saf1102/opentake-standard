@@ -279,20 +279,19 @@ test('CodeBuddy 登录探测与工程工作进程收到同一地区与 ACP 参�
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-region-'));
  const old=process.env.LINKREADER_CONNECTION_SETTINGS_FILE;
  try{
-  const file=path.join(root,'fixture.cjs'),log=path.join(root,'calls.jsonl');
-  fs.writeFileSync(file,`#!${process.execPath}
-const fs=require('node:fs');
+  const log=path.join(root,'calls.jsonl');
+  const file=fakeNodeCli(path.join(root,'codebuddy'),`const fs=require('node:fs');
 fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),region:process.env.CODEBUDDY_INTERNET_ENVIRONMENT})+'\\n');
 require('node:readline').createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line),sessionId='fixture';
  if(m.method==='session/prompt')console.log(JSON.stringify({jsonrpc:'2.0',method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'完成'}}}}));
  const result=m.method==='initialize'?{protocolVersion:1}:m.method==='session/new'?{sessionId}:{stopReason:'end_turn'};
  console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result}));
-});`,{mode:0o755});
+});`);
   const args=['--acp','--permission-mode','bypassPermissions'];
   for(const region of [undefined,'ioa','']){
    process.env.LINKREADER_CONNECTION_SETTINGS_FILE=path.join(root,'settings-'+String(region));
-   const discoveryEnv={PATH:process.env.PATH,...(region===undefined?{}:{CODEBUDDY_INTERNET_ENVIRONMENT:region})};
+   const discoveryEnv={PATH:process.env.PATH,...(process.platform==='win32'?{SystemRoot:process.env.SystemRoot}:{}),...(region===undefined?{}:{CODEBUDDY_INTERNET_ENVIRONMENT:region})};
    const deps={detect:async()=>file,discoveryEnv};
    fs.writeFileSync(log,'');
    const status=await refreshAgentConnection('codebuddy',deps);

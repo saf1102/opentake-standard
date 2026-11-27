@@ -213,15 +213,16 @@ function deepseekWindowsBins(env,installedRoots){
 }
 // Only inspect the DOS/PE headers, including for large executables.
 // https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#optional-header-windows-specific-fields-image-only
-function isWindowProgram(file){
- let fd;
+function isConsoleProgram(file,io){
+ const fd=io.openSync(file,'r');
  try{
-  fd=fs.openSync(file,'r');
   const dos=Buffer.alloc(64),header=Buffer.alloc(94);
-  if(fs.readSync(fd,dos,0,dos.length,0)!==dos.length||dos.readUInt16LE(0)!==0x5a4d)return false;
-  if(fs.readSync(fd,header,0,header.length,dos.readUInt32LE(60))!==header.length)return false;
-  return header.readUInt32LE(0)===0x4550&&header.readUInt16LE(20)>=70&&[0x10b,0x20b].includes(header.readUInt16LE(24))&&header.readUInt16LE(92)===2;
- }catch{return false}finally{if(fd!==undefined)fs.closeSync(fd)}
+  if(io.readSync(fd,dos,0,dos.length,0)!==dos.length||dos.readUInt16LE(0)!==0x5a4d)return false;
+  if(io.readSync(fd,header,0,header.length,dos.readUInt32LE(60))!==header.length)return false;
+  const flags=header.readUInt16LE(22);
+  return header.readUInt32LE(0)===0x4550 && (flags&0x2002)===2 && header.readUInt16LE(20)>=70
+   && [0x10b,0x20b].includes(header.readUInt16LE(24)) && header.readUInt16LE(92)===3;
+ }finally{io.closeSync(fd)}
 }
 function agentFileStatus(file,osName=process.platform,io=fs){
  const win=osName==='win32';
@@ -233,12 +234,12 @@ function agentFileStatus(file,osName=process.platform,io=fs){
    if(alias.isSymbolicLink()||(alias.isFile()&&alias.size===0))return isWorkBuddyProgram(file)?'invalid':'executable';
   }
   const stat=io.statSync(file);
-  if(!stat.isFile()||(win&&/\.mjs$/i.test(file))||isWorkBuddyProgram(file))return 'invalid';
+  if(!stat.isFile()||(win&&!/\.(?:exe|cmd|bat|ps1)$/i.test(file))||isWorkBuddyProgram(file))return 'invalid';
   if(win&&/\.cmd$/i.test(file)){
    const shim=windowsShim(file,process.env);
-   if(shim?.editor||shim?.incomplete||(shim?.file&&!shim.harness&&isWindowProgram(shim.file)))return 'invalid';
+   if(shim?.editor||shim?.incomplete||(shim?.file&&!shim.harness&&!isConsoleProgram(shim.file,io)))return 'invalid';
   }
-  if(win&&/\.exe$/i.test(file)&&isWindowProgram(file))return 'invalid';
+  if(win&&/\.exe$/i.test(file)&&!isConsoleProgram(file,io))return 'invalid';
   io.accessSync(file,fs.constants.X_OK);
   return 'executable';
  }catch(error){return ['EACCES','EPERM'].includes(error.code)?'access-denied':error.code==='ENOENT'||error.code==='ENOTDIR'?'missing':'invalid'}

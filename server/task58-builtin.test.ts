@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {inflateSync} from 'node:zlib';
+import {ffmpegPath,ffprobePath} from './general/kit-env.ts';
 import {execFileSync} from 'node:child_process';
 import {connectionReadyForFilm, normalizeConnectionBaseUrl} from '../shared/agent-connections.ts';
 import {refreshConnectionModels,resolveAgentConnectionLaunch,saveAgentConnection,switchBuiltinProfile,testUnifiedConnection} from './agent-connections.ts';
@@ -85,7 +86,8 @@ test('从密钥卡片到实际 ACP 子进程：三协议、独立密钥、错误
  status=200;silent=true;assert.equal((await testUnifiedConnection('builtin',{store,timeoutMs:50})).connection.lastApiTest?.category,'timeout');silent=false;
  wrongColor=true;assert.match((await testUnifiedConnection('builtin',{store})).error||'',/换用/);wrongColor=false;
  assert.ok((await testUnifiedConnection('builtin',{store})).ok);
- const launch=await resolveAgentConnectionLaunch('builtin',{UNRELATED_SECRET:'private-fixture'},{store});
+ const mediaPath=[path.dirname(ffmpegPath()),process.env.PATH].join(path.delimiter);
+ const launch=await resolveAgentConnectionLaunch('builtin',{PATH:mediaPath,UNRELATED_SECRET:'private-fixture'},{store});
  assert.equal(launch.env.UNRELATED_SECRET,undefined);
  const agent={...launch,agent:'builtin' as const,effort:'none'};
  const lastMessage=path.join(work,'result.txt'),eventLog=path.join(work,'events.jsonl');
@@ -97,7 +99,7 @@ test('从密钥卡片到实际 ACP 子进程：三协议、独立密钥、错误
  assert.equal(requests.at(-1)?.key,'Bearer fixture-key-alpha');
  assert.ok(seen.some(e=>e.type==='acp.permission'&&e.allowed===true));
  assert.ok(seen.some(e=>e.type==='acp.completed'&&e.usage));
- const stream=JSON.parse(execFileSync('ffprobe',['-v','error','-show_streams','-of','json',path.join(work,'fixture.mp4')],{encoding:'utf8'})).streams[0];
+ const stream=JSON.parse(execFileSync(ffprobePath(),['-v','error','-show_streams','-of','json',path.join(work,'fixture.mp4')],{encoding:'utf8'})).streams[0];
  assert.equal(stream.width,64);assert.equal(stream.nb_frames,'2');
  const clip=fs.readFileSync(path.join(work,'fixture.mp4'));
  t.diagnostic(`工程内视频 ${stream.width}×${stream.height}，${stream.nb_frames} 帧，${clip.length} 字节，SHA-256 ${createHash('sha256').update(clip).digest('hex')}`);

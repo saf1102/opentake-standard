@@ -1,3 +1,4 @@
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -6,7 +7,7 @@ import path from 'node:path';
 import {agentInstallationStatus} from './agent-installations.ts';
 test('installation status distinguishes ready, logged-out, invalid and auth failure without credentials',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cw-auth-status-'));
- const fixture=(name:string,version:string,body:string)=>{const file=path.join(dir,name);fs.writeFileSync(file,`#!${process.execPath}\nif(process.argv[2]==='--version'){console.log(${JSON.stringify(version)});}else{${body}}`,{mode:0o700});return file};
+ const fixture=(name:string,version:string,body:string)=>fakeNodeCli(path.join(dir,name),`if(process.argv[2]==='--version'){console.log(${JSON.stringify(version)});}else{${body}}`);
  try{
   const codex=fixture('codex','codex-cli 1.0.0',"console.error('Logged in using ChatGPT')");
   assert.equal((await agentInstallationStatus('codex',codex)).state,'ready');
@@ -21,14 +22,16 @@ test('Claude Code is found from its file alone and never run, not even for its v
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cw-claude-file-'));
  const ran=path.join(dir,'ran');
  // Any start of this program leaves a mark; detection must leave none.
- const claude=path.join(dir,'claude');fs.writeFileSync(claude,`#!/bin/sh\necho "$@" >> '${ran}'\necho '2.1.300 (Claude Code)'\n`,{mode:0o755});
+ const claude=fakeNodeCli(path.join(dir,'claude'),`require('node:fs').writeFileSync(${JSON.stringify(ran)},'started');`);
  try{
   const status=await agentInstallationStatus('claude',claude);
   assert.equal(status.state,'installed');assert.equal(status.executable,claude);
   assert.equal('loginCommand' in status,false);assert.equal(fs.existsSync(ran),false);
   assert.equal((await agentInstallationStatus('claude',path.join(dir,'missing'))).state,'invalid');
-  fs.chmodSync(claude,0o644);
-  assert.equal((await agentInstallationStatus('claude',claude)).state,'invalid','a file that cannot be executed is not an installation');
+  const invalid=process.platform==='win32'?path.join(dir,'claude.txt'):claude;
+  if(process.platform==='win32')fs.copyFileSync(claude,invalid);
+  else fs.chmodSync(invalid,0o644);
+  assert.equal((await agentInstallationStatus('claude',invalid)).state,'invalid','a file that cannot be executed is not an installation');
   assert.equal(fs.existsSync(ran),false);
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 });
@@ -37,11 +40,14 @@ test('a saved Codex path stays pinned when unavailable until the user clears it'
  const settingsFile=path.join(dir,'agent-settings.json');process.env.LINKREADER_AGENT_SETTINGS_FILE=settingsFile;
  const {defaultAgentSettings}=await import('../src/studio/agent-settings.ts');const {resolveCliPath,readAgentSettings}=await import('./agent-settings.ts');
  // What 0.2.x saved: the Codex bundled inside the old app, which 1.0.0 no longer ships.
- const stale='/Applications/OpenTake.app/Contents/Resources/runtime/support/bin/codex';
- const codex=path.join(dir,'bin','codex');fs.mkdirSync(path.dirname(codex));
- fs.writeFileSync(codex,`#!${process.execPath}\nif(process.argv[2]==='--version'){console.log('codex-cli 1.0.0');}else{console.error('Logged in using ChatGPT')}`,{mode:0o755});
- const options={home:dir,env:{HOME:dir,PATH:path.dirname(codex)},applicationDirs:[path.join(dir,'Applications')]};
+ const stale=process.platform==='win32'?path.join(dir,'removed','codex.exe'):'/Applications/OpenTake.app/Contents/Resources/runtime/support/bin/codex';
+ const bin=path.join(dir,'bin');fs.mkdirSync(bin);
+ const codex=fakeNodeCli(path.join(bin,'codex'),`if(process.argv[2]==='--version'){console.log('codex-cli 1.0.0');}else{console.error('Logged in using ChatGPT')}`);
+ const options={home:dir,env:{HOME:dir,PATH:bin,...(process.platform==='win32'?{SystemRoot:process.env.SystemRoot}:{})},applicationDirs:[path.join(dir,'Applications')],packageRoots:()=>[]};
  try{
+  fs.writeFileSync(settingsFile,JSON.stringify({...defaultAgentSettings(),cliPath:codex}));
+  const pinned=await agentInstallationStatus('codex',undefined,options);
+  assert.equal(pinned.mode,'manual');assert.equal(pinned.executable,codex);assert.equal(pinned.state,'ready');
   fs.writeFileSync(settingsFile,JSON.stringify({...defaultAgentSettings(),cliPath:stale}));
   const status=await agentInstallationStatus('codex',undefined,options);
   assert.equal(status.executable,undefined);assert.equal(status.mode,'manual');assert.equal(status.state,'invalid');

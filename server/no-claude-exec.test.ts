@@ -1,3 +1,4 @@
+import {fakeNodeCli} from './test-support/fake-cli.ts';
 /** 任务17：Claude Code 开关关闭时，检测、设置、接入测试及所有出片入口绝不执行它。
  * 静态扫描约束可执行 Claude 的代码边界，动态拦截 child_process 并使用会留标记的假 CLI。
  * 不使用订阅账号、不读取凭据，也不运行真实 Claude 出片。
@@ -61,10 +62,14 @@ test('Claude execution is confined to explicit gated adapters',()=>{
 test('closed switch: settings, connectivity and film launch never start Claude Code',async()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'cw-no-claude-'));
  const ran=path.join(home,'claude-ran');
- const fake=(file:string)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`#!/bin/sh\necho "$0 $@" >> '${ran}'\necho '2.1.300 (Claude Code)'\n`,{mode:0o755});return file};
- const bin=path.join(home,'bin');
- const onPath=fake(path.join(bin,C));
- const inApp=fake(path.join(home,'Library/Application Support/Claude/claude-code/2.1.300/build/claude.app/Contents/MacOS/claude'));
+ const fake=(file:string)=>{
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  return fakeNodeCli(file,`require('node:fs').writeFileSync(${JSON.stringify(ran)},'started');`);
+ };
+ const bin=path.join(home,'bin'),onPath=fake(path.join(bin,C));
+ const inApp=process.platform==='win32'
+  ?fake(path.join(home,'2.1.300','bin',C))
+  :fake(path.join(home,'Library/Application Support/Claude/claude-code/2.1.300/build/claude.app/Contents/MacOS/claude'));
  const legacy=fake(path.join(home,'legacy',C));
  const settingsDir=path.join(home,'settings');fs.mkdirSync(settingsDir);
  const legacyConfig=path.join(settingsDir,'enhanced-agent.json'),legacyText=JSON.stringify({cliPath:legacy,model:'claude-opus-5-5',effort:'high'});
@@ -73,7 +78,7 @@ test('closed switch: settings, connectivity and film launch never start Claude C
  const shell=path.join(home,'login-shell');
  fs.writeFileSync(shell,`#!/bin/sh\nprintf '__CW_LOGIN_ENV_7B31__\\0PATH=${bin}:/usr/bin:/bin\\0'\n`,{mode:0o755});
  const saved={USERPROFILE:process.env.USERPROFILE,HOME:process.env.HOME,PATH:process.env.PATH,SHELL:process.env.SHELL,LINKREADER_AGENT_SETTINGS_FILE:process.env.LINKREADER_AGENT_SETTINGS_FILE,LINKREADER_CLAUDE_EXECUTABLE:process.env.LINKREADER_CLAUDE_EXECUTABLE,LINKREADER_CONNECTION_SETTINGS_FILE:process.env.LINKREADER_CONNECTION_SETTINGS_FILE};
- Object.assign(process.env,{HOME:home,USERPROFILE:home,PATH:`${bin}${path.delimiter}${process.env.PATH}`,SHELL:shell,LINKREADER_AGENT_SETTINGS_FILE:path.join(settingsDir,'agent-settings.json'),LINKREADER_CLAUDE_EXECUTABLE:onPath,LINKREADER_CONNECTION_SETTINGS_FILE:path.join(settingsDir,'connections.json')});
+ Object.assign(process.env,{HOME:home,USERPROFILE:home,PATH:[bin,...(process.platform==='win32'?[path.dirname(inApp)]:[]),process.env.PATH].join(path.delimiter),SHELL:shell,LINKREADER_AGENT_SETTINGS_FILE:path.join(settingsDir,'agent-settings.json'),LINKREADER_CLAUDE_EXECUTABLE:onPath,LINKREADER_CONNECTION_SETTINGS_FILE:path.join(settingsDir,'connections.json')});
 
  // Watch every way child_process starts a program, before any workbench module captures it.
  const require=createRequire(import.meta.url);

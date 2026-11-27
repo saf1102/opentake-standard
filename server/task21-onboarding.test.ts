@@ -10,7 +10,19 @@ test('S11：公共部署检查覆盖 Codex 未装/未登录/就绪、工程库�
   const c=await import(pathToFileURL(outfile).href),g=globalThis as any;
   g.__task21Codex={state:'missing'};assert.equal((await c.codex()).action.target,'agents');g.__task21Codex={state:'needs-login',executable:'/codex'};assert.equal((await c.codex()).action.kind,'codex-login');g.__task21Codex={state:'ready',executable:'/codex'};assert.equal((await c.codex()).state,'ok');
   g.__task21Disk={path:'/fixture',online:false,writable:false,error:'离线'};assert.equal(c.disk().action.target,'storage');g.__task21Disk={path:'/fixture',online:true,writable:true};assert.equal(c.disk().state,'ok');
-  g.__task21Screen={installed:false};assert.equal((await c.openscreen()).action.kind,'link');g.__task21Screen={installed:true,version:'1.10.0'};assert.match((await c.openscreen()).text,/版本太旧/);g.__task21Screen={installed:true,version:'2.1.2'};assert.equal((await c.openscreen()).action.target,'screen-recording');
+  const windows=process.platform==='win32';
+  g.__task21Screen={installed:false};const missing=await c.openscreen();
+  g.__task21Screen={installed:true,version:'1.10.0'};const old=await c.openscreen();
+  g.__task21Screen={installed:true,version:'2.1.2'};const ready=await c.openscreen();
+  assert.deepEqual([missing.state,old.state,ready.state],['opt','opt','ok']);
+  if(windows){
+   assert.match(missing.text,/修复安装/);assert.match(old.text,/需要已验证的 OpenScreen 2.1.2/);
+   assert.match(ready.text,/Windows 麦克风访问/);
+   for(const row of [missing,old,ready]){assert.equal(row.action,undefined);assert.equal(row.screenGuide,undefined)}
+  }else{
+   assert.equal(missing.action.kind,'link');assert.match(old.text,/版本太旧/);
+   assert.equal(ready.action.target,'screen-recording');
+  }
  }finally{delete (globalThis as any).__task21Codex;delete (globalThis as any).__task21Disk;delete (globalThis as any).__task21Screen;fs.rmSync(dir,{recursive:true,force:true})}
 });
 
