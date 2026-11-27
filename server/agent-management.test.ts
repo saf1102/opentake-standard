@@ -11,8 +11,9 @@ const view=(id:ConnectionId,patch:Partial<ConnectionView>={}):ConnectionView=>({
 test('程序路径先验证 --version，只返回版本号，失败不保存；诊断不启动程序',async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'task24-management-'));
  try{
-  const marker=path.join(root,'ran'),file=path.join(root,'qwen');
-  fs.writeFileSync(file,`#!/bin/sh\ntouch '${marker}'\n`,{mode:0o755});
+  const marker=path.join(root,'ran');
+  const markRun=`require('node:fs').writeFileSync(${JSON.stringify(marker)},'started')`;
+  const file=fakeNodeCli(path.join(root,'qwen'),markRun);
   let writes=0,versions=0;
   const deps:AgentManagementDeps={assertAllowed:()=>{},version:async executable=>{versions++;assert.equal(executable,file);return 'qwen 1.2.3 private@example.com'},save:async(id,input)=>{writes++;return view(id,{cliPath:input.cliPath})}};
   const result=await setAgentProgramPath('qwen',file,deps);
@@ -21,8 +22,8 @@ test('程序路径先验证 --version，只返回版本号，失败不保存；�
   await assert.rejects(setAgentProgramPath('qwen','relative/qwen',deps),/完整绝对路径/);
   const diagnostics=getAgentDiagnostics('qwen',{home:root,env:{PATH:root},configured:file});
   assert.deepEqual(diagnostics.candidates,[{path:file,status:'executable'}]);assert.equal(fs.existsSync(marker),false);
-  const claude=path.join(root,'claude');fs.writeFileSync(claude,'#!/bin/sh\n',{mode:0o755});
-  await assert.rejects(setAgentProgramPath('qwen',claude,deps),/Claude Code/);assert.equal(versions,1);
+  const claude=fakeNodeCli(path.join(root,'claude'),markRun);
+  await assert.rejects(setAgentProgramPath('qwen',claude,deps),/Claude Code/);assert.equal(versions,1);assert.equal(writes,1);assert.equal(fs.existsSync(marker),false);
  }finally{fs.rmSync(root,{recursive:true,force:true})}
 });
 
@@ -136,7 +137,7 @@ test('两版诊断分别列出十家候选结果，只复制公开的系统、�
 test('单家诊断能区分文件不存在和没有执行权限',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'task57-stat-'));
  try{
-  const file=path.join(root,'qwen');
+  const file=path.join(root,process.platform==='win32'?'qwen.exe':'qwen');
   const inventory=()=>getAgentDiagnostics('qwen',{home:root,env:{PATH:root},configured:file}).candidates;
   assert.equal(inventory()[0].status,'missing');
   fs.mkdirSync(file);

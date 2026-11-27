@@ -29,6 +29,14 @@ export function fakeNodeCli(file:string,source:string,module=false):string {
  return executable;
 }
 
+// The PE may be started under the link's name. Both names must reach the same JS fixture.
+export function linkFakeNodeCli(source:string,alias:string,kind:'symlink'|'hardlink'='symlink'){
+ if(kind==='hardlink')fs.linkSync(source,alias);else fs.symlinkSync(source,alias);
+ if(process.platform==='win32'){
+  for(const suffix of ['.node-path','.script-path'])fs.copyFileSync(source+suffix,alias+suffix);
+ }
+}
+
 /** The product creates .cmd wrappers on Windows; execute those through cmd.exe. */
 export function runToolWrapper(file:string,env:NodeJS.ProcessEnv):string {
  const options={env,encoding:'utf8' as const,windowsHide:true};

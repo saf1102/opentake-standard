@@ -30,8 +30,19 @@ class FixtureLauncher {
   }
   return result.Append('\\',slashes*2).Append('"').ToString();
  }
- static Thread Pump(Stream input,Stream output) {
-  var t=new Thread(()=>{try{input.CopyTo(output);output.Flush();}catch(IOException){}catch(ObjectDisposedException){} });
+ static Thread Pump(Stream input,Stream output,bool closeOutput = false) {
+  var t=new Thread(()=>{
+   try{
+    byte[] buffer=new byte[4096];
+    int count;
+    while((count=input.Read(buffer,0,buffer.Length))>0){
+     output.Write(buffer,0,count);
+     // ACP waits for each reply while stdin is still open.
+     output.Flush();
+    }
+   }catch(IOException){}catch(ObjectDisposedException){}
+   finally{if(closeOutput){try{output.Close();}catch(IOException){}catch(ObjectDisposedException){}}}
+  });
   t.IsBackground=true;t.Start();return t;
  }
  static int Main(string[] args) {
@@ -42,7 +53,7 @@ class FixtureLauncher {
   if(job==IntPtr.Zero||!SetInformationJobObject(job,9,ref limits,(uint)Marshal.SizeOf(limits)))throw new InvalidOperationException("Cannot contain test process");
   try {using(var child=Process.Start(start)) {
    if(!AssignProcessToJobObject(job,child.Handle)){child.Kill();throw new InvalidOperationException("Cannot contain test child");}
-   var input=new Thread(()=>{try{Console.OpenStandardInput().CopyTo(child.StandardInput.BaseStream);child.StandardInput.Close();}catch(IOException){}catch(ObjectDisposedException){} });input.IsBackground=true;input.Start();
+   Pump(Console.OpenStandardInput(),child.StandardInput.BaseStream,true);
    var stdout=Pump(child.StandardOutput.BaseStream,Console.OpenStandardOutput());var stderr=Pump(child.StandardError.BaseStream,Console.OpenStandardError());
    child.WaitForExit();stdout.Join();stderr.Join();return child.ExitCode;
   }}finally{CloseHandle(job);}

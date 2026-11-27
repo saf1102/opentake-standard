@@ -1,25 +1,37 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const os=require('node:os');const path=require('node:path');const tools=require('./agent-installation.cjs');
+const {fakeNodeCli,linkFakeNodeCli}=require('../server/test-support/fake-cli.ts');
+const windows=process.platform==='win32';
+function fixtureCli(file,source){
+ fs.mkdirSync(path.dirname(file),{recursive:true});
+ return fakeNodeCli(file,source);
+}
+const versionCli=(file,version)=>fixtureCli(file,`console.log(${JSON.stringify(version)})`);
+const fixtureEnv=home=>({HOME:home,PATH:path.join(home,'bin'),...(windows?{USERPROFILE:home,LOCALAPPDATA:path.join(home,'Local'),SystemRoot:process.env.SystemRoot}:{})});
 test('discovers app-only installs, selects newest, pins manual paths and rejects impostors',()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'cw-agents-'));const applicationDirs=[path.join(home,'Applications')];
- const make=(p,text)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,`#!/bin/sh\nprintf '%s\\n' '${text}'\n`,{mode:0o755});return p};
- const env={HOME:home,PATH:path.join(home,'bin')};
+ const env=fixtureEnv(home);
+ const options={home,env,applicationDirs:windows?[]:applicationDirs,packageRoots:()=>[]};
  try{
- const app=make(path.join(applicationDirs[0],'Codex.app/Contents/Resources/codex'),'codex-cli 1.2.0');
- assert.equal(tools.detectAgent('codex',{home,env,applicationDirs}).executable,app);
- const old=make(path.join(home,'bin/codex'),'codex-cli 1.1.0');
- assert.equal(tools.detectAgent('codex',{home,env,applicationDirs}).executable,app);
- assert.equal(tools.detectAgent('codex',{home,env,applicationDirs,configured:old}).executable,old);
- assert.equal(tools.detectAgent('codex',{home,env,applicationDirs,configured:path.join(home,'missing')}).state,'invalid');
- const fake=make(path.join(home,'fake'),'Text Editor 9.9.9');
- assert.equal(tools.detectAgent('codex',{home,env,applicationDirs,configured:fake}).state,'invalid');
+ const app=versionCli(windows?path.join(env.LOCALAPPDATA,'Programs/Codex/resources/codex.exe'):path.join(applicationDirs[0],'Codex.app/Contents/Resources/codex'),'codex-cli 1.2.0');
+ assert.equal(tools.detectAgent('codex',options).executable,app);
+ const old=versionCli(path.join(home,'bin/codex'),'codex-cli 1.1.0');
+ assert.equal(tools.detectAgent('codex',options).executable,app);
+ assert.equal(tools.detectAgent('codex',{...options,configured:old}).executable,old);
+ assert.equal(tools.detectAgent('codex',{...options,configured:path.join(home,'missing')}).state,'invalid');
+ const fake=versionCli(path.join(home,'fake'),'Text Editor 9.9.9');
+ assert.equal(tools.detectAgent('codex',{...options,configured:fake}).state,'invalid');
  assert.deepEqual(tools.sanitizeAgentEnv({PATH:'/bin',CLAUDECODE:'1',CLAUDE_CODE_SESSION_ID:'x',ANTHROPIC_BASE_URL:'x'}),{PATH:'/bin'});
  }finally{fs.rmSync(home,{recursive:true,force:true})}
 });
 test('reads login shell environment after marker, limits inherited values and refreshes PATH',()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'cw-shell-'));const shell=path.join(home,'shell');
  try{
- fs.writeFileSync(shell,"#!/bin/sh\nprintf 'startup noise\\n__CW_LOGIN_ENV_7B31__\\0PATH=/test/bin:/bin\\0CLAUDECODE=bad\\0CODEBUDDY_INTERNET_ENVIRONMENT=ioa\\0CODEBUDDY_CONFIG_DIR=/fixture/settings\\0LANG=en_US.UTF-8\\0'\n",{mode:0o755});
- const result=tools.loginEnvironment({HOME:home,SHELL:shell,PATH:'/bin'},true);
+ const output=['startup noise\n__CW_LOGIN_ENV_7B31__','PATH=/test/bin:/bin','CLAUDECODE=bad','CODEBUDDY_INTERNET_ENVIRONMENT=ioa','CODEBUDDY_CONFIG_DIR=/fixture/settings','LANG=en_US.UTF-8',''].join('\0');
+ const env={HOME:home,SHELL:shell,PATH:'/bin',http_proxy:'http://127.0.0.1:1'};
+ if(!windows)fs.writeFileSync(shell,"#!/bin/sh\nprintf '"+output.replaceAll('\0','\\0')+"'\n",{mode:0o755});
+ const result=windows?tools.agentEnvironmentSnapshot(env,true,{platform:'darwin',spawnSync(file,args){
+  assert.equal(file,shell);assert.equal(args[0],'-ilc');return {status:0,stdout:output};
+ }}).env:tools.loginEnvironment(env,true);
  assert.deepEqual(result.PATH.split(':').slice(0,2),['/test/bin','/bin']);assert.equal(result.CLAUDECODE,undefined);assert.equal(result.CODEBUDDY_INTERNET_ENVIRONMENT,'ioa');assert.equal(result.CODEBUDDY_CONFIG_DIR,'/fixture/settings');
  }finally{fs.rmSync(home,{recursive:true,force:true})}
 });
@@ -28,26 +40,36 @@ test('compares numeric prerelease identifiers and stable versions',()=>{assert(t
 test('finds Claude Code from its files alone, reads its version from its install folder and never runs it',()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'cw-claude-'));const applicationDirs=[path.join(home,'Applications')];const ran=path.join(home,'ran');
  // Every fixture records any start; Claude Code detection must start none of them.
- const make=p=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,`#!/bin/sh\necho "$0 $@" >> '${ran}'\necho '9.9.9 (Claude Code)'\n`,{mode:0o755});return p};
- const env={HOME:home,PATH:path.join(home,'bin')};const apps=path.join(home,'Library/Application Support/Claude/claude-code');
+ const make=p=>fixtureCli(p,`require('node:fs').writeFileSync(${JSON.stringify(ran)},'started')`);
+ const env=fixtureEnv(home),apps=path.join(home,'Library/Application Support/Claude/claude-code');
+ const detect=configured=>tools.detectAgent('claude',{home,env,applicationDirs,configured});
+ // Windows discovers the versioned installations from PATH; Mac scans the app bundle.
+ function versionFolder(version,macEntry='claude.app/Contents/MacOS/claude'){
+  if(!windows)return make(path.join(apps,version,macEntry));
+  const file=make(path.join(home,version,'bin','claude'));
+  env.PATH+=path.delimiter+path.dirname(file);
+  return file;
+ }
  try{
-  const old=make(path.join(apps,'2.1.284/claude.app/Contents/MacOS/claude'));
-  let found=tools.detectAgent('claude',{home,env,applicationDirs});
-  assert.equal(found.executable,old);assert.equal(found.version,'2.1.284');assert.equal(found.state,'installed');
-  make(path.join(apps,'2.1.99/claude'));
-  assert.equal(tools.detectAgent('claude',{home,env,applicationDirs}).executable,old,'newest version by folder name');
-  // Newer Claude apps: claude-code/<version>/<build>/claude.app, version also in its Info.plist.
-  const bundle=path.join(apps,'2.1.308/a93ded4b1b47/claude.app');const current=make(path.join(bundle,'Contents/MacOS/claude'));
-  fs.writeFileSync(path.join(bundle,'Contents/Info.plist'),'<?xml version="1.0"?><plist><dict><key>CFBundleShortVersionString</key><string>2.1.308</string></dict></plist>');
-  found=tools.detectAgent('claude',{home,env,applicationDirs});assert.equal(found.executable,current);assert.equal(found.version,'2.1.308');
-  // npm install: the version is in the package beside the linked program.
-  const pkg=path.join(home,'lib/node_modules/@anthropic-ai/claude-code');make(path.join(pkg,'cli.js'));
+  const old=versionFolder('2.1.284');
+  let found=detect();assert.equal(found.executable,old);assert.equal(found.version,'2.1.284');assert.equal(found.state,'installed');
+  versionFolder('2.1.99','claude');
+  assert.equal(detect().executable,old,'newest version by folder name');
+  let current;
+  if(windows)current=versionFolder('2.1.308');
+  else{
+   const bundle=path.join(apps,'2.1.308/a93ded4b1b47/claude.app');current=make(path.join(bundle,'Contents/MacOS/claude'));
+   fs.writeFileSync(path.join(bundle,'Contents/Info.plist'),'<?xml version="1.0"?><plist><dict><key>CFBundleShortVersionString</key><string>2.1.308</string></dict></plist>');
+  }
+  found=detect();assert.equal(found.executable,current);assert.equal(found.version,'2.1.308');
+  const pkg=path.join(home,'lib/node_modules/@anthropic-ai/claude-code'),cli=make(path.join(pkg,windows?'cli.exe':'cli.js'));
   fs.writeFileSync(path.join(pkg,'package.json'),JSON.stringify({name:'@anthropic-ai/claude-code',version:'2.2.0'}));
-  fs.mkdirSync(path.join(home,'bin'));fs.symlinkSync(path.join(pkg,'cli.js'),path.join(home,'bin/claude'));
-  found=tools.detectAgent('claude',{home,env,applicationDirs});assert.equal(found.executable,path.join(home,'bin/claude'));assert.equal(found.version,'2.2.0');
-  // Native installer: ~/.local/bin/claude links to ~/.local/share/claude/versions/<version>.
-  const native=make(path.join(home,'.local/share/claude/versions/2.3.1'));fs.mkdirSync(path.join(home,'.local/bin'),{recursive:true});fs.symlinkSync(native,path.join(home,'.local/bin/claude'));
-  found=tools.detectAgent('claude',{home,env,applicationDirs});assert.equal(found.executable,path.join(home,'.local/bin/claude'));assert.equal(found.version,'2.3.1');
+  const name=windows?'claude.exe':'claude',npmLink=path.join(home,'bin',name);
+  fs.mkdirSync(path.dirname(npmLink));linkFakeNodeCli(cli,npmLink);
+  found=detect();assert.equal(found.executable,npmLink);assert.equal(found.version,'2.2.0');
+  const native=make(path.join(home,'.local/share/claude/versions/2.3.1',...(windows?['claude.exe']:[])));
+  const nativeLink=path.join(home,'.local/bin',name);fs.mkdirSync(path.dirname(nativeLink),{recursive:true});linkFakeNodeCli(native,nativeLink);
+  found=detect();assert.equal(found.executable,nativeLink);assert.equal(found.version,'2.3.1');
   // A manual path only counts when the file is there and executable; nothing about it is run.
   assert.equal(tools.detectAgent('claude',{home,env,applicationDirs,configured:path.join(home,'missing')}).state,'invalid');
   assert.equal(tools.detectAgent('claude',{home,env,applicationDirs,configured:old}).executable,old);
@@ -59,13 +81,12 @@ test('finds Claude Code from its files alone, reads its version from its install
 });
 test('Windows: finds the command inside the Store Codex app, which puts nothing on PATH',()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'cw-store-'));
- const make=(p,text)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,`#!/bin/sh\nprintf '%s\\n' '${text}'\n`,{mode:0o755});return p};
  try{
   const root=path.join(home,'WindowsApps','OpenAI.Codex_26.1111.9664.0_x64__2p2nqsd0c76g0');
   const asked=[];const packageRoots=prefixes=>{asked.push(...prefixes);return [root]};
-  const env={HOME:home,PATH:path.join(home,'bin')};
+  const env=fixtureEnv(home);delete env.LOCALAPPDATA; // This fixture has only an MSIX registration.
   assert.equal(tools.detectAgent('codex',{home,env,applicationDirs:[],packageRoots}).state,'missing');
-  const store=make(path.join(root,'app','resources','codex.exe'),'codex-cli 0.169.1');
+  const store=versionCli(path.join(root,'app','resources','codex.exe'),'codex-cli 0.169.1');
   const found=tools.detectAgent('codex',{home,env,applicationDirs:[],packageRoots});
   assert.equal(found.executable,store);assert.match(found.version,/0\.169\.1/);
   assert.equal(found.candidates.find(c=>c.path===store).source,'app');
@@ -99,9 +120,29 @@ test('Windows 每轮重读注册表，展开新变量，忽略未展开和相对
  assert.equal(launch.options.env.PATH,second.env.PATH);assert.equal(launch.options.shell,false);assert.match(launch.file,/\\powershell\.exe$/i);
  assert.deepEqual(launch.args,['-NoLogo','-NoProfile','-File',file,...args]);
 });
-test('Mac 登录环境超时后可从最新版 nvm 找到并启动命令；缓存与强制重读真实分开',()=>{
+test('按平台从 Node 版本管理器找到并启动命令，验证登录环境和版本探测缓存',()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'task57-shell-'));
  try{
+  if(windows){
+   const bin=path.join(home,'node-manager','current'),file=path.join(bin,'codex.cmd');
+   fs.mkdirSync(bin,{recursive:true});
+   const env={...fixtureEnv(home),NVM_SYMLINK:bin};
+   let registryPath=path.join(home,'first'),reads=0;
+   const options={home,platform:'win32',registryEnvironment(){reads++;return {user:registryPath}}};
+   const first=tools.agentEnvironmentSnapshot(env,false,options);
+   registryPath=path.join(home,'refreshed');
+   const refreshed=tools.agentEnvironmentSnapshot(env,true,options);
+   assert.equal(reads,2);assert.equal(refreshed.loginShellTimedOut,false);
+   assert(first.env.PATH.split(';').includes(bin));assert(refreshed.env.PATH.split(';').includes(registryPath));
+   const probe={home,env:refreshed.env,applicationDirs:[],packageRoots:()=>[]};
+   fs.writeFileSync(file,'@echo off\r\necho codex-cli 1.2.3\r\n');
+   assert.equal(tools.detectAgent('codex',probe).executable,file);
+   fs.writeFileSync(file,'@exit /b 1\r\n');
+   assert.equal(tools.detectAgent('codex',{...probe,configured:file}).state,'invalid');assert.equal(tools.codexVersionUnreadable(file),true);
+   fs.writeFileSync(file,'@echo off\r\necho codex-cli 1.3.0\r\n');
+   assert.equal(tools.codexVersionUnreadable(file),false);assert.equal(tools.detectAgent('codex',probe).version,'codex-cli 1.3.0');
+   return;
+  }
   const env={HOME:home,SHELL:path.join(home,'fixture-shell'),PATH:'/bin',http_proxy:'http://127.0.0.1:1'};
   const called=[];let timeout=true;
   const options={platform:'darwin',home,spawnSync(_shell,_args,opts){called.push(opts.timeout);return timeout?

@@ -1,4 +1,4 @@
-import {fakeNodeCli} from './test-support/fake-cli.ts';
+import {fakeNodeCli,linkFakeNodeCli} from './test-support/fake-cli.ts';
 import type {IncomingMessage,ServerResponse} from 'node:http';
 import {ROSTER_AGENTS,rosterExecutableCandidates} from './agent-roster.ts';
 import test from 'node:test';
@@ -74,8 +74,9 @@ test('错误绑定 Claude 的路径、符号链接和硬链接不能作为其他
  process.env.LINKREADER_CONNECTION_SETTINGS_FILE=path.join(root,'connections.json');
  try{
   const marked=path.join(root,'started'),bin=path.join(root,'bin');fs.mkdirSync(bin);
-  const claude=path.join(bin,'claude'),alias=path.join(bin,'kimi'),hard=path.join(bin,'renamed');
-  fs.writeFileSync(claude,`#!/bin/sh\necho ran > '${marked}'\nexit 1\n`,{mode:0o755});fs.symlinkSync(claude,alias);fs.linkSync(claude,hard);
+  const claude=fakeNodeCli(path.join(bin,'claude'),`require('node:fs').writeFileSync(${JSON.stringify(marked)},'ran');process.exit(1)`);
+  const ext=path.extname(claude),alias=path.join(bin,'kimi'+ext),hard=path.join(bin,'renamed'+ext);
+  linkFakeNodeCli(claude,alias);linkFakeNodeCli(claude,hard,'hardlink');
   assert.equal(isClaudeExecutable(claude,{PATH:bin}),true);assert.equal(isClaudeExecutable(alias,{PATH:bin}),true);assert.equal(isClaudeExecutable(hard,{PATH:bin}),true);
   let versions=0;
   const roster=await rosterAgentStatus(ROSTER_AGENTS.find(a=>a.id==='kimi')!,{home:root,env:{PATH:bin},applicationDirs:[],version:async()=>{versions++;return 'must-not-run'}});
@@ -90,6 +91,23 @@ test('错误绑定 Claude 的路径、符号链接和硬链接不能作为其他
  }finally{if(old===undefined)delete process.env.LINKREADER_CONNECTION_SETTINGS_FILE;else process.env.LINKREADER_CONNECTION_SETTINGS_FILE=old;fs.rmSync(root,{recursive:true,force:true});}
 });
 
+
+test('Windows PATH 中的命令与改名硬链接指向同一文件时拒绝误绑，内容相同的独立程序仍可用',async t=>{
+ const {isClaudeExecutable}=await import('./agent-roster.ts');
+ const {default:tools}=await import('./agent-installation.ts');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-win-identity-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const bin=path.join(root,'bin');fs.mkdirSync(bin);
+ const env={Path:[path.join(root,'unused'),bin].join(';')};
+ for(const ext of ['.cmd','.bat','.ps1']){
+  const original=path.join(bin,'claude'+ext),alias=path.join(root,'renamed'+ext),other=path.join(root,'independent'+ext);
+  fs.writeFileSync(original,ext==='.ps1'?"Write-Output 'fixture'\r\n":"@echo fixture\r\n",{mode:0o755});
+  fs.linkSync(original,alias);fs.copyFileSync(original,other);
+  for(const file of [alias,other])assert.equal(tools.agentFileStatus(file,'win32'),'executable',file);
+  assert.equal(isClaudeExecutable(alias,env,undefined,'win32'),true,ext);
+  assert.equal(isClaudeExecutable(other,env,undefined,'win32'),false,ext);
+ }
+});
 
 test('内置智能体无需 CLI，十家外置智能体保留 ACP/登录命令；DeepSeek 用官方 ACP profile、不提供登录命令',()=>{
  assert.equal(AGENT_CONNECTION_IDS.length,11);
@@ -279,11 +297,12 @@ test('CodeBuddy 登录探测与工程工作进程收到同一地区与 ACP 参�
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-region-'));
  const old=process.env.LINKREADER_CONNECTION_SETTINGS_FILE;
  try{
-  const log=path.join(root,'calls.jsonl');
+  const log=path.join(root,'calls.jsonl'),trace=path.join(root,'methods.log');
   const file=fakeNodeCli(path.join(root,'codebuddy'),`const fs=require('node:fs');
 fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),region:process.env.CODEBUDDY_INTERNET_ENVIRONMENT})+'\\n');
 require('node:readline').createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line),sessionId='fixture';
+ fs.appendFileSync(${JSON.stringify(trace)},m.method+'\\n');
  if(m.method==='session/prompt')console.log(JSON.stringify({jsonrpc:'2.0',method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'完成'}}}}));
  const result=m.method==='initialize'?{protocolVersion:1}:m.method==='session/new'?{sessionId}:{stopReason:'end_turn'};
  console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result}));
@@ -293,9 +312,11 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
    process.env.LINKREADER_CONNECTION_SETTINGS_FILE=path.join(root,'settings-'+String(region));
    const discoveryEnv={PATH:process.env.PATH,...(process.platform==='win32'?{SystemRoot:process.env.SystemRoot}:{}),...(region===undefined?{}:{CODEBUDDY_INTERNET_ENVIRONMENT:region})};
    const deps={detect:async()=>file,discoveryEnv};
-   fs.writeFileSync(log,'');
+   fs.writeFileSync(log,'');fs.writeFileSync(trace,'');
+   const methods=()=>fs.readFileSync(trace,'utf8').trim().split(/\s+/).filter(Boolean);
    const status=await refreshAgentConnection('codebuddy',deps);
-   assert.equal(status.cliAuthState,'connected');
+   assert.equal(status.cliAuthState,'connected',`${status.cliAuthMessage}；假 CLI 已启动=${!!fs.statSync(log).size}，已收到 ${JSON.stringify(methods())}`);
+   assert.deepEqual(methods(),['initialize','session/new']);
    const launch=await resolveAgentConnectionLaunch('codebuddy',undefined,deps);
    const agent={...launch,agent:'codebuddy' as const,effort:'medium'};
    const cli=filmAgentArgs(agent,{work:root,lastMessage:'',network:false,model:'default',effort:'medium'});
@@ -303,6 +324,7 @@ require('node:readline').createInterface({input:process.stdin}).on('line',line=>
    assert.throws(()=>startFilmAgent(agent,cli,{...options,cwd:path.dirname(root)}),/工程目录/);
    const result=await startFilmAgent(agent,cli,options).done;
    assert.equal(result.code,0,result.stderr);
+   assert.ok(methods().slice(2).includes('session/prompt'));
    assert.deepEqual(fs.readFileSync(log,'utf8').trim().split('\n').map(s=>JSON.parse(s)),Array(2).fill({args,region:region??'internal'}));
    assert.equal(discoveryEnv.CODEBUDDY_INTERNET_ENVIRONMENT,region);
    assert.deepEqual(agentRegionEnvironment('qwen',{}),{});

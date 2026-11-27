@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileAsync} from './proc.ts';
 import tools from './agent-installation.ts';
+import platform from './platform.ts';
 import {appBundleForExecutable,findOpenScreenExecutable} from './editor/openscreen.ts';
 
 /** Shared native-agent discovery. Command contracts come from each provider's official docs; no third-party implementation is read. */
@@ -44,20 +45,30 @@ export type RosterStatus={id:RosterAgentId;name:string;kind:'agent'|'tool';state
 type RosterOptions={platform?:NodeJS.Platform;installedRoots?:string[];installedApps?:{name:string;path:string}[];home?:string;env?:NodeJS.ProcessEnv;applicationDirs?:string[];binDirs?:string[];version?:(file:string,env:NodeJS.ProcessEnv)=>Promise<string|undefined>;bundleVersion?:(app:string)=>Promise<string|undefined>;readVersion?:boolean};
 
 /** Prevent another agent's alias/path from starting Claude Code; inspect paths and file identity only. */
-export function isClaudeExecutable(file:string,env:NodeJS.ProcessEnv=process.env,configured?:string){
+export function isClaudeExecutable(file:string,env:NodeJS.ProcessEnv=process.env,configured?:string,osName:NodeJS.Platform=process.platform){
  const real=(value:string)=>{try{return fs.realpathSync(value)}catch{return path.resolve(value)}};
  const target=real(file);
  const named=(value:string)=>/(?:^|[\\/])claude(?:-code)?(?:\.(?:exe|cmd|bat|ps1))?$/i.test(value)||/[\\/]@anthropic-ai[\\/]claude-code[\\/]|[\\/]claude[\\/]versions[\\/]|[\\/]Claude[\\/]claude-code[\\/]/i.test(value);
  if(named(file)||named(target))return true;
- if(process.platform==='win32'&&/\.cmd$/i.test(file)){
+ if(osName==='win32'&&/\.cmd$/i.test(file)){
   const shim=tools.windowsShim(file,env);
   if([shim?.file,...(shim?.args??[])].some(arg=>arg&&(named(arg)||named(real(arg)))))return true;
  }
- const known=[configured,env.LINKREADER_CLAUDE_EXECUTABLE,...String(env.PATH||'').split(path.delimiter).filter(dir=>path.isAbsolute(dir)).map(dir=>path.join(dir,'claude')),path.join(os.homedir(),'.local','bin','claude'),path.join(os.homedir(),'.claude','local','claude')].filter((value):value is string=>!!value);
+ const windows=osName==='win32';
+ const dirs=platform.environmentPath(env,osName).split(windows?';':':').filter(dir=>path.isAbsolute(dir));
+ dirs.push(path.join(os.homedir(),'.local','bin'),path.join(os.homedir(),'.claude','local'));
+ const names=windows?['claude.exe','claude.cmd','claude.bat','claude.ps1','claude']:['claude'];
+ const known=[configured,env.LINKREADER_CLAUDE_EXECUTABLE,...dirs.flatMap(dir=>names.map(name=>path.join(dir,name)))];
+ let identity:fs.BigIntStats|undefined;
+ try{identity=fs.statSync(file,{bigint:true})}catch{/* A missing configured path can still match by name. */}
  for(const candidate of known){
-  if(real(candidate)===target)return true;
-  // A hard link has a different realpath but still names the same executable.
-  try{const a=fs.statSync(candidate),b=fs.statSync(file);if(a.dev===b.dev&&a.ino===b.ino)return true}catch{/* not installed */}
+  if(!candidate)continue;
+  if(path.resolve(candidate)===target)return true;
+  if(!identity||identity.ino===0n){if(real(candidate)===target)return true;continue;}
+  try{
+   const other=fs.statSync(candidate,{bigint:true,throwIfNoEntry:false});
+   if(other&&other.dev===identity.dev&&other.ino===identity.ino)return true;
+  }catch{/* This candidate is inaccessible. */}
  }
  return false;
 }
@@ -154,7 +165,7 @@ export async function rosterAgentStatus(agent:RosterAgent,options:RosterOptions=
   return {...base,state:'found',executable,...(app?{app:{name:agent.name,path:app},version:await (options.bundleVersion??bundleVersion)(app)}:{})};
  }
  const env=options.env??tools.loginEnvironment();
- const executable=rosterExecutableCandidates(agent,{...options,home,env,applicationDirs:apps}).find(file=>tools.agentFileStatus(file,options.platform)==='executable'&&!isClaudeExecutable(file,env));
+ const executable=rosterExecutableCandidates(agent,{...options,home,env,applicationDirs:apps}).find(file=>tools.agentFileStatus(file,options.platform)==='executable'&&!isClaudeExecutable(file,env,undefined,options.platform));
  if(executable)return {...base,state:'found',executable,version:options.readVersion===false?undefined:await (options.version??askVersion)(executable,env,agent.id)};
  const app=rosterDesktopApp(agent,{...options,applicationDirs:apps});
  return {...base,state:'missing',...(app?{app}:{}),installCommand:rosterInstaller(agent,options.platform)};
