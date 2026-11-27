@@ -28,9 +28,9 @@ test('combined release contains three installers, source, official update feed a
   const result=await prepareDesktopRelease(f);assert.equal(result.tag,release.desktopTag('1.1.4',metadata.windowsBuild));
   const feed=JSON.parse(fs.readFileSync(path.join(f.out,'windows-update.json'),'utf8'));
   assert.equal(feed.url,`https://github.com/${release.REPOSITORY}/releases/download/${result.tag}/OpenTake-Standard-Setup-1.1.4-x64.exe`);
-  assert.equal(feed.windowsBuild,2026112601);
+  assert.equal(feed.windowsBuild,2026112701);
   assert.equal(feed.notes,fs.readFileSync(new URL('../RELEASE-NOTES-1.1.4.md',import.meta.url),'utf8').slice(0,16000));
-  const macFeed=JSON.parse(fs.readFileSync(path.join(f.out,'mac-update.json'),'utf8'));assert.equal(macFeed.version,'1.1.4');assert.equal(macFeed.desktopBuild,2026112601);assert.equal(macFeed.platform,'darwin');assert.equal(macFeed.tag,undefined);
+  const macFeed=JSON.parse(fs.readFileSync(path.join(f.out,'mac-update.json'),'utf8'));assert.equal(macFeed.version,'1.1.4');assert.equal(macFeed.desktopBuild,2026112701);assert.equal(macFeed.platform,'darwin');assert.equal(macFeed.tag,undefined);
   for(const arch of ['arm64','x64']){const r=f.receipts.find(x=>x.platform==='darwin'&&x.arch===arch);assert.deepEqual(macFeed.installers[arch],{url:`https://github.com/${release.REPOSITORY}/releases/download/${result.tag}/OpenTake-Standard-1.1.4-mac-${arch}.dmg`,sha256:r.sha256,size:r.bytes})}
   for(const line of fs.readFileSync(path.join(f.out,'SHA256SUMS.txt'),'utf8').trim().split('\n')){const [hash,name]=line.split('  ');assert.equal(sha(fs.readFileSync(path.join(f.out,name))),hash,name)}
   await assert.rejects(prepareDesktopRelease(f),/replace/);
