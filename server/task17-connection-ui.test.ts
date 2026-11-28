@@ -17,7 +17,9 @@ test('统一接入界面：Claude风险确认推荐API、代理提醒不挡测�
     for(const theme of ['original','warm']){
      document.documentElement.dataset.uiTheme=theme;
      const primary=document.querySelector('.connection-builtin-primary')!;
-     assert.equal(primary.textContent,'测试连接');assert.equal(dom.window.getComputedStyle(primary).backgroundColor,'rgb(245, 179, 22)');
+     assert.equal(primary.textContent,'测试连接');
+     // 没填密钥：按钮禁用并彻底变灰（11-27 S先生：暗琥珀色看着像能点），悬停说明原因。
+     assert.equal((primary as HTMLButtonElement).disabled,true);assert.equal(primary.getAttribute('title'),'先填入 API 密钥');assert.notEqual(dom.window.getComputedStyle(primary).backgroundColor,'rgb(245, 179, 22)');
      assert.equal(document.querySelectorAll('[aria-label="填入官方地址"] button').length,6);
      await click('Kimi（月之暗面）');
      assert.equal((document.querySelector('#connection-builtin-url') as HTMLInputElement).value,'https://api.moonshot.cn/v1');

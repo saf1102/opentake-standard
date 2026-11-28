@@ -7,7 +7,7 @@ import {AgentMark} from '@/studio/components/AgentMark';
 import {UNIFIED_AGENTS} from '@/general/platform';
 import {refreshConnections,useConnections} from '@/studio/connection-store';
 import {ConnectionActions} from '@/studio/components/ConnectionActions';
-import {connectionDefinition,type ConnectionId,type ConnectionMode} from '@/studio/connections';
+import {type ConnectionId,type ConnectionMode} from '@/studio/connections';
 import type {AgentId} from '@/studio/agent-marks';
 import {useAccountAndFirstRun,deployDescription,pendingAgents} from './edition';
 import {DEPLOY_ITEMS,openSettings,recheck,runAll,setDeployOpen,summary,syncDeployConnections,useDeploy,useDeployOpen,type CheckAction,type DeployItemId} from './onboarding-store';
@@ -71,7 +71,7 @@ export function DeployWizard(){
  };
  const manage=(agentId?:ConnectionId,mode?:ConnectionMode)=>{setDeployOpen(false);openSettings('agents',agentId,true,mode)};
  const prominent=(item:ConnectionView)=>item.id==='builtin'||item.workBuddyNeedsCli||item.cliInstalled||item.connected||item.hasKey||!!connections.waiting[item.id];
- const renderAgent=(connection:ConnectionView)=><div key={connection.id} className={`ot-deploy-agent${connections.waiting[connection.id]?' is-waiting':connection.connected?' is-on':!connection.cliInstalled?' is-off':''}`}><div className="ot-deploy-agent-head"><b>{connection.name}</b><button type="button" onClick={()=>manage(connection.id)}>设置 ›</button><AgentMark id={connection.id as AgentId} size={24}/></div><small>{connection.id==='builtin'?'首选 · 填模型密钥即可出片':connections.waiting[connection.id]?`终端已打开，在里面登录 ${connection.name}`:connection.mode==='api'?`API 密钥 · ${connection.relay?'中转站':'官方'}${!connection.apiReason&&!connection.cliInstalled?' · 只能做轻活，出片要装命令行':''}`:connection.id==='deepseek'&&connection.deepseekRoute?harnessRouteLabel(connection):connection.workBuddyNeedsCli?'已找到 WorkBuddy 桌面版':connection.cliInstalled?'已找到命令行':'没找到命令行'}{connection.mode==='cli'&&connectionDefinition(connection.id).acpVerification==='docs'?' · 未实机验证':''}</small><ConnectionActions connection={connection} compact onConfigure={mode=>manage(connection.id,mode)}/></div>;
+ const renderAgent=(connection:ConnectionView)=><div key={connection.id} className={`ot-deploy-agent${connections.waiting[connection.id]?' is-waiting':connection.connected?' is-on':!connection.cliInstalled?' is-off':''}`}><div className="ot-deploy-agent-head"><b>{connection.name}</b><button type="button" onClick={()=>manage(connection.id)}>设置 ›</button><AgentMark id={connection.id as AgentId} size={24}/></div><small>{connection.id==='builtin'?'首选 · 填模型密钥即可出片':connections.waiting[connection.id]?`终端已打开，在里面登录 ${connection.name}`:connection.mode==='api'?`API 密钥 · ${connection.relay?'中转站':'官方'}${!connection.apiReason&&!connection.cliInstalled?' · 只能做轻活，出片要装命令行':''}`:connection.id==='deepseek'&&connection.deepseekRoute?harnessRouteLabel(connection):connection.workBuddyNeedsCli?'已找到 WorkBuddy 桌面版':connection.cliInstalled?'已找到命令行':'没找到命令行'}</small><ConnectionActions connection={connection} compact onConfigure={mode=>manage(connection.id,mode)}/></div>;
  const checking=snap.running;
  const title=s.ready?'可以开工了':checking?'正在检查这台电脑':`还差 ${s.required-s.okRequired} 项`;
  const sub=s.ready?(s.allOk?'全部就绪':'可选的几项，用到时再登录也行'):checking?`已查 ${s.done} / ${s.total} 项`:'点紫色的按钮补上，补完自动再查一遍';

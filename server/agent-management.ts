@@ -78,7 +78,9 @@ export function createAgentManagement(){
   if(session.state.action==='install-and-login'&&(result.connection.mode!=='cli'||!result.connection.enabled))return finish(session,'cancelled','接入方式已改变，已停止登录');
   if(result.waiting){schedule(session.state.id,session);return {...session.state};}
   const connected=result.connection.mode==='cli'&&result.connection.connected;
-  return finish(session,connected?'complete':'failed',connected?(session.state.action==='switch-account'?'新账号已接通':'已接通'):'登录未完成，请重新登录');
+  // 登录成功但一句话测试查出套餐、余额问题时，直接说原因，不说笼统的「登录未完成」。
+  const reason=result.connection.cliAuthMessage&&result.connection.cliAuthMessage!=='还没登录'?result.connection.cliAuthMessage:'';
+  return finish(session,connected?'complete':'failed',connected?(session.state.action==='switch-account'?'新账号已接通':'已接通'):reason||'登录未完成，请重新登录');
  }
  async function openLogin(session:ManagedSession){
   allowed(session.state.id,session.deps);

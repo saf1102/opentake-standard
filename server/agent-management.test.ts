@@ -335,3 +335,17 @@ test('旧的内置路径恢复自动查找，桌面和 PATH 别名均不能触�
  assert.equal(ready.executable,alias);assert.equal(ready.workBuddyNeedsCli,undefined);assert.equal(ready.cliAuthState,'connected');
  assert(probes.length>0&&probes.every(file=>file===alias));
 });
+
+test('Windows 登录和安装终端在用户主目录打开，不占住 OpenTake 安装目录（否则覆盖安装换不了 resources）',async()=>{
+ const {systemPowerShell,startWindowsAgentTerminal}=await import('./windows-agent-terminal.ts');
+ const home='C:\\Users\\测试 用户',exe=systemPowerShell();
+ let seen:{cwd?:unknown}={};
+ const pid=await startWindowsAgentTerminal(exe,['login'],'C:\\fixture',{USERPROFILE:home},async(_file,args,options)=>{
+  seen=options as {cwd?:unknown};
+  const opener=args.at(-1)!;assert.ok(opener.includes("-WorkingDirectory '"+home+"'"),opener);
+  const wrapper=Buffer.from(opener.match(/-EncodedCommand ([A-Za-z0-9+/=]+)/)![1],'base64').toString('utf16le');
+  assert.ok(wrapper.includes("$start.WorkingDirectory='"+home+"'"));
+  return {stdout:'4321\r\n'};
+ });
+ assert.equal(pid,4321);assert.equal(seen.cwd,home);
+});

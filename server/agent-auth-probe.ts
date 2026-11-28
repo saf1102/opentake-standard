@@ -10,7 +10,7 @@ import {spawn} from 'node:child_process';
 
 import type {CliAuthState,ConnectionModel} from '../shared/agent-connections.ts';
 
-export type AuthProbeResult={state:CliAuthState;message:string;checkedAt?:string;models?:ConnectionModel[];acpModelSelection?:boolean;deepseekRoute?:'official'|'account';deepseekVerified?:boolean;deepseekKeyRejected?:boolean;deepseekAccountRejected?:boolean;verified?:boolean};
+export type AuthProbeResult={state:CliAuthState;message:string;checkedAt?:string;models?:ConnectionModel[];acpModelSelection?:boolean;deepseekRoute?:'official'|'account';deepseekVerified?:boolean;deepseekKeyRejected?:boolean;deepseekAccountRejected?:boolean;verified?:boolean;blocked?:boolean};
 export const AUTH_CONNECTED_TTL=10*60*1000;
 export const AUTH_RETRY_TTL=15*1000;
 
@@ -93,7 +93,9 @@ export const VERIFY_PROMPT='只回复 OK。';
 function verifyFailure(error:unknown,info:Pick<AuthProbeResult,'models'|'acpModelSelection'>):AuthProbeResult{
  const failure=classifyAgentFailure(error);
  // 套餐、额度先于「要登录」判断：Kimi 的「套餐不含」报错也带 auth_required。
- if(failure.kind==='model-plan'||failure.kind==='quota'||failure.kind==='rate-limit'||failure.kind==='busy')return {state:'unknown',message:failure.message,...info};
+ // 套餐不含、余额或额度用完：账号是登录了的，原因要留在卡片上（blocked），不能再显示「还没登录」。
+ if(failure.kind==='model-plan'||failure.kind==='quota')return {state:'unknown',message:failure.message,blocked:true,...info};
+ if(failure.kind==='rate-limit'||failure.kind==='busy')return {state:'unknown',message:failure.message,...info};
  if(failure.kind==='credentials'||authRequired(error))return {state:'needs-login',message:'还没登录',...info};
  return {state:'unknown',message:'一句话测试没通过：智能体没有正常回复，请重新检查',...info};
 }

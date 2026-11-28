@@ -11,7 +11,8 @@ export function connectionLabel(connection:ConnectionView,waiting=false){
  if(connection.workBuddyNeedsCli)return '已装 WorkBuddy';
  if(!connection.cliInstalled)return '没找到命令行';
  if(connection.id==='deepseek'&&connection.cliAuthState==='needs-login')return '需要设置出片凭据';
- return connection.cliAuthState==='needs-login'?'已安装 · 还没登录':connection.cliAuthState==='unknown'?'没查到':connection.cliAuthState==='pending'?'待适配':'未接通';
+ // 一句话测试查出套餐、余额问题：账号已登录，不能说「没查到」。
+ return connection.cliAuthState==='needs-login'?'已安装 · 还没登录':connection.blockedReason?'套餐或余额不足':connection.cliAuthState==='unknown'?'没查到':connection.cliAuthState==='pending'?'待适配':'未接通';
 }
 export function ConnectionActions({connection,onConfigure,compact=false,disabled=false,showRecheck=true}:{connection:ConnectionView;onConfigure:(mode?:'api')=>void;compact?:boolean;disabled?:boolean;showRecheck?:boolean}){
  const {waiting,busy,errors,workBuddySetup}=useConnections(),id=connection.id,isWaiting=!!waiting[id],isBusy=!!busy[id],definition=connectionDefinition(id);
@@ -34,7 +35,7 @@ export function ConnectionActions({connection,onConfigure,compact=false,disabled
       :<a href={connection.installPage||definition.page} target="_blank" rel="noreferrer">打开官方下载页 ↗</a>}{!definition.apiReason&&<button type="button" disabled={disabled} onClick={()=>onConfigure('api')}>{compact?'填密钥':'填 API 密钥'}</button>}</>
     :connection.cliAuthState==='needs-login'&&connection.cliLoginAvailable?<><span>{compact?'已安装 · 还没登录':''}</span><button type="button" className="connection-login" disabled={isBusy||disabled} onClick={()=>void startConnectionLogin(id)}>{isBusy?'正在打开…':'登录'}</button></>
     :connection.cliAuthState==='pending'?<><span className="connection-adaptation">{connection.cliAuthMessage||'命令行接通待适配'}</span><button type="button" disabled={disabled} onClick={()=>onConfigure('api')}>改用 API 密钥</button></>
-    :showRecheck?<><span>{compact?'没查到':''}</span><button type="button" disabled={isBusy||disabled} onClick={()=>void recheckConnection(id)}>{isBusy?'检查中…':'重新检查'}</button></>:null}
+    :showRecheck?<><span>{compact?(connection.blockedReason?'套餐或余额不足':'没查到'):''}</span><button type="button" disabled={isBusy||disabled} onClick={()=>void recheckConnection(id)}>{isBusy?'检查中…':'重新检查'}</button></>:null}
   </div>
   {!showSetup&&!setupWaiting&&!isWaiting&&connection.cliAuthState==='missing'&&connection.cliAuthMessage&&connection.cliAuthMessage!=='未安装'&&<span className="connection-adaptation">{connection.cliAuthMessage}</span>}
   {!harness&&!setupWaiting&&!compact&&!isWaiting&&connection.cliAuthState==='needs-login'&&connection.cliAuthMessage&&connection.cliAuthMessage!=='还没登录'&&<span className="connection-adaptation">{connection.cliAuthMessage}</span>}

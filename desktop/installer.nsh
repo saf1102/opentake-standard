@@ -18,6 +18,7 @@ Var otRenameAttempt
   SetFont "Microsoft YaHei UI" 9
   ShowInstDetails show
   !ifndef BUILD_UNINSTALLER
+    !include "install-lock.nsh"
     !insertmacro OpenTakeInstallerFunctions
   !endif
 !macroend
@@ -72,6 +73,7 @@ Function OpenTakePromotePayload
   ; Staging is a unique directory inside INSTDIR: every rename stays on the target volume.
   ; Never fall back to overwriting existing files or copying/deleting an unrelated directory.
   StrCpy $otResult "0"
+  StrCpy $otBackup ""
 otFindNextItem:
   ClearErrors
   FindFirst $otFind $otItem "$otStage\*"
@@ -86,9 +88,13 @@ otSkipDots:
     ClearErrors
     RMDir "$otStage"
     IfErrors otPromoteFailed
+    Call OpenTakeDropBackup
     Return
   ${EndIf}
   FindClose $otFind
+  ; 安装目录里已有同名项目（上次失败留下的）先挪开，重装可以自愈。
+  Call OpenTakeMoveAside
+  StrCmp $otResult "0" 0 otAsideStop
   StrCpy $otRenameAttempt "0"
 otRenameItem:
   ClearErrors
@@ -98,6 +104,8 @@ otRenameItem:
   IntCmp $otRenameAttempt 6 otPromoteFailed
   Sleep 250
   Goto otRenameItem
+otAsideStop:
+  Return
 otPromoteFailed:
   StrCpy $otResult "2"
   StrCpy $otCheckOutput "无法移动安装文件：$otItem。已有文件未覆盖。"
@@ -108,6 +116,8 @@ FunctionEnd
 !macro customInit
   !ifndef BUILD_UNINSTALLER
     StrCpy $otCheckOutput ""
+    ; 升级前确认安装目录没被占用，再让旧版卸载动文件。
+    Call OpenTakeWaitUnlocked
   !endif
 !macroend
 

@@ -25,7 +25,7 @@ type LoginResult={waiting:boolean;connection:ConnectionView};
 function applyLogin(id:ConnectionId,result:LoginResult,cancelled=false){
  acceptConnection(result.connection);
  const failed=!cancelled&&!result.waiting&&!result.connection.connected;
- publish({waiting:{...snapshot.waiting,[id]:result.waiting&&!result.connection.connected},errors:{...snapshot.errors,[id]:failed?'登录未完成，请重试':''}});
+ publish({waiting:{...snapshot.waiting,[id]:result.waiting&&!result.connection.connected},errors:{...snapshot.errors,[id]:failed?(result.connection.blockedReason||'登录未完成，请重试'):''}});
  notifyConnectionsChanged(result.connection);
 }
 function scheduleLogin(id:ConnectionId,generation:number){

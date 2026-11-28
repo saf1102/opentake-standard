@@ -17,7 +17,7 @@ import {createAuthProbeCache,probeAcpAuthentication,probeAgentStatusCommand,type
 import {agentSettingsFile,atomicAgentJson,readAgentSettings,getAgentCatalog} from './agent-settings.ts';
 import {connectionSecretStore,type ConnectionSecretStore} from './connection-secrets.ts';
 import {cliVersionNumber,agentFilmUnavailableReason,filmVersionOutdated,agentAcpArgs,agentCliLoginArgs,CONNECTION_IDS,CONNECTION_DEFINITIONS,connectionDefinition,defaultConnection,isRelay,normalizeConnectionBaseUrl,connectionProtocol,deepseekCodexEndpoint,deepseekResponsesModel,DEEPSEEK_CODEX_MODEL,API_TEST_CATEGORIES,type ApiTestCategory,type ConnectionId,type ConnectionConfig,type ConnectionView,type ConnectionModel} from '../shared/agent-connections.ts';
-const configSchema=z.object({deepseekVerifiedRoute:z.enum(['official','account']).optional(),deepseekKeyRejected:z.boolean().optional(),keyId:z.uuid().optional(),profileId:z.string().regex(/^(main|[0-9a-f-]{36})$/).optional(),profileName:z.string().trim().min(1).max(80).optional(),format:z.enum(['auto','responses','chat','anthropic']).optional(),lastApiTest:z.object({httpStatus:z.number().int().min(100).max(599).optional(),category:z.enum(API_TEST_CATEGORIES)}).optional(),authRejectedAt:z.string().optional(),revision:z.number().int().nonnegative().optional(),mode:z.enum(['cli','api']),enabled:z.boolean(),baseUrl:z.string().max(2048),model:z.string().regex(/^[\w.\/:_,-]+$/),cliPath:z.string().max(4096),hasKey:z.boolean(),models:z.array(z.object({id:z.string(),name:z.string(),isDefault:z.boolean().optional()})),checkedAt:z.string().optional(),connected:z.boolean().optional(),message:z.string().optional()}).strict();
+const configSchema=z.object({deepseekVerifiedRoute:z.enum(['official','account']).optional(),deepseekKeyRejected:z.boolean().optional(),keyId:z.uuid().optional(),profileId:z.string().regex(/^(main|[0-9a-f-]{36})$/).optional(),profileName:z.string().trim().min(1).max(80).optional(),format:z.enum(['auto','responses','chat','anthropic']).optional(),lastApiTest:z.object({httpStatus:z.number().int().min(100).max(599).optional(),category:z.enum(API_TEST_CATEGORIES)}).optional(),authRejectedAt:z.string().optional(),blockedReason:z.string().max(400).optional(),revision:z.number().int().nonnegative().optional(),mode:z.enum(['cli','api']),enabled:z.boolean(),baseUrl:z.string().max(2048),model:z.string().regex(/^[\w.\/:_,-]+$/),cliPath:z.string().max(4096),hasKey:z.boolean(),models:z.array(z.object({id:z.string(),name:z.string(),isDefault:z.boolean().optional()})),checkedAt:z.string().optional(),connected:z.boolean().optional(),message:z.string().optional()}).strict();
 const file=()=>process.env.LINKREADER_CONNECTION_SETTINGS_FILE||path.join(path.dirname(agentSettingsFile()),'agent-connections.json');
 const builtinFile=()=>file()+'.builtin.json';
 const profileBook=z.object({active:z.string(),revision:z.number().int(),profiles:z.record(z.string(),configSchema)});
@@ -72,7 +72,7 @@ export function validateConnectionBaseUrl(value:string){
  if(url.protocol!=='https:'&&!(url.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(url.hostname)))throw Error('接口地址必须使用 HTTPS（本机测试地址除外）');
  return url.origin+url.pathname.replace(/\/{2,}/g,'/').replace(/\/+$/,'');
 }
-export type ConnectionDependencies={validatedPath?:string;discoveryEnv?:NodeJS.ProcessEnv;store?:ConnectionSecretStore;fetcher?:typeof fetch;detect?:(id:ConnectionId,config:ConnectionConfig)=>Promise<string|undefined>;cliTest?:(id:ConnectionId,executable:string,verify?:boolean)=>Promise<{connected:boolean;models?:ConnectionModel[]}>;timeoutMs?:number;version?:(file:string)=>Promise<string|undefined>};
+export type ConnectionDependencies={validatedPath?:string;discoveryEnv?:NodeJS.ProcessEnv;store?:ConnectionSecretStore;fetcher?:typeof fetch;detect?:(id:ConnectionId,config:ConnectionConfig)=>Promise<string|undefined>;cliTest?:(id:ConnectionId,executable:string,verify?:boolean)=>Promise<{connected:boolean;blocked?:string;models?:ConnectionModel[]}>;timeoutMs?:number;version?:(file:string)=>Promise<string|undefined>};
 export async function detectConnectionExecutable(id:ConnectionId,config:ConnectionConfig=getConnectionConfig(id),env?:NodeJS.ProcessEnv,refresh=false){
  const otherAgentPath=(candidate:string|undefined)=>candidate&&!isClaudeExecutable(candidate,env??process.env,getConnectionConfig('claude').cliPath)?candidate:undefined;
  if(id==='dreamina'&&!config.cliPath)return otherAgentPath(serviceCliPath(id));
@@ -128,6 +128,8 @@ async function cliAuthentication(id:ConnectionId,config:ConnectionConfig,executa
  const rejected=id!=='deepseek'&&!!config.authRejectedAt;
  // 被拒标记只挡后台的自动查询；用户点「重新检查」或刚登录完，就用一句话测试真查一次，不能永远卡在「还没登录」。
  if(rejected&&!afterLogin&&!force)return {state:'needs-login',message:'还没登录',checkedAt:config.authRejectedAt};
+ // 上次一句话测试查出套餐、余额问题：后台查询直接给出原因，不反复测试；用户点「重新检查」或重新登录时再测。
+ if(id!=='deepseek'&&config.blockedReason&&!afterLogin&&!force)return {state:'unknown',message:config.blockedReason,blocked:true,checkedAt:config.checkedAt};
  // 一句话测试：明确要求、刚登录完、被拒后重查，或这家还没确认接通过时做。只开会话不够：
  // 有的智能体不登录也能开会话，套餐不含也能开，要等出片才发现。
  const verify=id==='deepseek'?verifyHarness:verifyHarness||afterLogin||rejected||config.connected!==true;
@@ -135,7 +137,7 @@ async function cliAuthentication(id:ConnectionId,config:ConnectionConfig,executa
  return authCache.check(key,signature,async()=>{
   assertAgentExecutionAllowed(id);
   // 测试替身：verify 为真时代表做了一句话测试。
-  if(deps.cliTest)return (await deps.cliTest(id,executable,verify)).connected?{state:'connected',message:'已接通',...(verify?{verified:true}:{})}:{state:'needs-login',message:'还没登录'};
+  if(deps.cliTest){const r=await deps.cliTest(id,executable,verify);return r.connected?{state:'connected',message:'已接通',...(verify?{verified:true}:{})}:r.blocked?{state:'unknown',message:r.blocked,blocked:true}:{state:'needs-login',message:'还没登录'};}
   if(id!=='codex'&&id!=='claude'&&!agentAcpArgs(id))return {state:'pending',message:connectionDefinition(id).cliReason||'命令行登录检查待适配，可改用 API 密钥'};
   const controller=new AbortController();authControllers.set(key,controller);
   try{
@@ -174,6 +176,11 @@ export function markAgentCredentialsRejected(id:ConnectionId,expectedMode?:Conne
  for(const listener of credentialRejectedListeners)listener(id);
  emitConnectionStatus(id,(config.revision||0)+1);
 }
+/** 一句话测试查出套餐、余额问题：账号已登录，清掉旧的「凭据被拒」，把原因留给卡片和登录提示。 */
+function persistBlocked(id:ConnectionId,config:ConnectionConfig,auth:AuthProbeResult){
+ const next={...config,revision:(config.revision||0)+1,authRejectedAt:undefined,blockedReason:auth.message,connected:false,checkedAt:auth.checkedAt??new Date().toISOString(),message:auth.message};
+ persist(id,next);authCache.forget(authKey(id));emitConnectionStatus(id,next.revision);
+}
 /** User-started login may clear a previous rejection after an authenticated probe. */
 export async function completeAgentLogin(id:ConnectionId,revision:number|undefined,deps:ConnectionDependencies={},stillWaiting=()=>true):Promise<ConnectionView>{
  const config=getConnectionConfig(id);
@@ -181,9 +188,9 @@ export async function completeAgentLogin(id:ConnectionId,revision:number|undefin
  const executable=await (deps.detect??detectExecutable)(id,config);if(!executable)return getConnectionStatus(id,deps);
  const auth=await cliAuthentication(id,config,executable,deps,true,true);
  if(auth.state==='connected'&&stillWaiting()&&getConnectionConfig(id).revision===revision){
-  const next={...config,revision:(config.revision||0)+1,authRejectedAt:undefined,connected:true,checkedAt:auth.checkedAt,message:'已接通'};
+  const next={...config,revision:(config.revision||0)+1,authRejectedAt:undefined,blockedReason:undefined,connected:true,checkedAt:auth.checkedAt,message:'已接通'};
   persist(id,next);authCache.remember(authKey(id),authSignature(next,executable),auth);emitConnectionStatus(id,next.revision);
- }
+ }else if(auth.blocked&&getConnectionConfig(id).revision===revision)persistBlocked(id,config,auth);
  return getConnectionStatus(id,deps);
 }
 const versionCache=new Map<string,{at:number;value?:string}>();
@@ -236,9 +243,13 @@ async function connectionStatus(id:ConnectionId,deps:ConnectionDependencies,forc
   }
   if(config.mode==='cli')connected=auth?.state==='connected';
   // 一句话测试通过：记下已确认接通，清掉旧的被拒标记，之后的后台查询不再重复测试。
-  if(id!=='deepseek'&&config.mode==='cli'&&executable&&auth?.verified&&auth.state==='connected'&&(config.connected!==true||config.authRejectedAt)&&getConnectionConfig(id).revision===config.revision){
-   const next={...config,revision:(config.revision||0)+1,authRejectedAt:undefined,connected:true,checkedAt:auth.checkedAt,message:'已接通'};
+  if(id!=='deepseek'&&config.mode==='cli'&&executable&&auth?.verified&&auth.state==='connected'&&(config.connected!==true||config.authRejectedAt||config.blockedReason)&&getConnectionConfig(id).revision===config.revision){
+   const next={...config,revision:(config.revision||0)+1,authRejectedAt:undefined,blockedReason:undefined,connected:true,checkedAt:auth.checkedAt,message:'已接通'};
    persist(id,next);authCache.remember(authKey(id),authSignature(next,executable),auth);emitConnectionStatus(id,next.revision);
+   return connectionStatus(id,deps);
+  }
+  if(id!=='deepseek'&&config.mode==='cli'&&auth?.blocked&&(config.blockedReason!==auth.message||config.authRejectedAt||config.connected)&&getConnectionConfig(id).revision===config.revision){
+   persistBlocked(id,config,auth);
    return connectionStatus(id,deps);
   }
  }
@@ -306,8 +317,8 @@ async function saveConnection(id:ConnectionId,input:unknown,deps:ConnectionDepen
  const changed=patch.apiKey||['mode','baseUrl','model','cliPath','format'].some(key=>next[key as keyof ConnectionConfig]!==previous[key as keyof ConnectionConfig]);
  if(id==='deepseek'){
   if(changed||next.enabled!==previous.enabled)next.deepseekVerifiedRoute=undefined;
-  if(patch.apiKey){next.deepseekKeyRejected=undefined;next.authRejectedAt=undefined;}
-  if(patch.mode&&patch.mode!==previous.mode){next.authRejectedAt=undefined;next.models=[];}
+  if(patch.apiKey){next.deepseekKeyRejected=undefined;next.authRejectedAt=undefined;next.blockedReason=undefined;}
+  if(patch.mode&&patch.mode!==previous.mode){next.authRejectedAt=undefined;next.blockedReason=undefined;next.models=[];}
  }
  if(changed){next.connected=false;next.checkedAt=undefined;next.message=undefined;next.lastApiTest=undefined;}
  if(next.baseUrl!==previous.baseUrl)next.models=[];
@@ -421,7 +432,8 @@ export async function testUnifiedConnection(id:ConnectionId,deps:ConnectionDepen
    const revision=(config.revision??0)+1;
    const next={...config,revision,deepseekVerifiedRoute:undefined,deepseekKeyRejected:!!(config.deepseekKeyRejected||cliAuth.deepseekKeyRejected),authRejectedAt:cliAuth.deepseekAccountRejected?new Date().toISOString():config.authRejectedAt,connected:false,checkedAt:new Date().toISOString(),message};
    persist(id,next);authCache.remember(authKey(id),authSignature(next,cliExecutable),cliAuth);emitConnectionStatus(id,revision);
-  }else if(getConnectionConfig(id).revision===config.revision)persist(id,{...getConnectionConfig(id),lastApiTest:config.mode==='api'?{category,httpStatus}:undefined,connected:false,checkedAt:new Date().toISOString(),message});return {ok:false,durationMs:Date.now()-start,error:message,connection:await getConnectionStatus(id,deps)};}
+  }else if(getConnectionConfig(id).revision===config.revision&&cliAuth?.blocked&&id!=='deepseek')persistBlocked(id,getConnectionConfig(id),cliAuth);
+  else if(getConnectionConfig(id).revision===config.revision)persist(id,{...getConnectionConfig(id),lastApiTest:config.mode==='api'?{category,httpStatus}:undefined,connected:false,checkedAt:new Date().toISOString(),message});return {ok:false,durationMs:Date.now()-start,error:message,connection:await getConnectionStatus(id,deps)};}
 }
 
 type ProbeRequest=(route:string,body?:unknown)=>Promise<Record<string,unknown>>;

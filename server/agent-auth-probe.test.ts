@@ -356,7 +356,8 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const request=J
  if(request.method==='session/new')return send({id:request.id,result:{sessionId:'s1'}});
  const say=text=>send({method:'session/update',params:{sessionId:'s1',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text}}}});
  if(scenario==='ok'){say('OK');return send({id:request.id,result:{stopReason:'end_turn'}});}
- if(scenario==='plan')return send({id:request.id,error:{code:-32000,message:'auth_required Authentication required: Your current subscription does not have access to Kimi Code right now. Upgrade your plan'}});
+ if(scenario==='plan')return send({id:request.id,error:{code:-32000,message:'Authentication required: Your current subscription does not have access to Kimi Code right now. Upgrade your plan'}});
+ if(scenario==='balance')return send({id:request.id,error:{code:-32603,message:'Internal error: MiniMax Code Runtime failed: insufficient balance (1008)'}});
  if(scenario==='login')return send({id:request.id,error:{code:-32000,message:'Authentication required'}});
  if(scenario==='text-plan'){say('当前套餐不包含 Qwen Code。升级到 Plus 或 Pro 即可开始编码。');return send({id:request.id,result:{stopReason:'end_turn'}});}
  if(scenario==='silent')return send({id:request.id,result:{stopReason:'end_turn'}});
@@ -364,6 +365,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const request=J
   for(const [scenario,state,message,verified] of [
    ['ok','connected',/一句话测试通过/,true],
    ['plan','unknown',/订阅套餐不包含/,undefined],
+   ['balance','unknown',/额度或余额已用完/,undefined],
    ['login','needs-login',/还没登录/,undefined],
    ['text-plan','unknown',/订阅套餐不包含/,undefined],
    ['silent','unknown',/没有正常回复/,undefined],
@@ -371,6 +373,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const request=J
    fs.writeFileSync(log,'');
    const result=await probeAcpAuthentication(process.execPath,[script,scenario,log],{tempRoot:root,timeoutMs:5000,verify:true});
    assert.equal(result.state,state,scenario);assert.match(result.message,message,scenario);assert.equal(result.verified,verified,scenario);
+   assert.equal(result.blocked,scenario==='plan'||scenario==='balance'||scenario==='text-plan'?true:undefined,scenario+' blocked');
    const requests=fs.readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));
    assert.deepEqual(requests.map(item=>item.method),['initialize','session/new','session/prompt'],scenario);
    assert.equal(requests[2].params.prompt[0].text,'只回复 OK。');
@@ -380,4 +383,23 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const request=J
   assert.equal(plain.state,'connected');assert.equal(plain.verified,undefined,'不要求测试时只开会话');
   assert.deepEqual(fs.readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line).method),['initialize','session/new']);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('一句话测试查出套餐、余额问题：清掉旧的凭据被拒，原因留在卡片上；后台不反复测试，重新检查和登录成功后恢复',async()=>{
+ const {markAgentCredentialsRejected,completeAgentLogin}=await import('./agent-connections.ts');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'opentake-auth-blocked-')),old=process.env.LINKREADER_CONNECTION_SETTINGS_FILE;
+ process.env.LINKREADER_CONNECTION_SETTINGS_FILE=path.join(root,'connections.json');
+ let verified=0,state:'plan'|'ok'='plan';const reason='当前订阅套餐不包含这项服务或所选模型。请到服务商升级套餐，或在设置里改用 API 密钥、内置智能体。';
+ const deps:ConnectionDependencies={detect:async id=>`/fixture/${id}`,cliTest:async(_id,_exe,verify)=>{if(!verify)return {connected:true};verified++;return state==='ok'?{connected:true}:{connected:false,blocked:reason}}};
+ try{
+  markAgentCredentialsRejected('kimi','cli');assert.ok(getConnectionConfig('kimi').authRejectedAt,'旧版本留下的凭据被拒');
+  const refreshed=await refreshAgentConnection('kimi',deps);
+  assert.equal(refreshed.connected,false);assert.equal(refreshed.cliAuthMessage,reason);assert.notEqual(refreshed.cliAuthState,'needs-login');
+  assert.equal(getConnectionConfig('kimi').authRejectedAt,undefined);assert.equal(getConnectionConfig('kimi').blockedReason,reason);
+  const before=verified;const background=await getConnectionStatus('kimi',deps);
+  assert.equal(background.cliAuthMessage,reason);assert.equal(verified,before,'后台查询不反复测试');
+  const login=await completeAgentLogin('kimi',getConnectionConfig('kimi').revision,deps);assert.equal(login.connected,false);assert.equal(login.blockedReason,reason);
+  state='ok';const recovered=await refreshAgentConnection('kimi',deps);
+  assert.equal(recovered.connected,true);assert.equal(getConnectionConfig('kimi').blockedReason,undefined);
+ }finally{if(old===undefined)delete process.env.LINKREADER_CONNECTION_SETTINGS_FILE;else process.env.LINKREADER_CONNECTION_SETTINGS_FILE=old;fs.rmSync(root,{recursive:true,force:true})}
 });

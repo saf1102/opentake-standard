@@ -83,6 +83,16 @@ export function outputLimit(config) {
   if (/(^|\.)dashscope(?:-intl)?\.aliyuncs\.com$/.test(host) && /^qwen3-vl/i.test(config.id || '')) return 32768;
   return 8192;
 }
+// 上下文窗口也要按服务商设：框架按「窗口 − 已用」算每轮还能输出多少。窗口设小了，
+// 做片做到一半上下文积满，每轮只剩几个字的输出空间，就会一直被截断（11-27 真机 DeepSeek 两次失败的真实原因）。
+// DeepSeek：https://api-docs.deepseek.com/quick_start/pricing（Flash 1M）；千问 qwen3-vl：约 256K。
+export function contextWindowFor(config) {
+  let host = '';
+  try { host = new URL(config.baseUrl).hostname.toLowerCase(); } catch {}
+  if (host === 'api.deepseek.com') return 1000000;
+  if (/(^|\.)dashscope(?:-intl)?\.aliyuncs\.com$/.test(host) && /^qwen3-vl/i.test(config.id || '')) return 262144;
+  return 128000;
+}
 export const LENGTH_FAILURE = '模型输出达到长度上限，未完成本次任务';
 export const LENGTH_CONTINUE = '你上一条输出超过了单次输出上限，被截断并已撤回。请把要写的内容拆成几个较小的文件，或分几次写入，然后接着完成任务。';
 export async function createEditorAgent(config,cwd,root,permission,update) {
@@ -91,7 +101,7 @@ export async function createEditorAgent(config,cwd,root,permission,update) {
   if (!spec || !config.key || !config.id || !config.baseUrl) throw Error('请先配置接口、密钥和模型');
   const [api,stream] = spec;
   const model = {api,id:config.id,name:config.id,provider:'opentake',baseUrl:config.baseUrl,
-    input:['text','image'],reasoning:false,contextWindow:128000,maxTokens:outputLimit(config),
+    input:['text','image'],reasoning:false,contextWindow:contextWindowFor(config),maxTokens:outputLimit(config),
     cost:{input:0,output:0,cacheRead:0,cacheWrite:0}};
   const agent = new Agent({
     initialState:{systemPrompt:projectPrompt(root) + (cwd === root ? '' : '\n\n' + projectInstructions(cwd)),model,tools:projectTools(root,cwd),thinkingLevel:'off'},

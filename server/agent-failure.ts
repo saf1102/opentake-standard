@@ -29,7 +29,7 @@ export function classifyAgentFailure(error:unknown):AgentFailure {
  const builtin=/模型一次要写的内容太长，被服务商截断[^\n]*/.exec(text)?.[0];
  if(builtin)return {kind:'other',message:builtin,excerpt};
  // Explicit exhausted-quota codes override HTTP 429; a bare 429 is only transient throttling.
- const kind:AgentFailure['kind']=/insufficient_quota|quota.{0,25}(?:exhaust|exceed)|(?:credit|balance).{0,25}(?:insufficient|exhaust|deplet)|(?:额度|余额).{0,12}(?:不足|耗尽|用完)|payment_required|\b402\b/i.test(text)?'quota'
+ const kind:AgentFailure['kind']=/insufficient_quota|quota.{0,25}(?:exhaust|exceed)|(?:credit|balance).{0,25}(?:insufficient|exhaust|deplet)|insufficient.{0,20}(?:balance|credits?|quota|funds)|(?:额度|余额).{0,12}(?:不足|耗尽|用完)|payment_required|\b402\b/i.test(text)?'quota'
   :/(?:subscription|plan).{0,50}(?:not include|does not include|not support|not cover|(?:does not|doesn't|do not) have access|no access)|upgrade (?:your )?(?:plan|subscription)|(?:model).{0,40}(?:not available.{0,20}(?:plan|subscription))|(?:订阅|套餐).{0,20}(?:不含|不包含|不支持|无权)|model_not_allowed/i.test(text)?'model-plan'
   :/auth_required|authentication[_ ]required|missing.{0,15}(?:key|credential|token)|invalid[_ ](?:api[_ ]?key|credential)|(?:缺少|未配置|无效|过期).{0,12}(?:密钥|凭据)|(?:密钥|凭据).{0,12}(?:缺失|未配置|过期)|not (?:logged in|authenticated)|\b401\b/i.test(text)?'credentials'
   :/at[ _-]+capacity|overload(?:ed)?|(?:模型|服务).{0,12}(?:繁忙|忙碌)|(?:繁忙|忙碌).{0,12}模型/i.test(text)?'busy'

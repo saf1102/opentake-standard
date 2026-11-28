@@ -224,3 +224,15 @@ test('输出上限按服务商设置，未核实的保持 8192',async()=>{
   assert.equal(outputLimit({baseUrl:'https://api.deepseek.com.evil.example',id:'x'}),8192);
   assert.equal(outputLimit({baseUrl:'not a url',id:'x'}),8192);
 });
+
+test('上下文窗口按服务商设置，长时间做片不会把每轮输出空间挤没',async()=>{
+  const {contextWindowFor}=await import('./engine.mjs');
+  const {clampMaxTokensToContext}=await import('@earendil-works/pi-ai/api/simple-options');
+  assert.equal(contextWindowFor({baseUrl:'https://api.deepseek.com',id:'deepseek-flash'}),1000000);
+  assert.equal(contextWindowFor({baseUrl:'https://dashscope.aliyuncs.com/compatible-mode/v1',id:'qwen3-vl-plus'}),262144);
+  assert.equal(contextWindowFor({baseUrl:'https://example.invalid/v1',id:'x'}),128000);
+  // 已用约 12 万 token 的上下文：窗口 12.8 万时输出被压到几千；按 DeepSeek 真实窗口仍有完整 32K。
+  const context={messages:[{role:'user',content:'x'.repeat(480000)}]};
+  assert.ok(clampMaxTokensToContext({contextWindow:128000},context,32768)<8000);
+  assert.equal(clampMaxTokensToContext({contextWindow:1000000},context,32768),32768);
+});
