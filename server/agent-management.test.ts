@@ -298,7 +298,7 @@ test('Windows 安装脚本的 exit 仅结束内层进程，可见父窗口记录
  const exe=systemPowerShell(),command='irm https://www.codebuddy.cn/cli/install.ps1 | iex';
  const pid=await startWindowsAgentTerminal(exe,['-NoLogo','-NoProfile','-Command',command],'C:\\fixture',{},async(file,args,options)=>{
   assert.equal(file,exe);assert.equal(options.windowsHide,true);
-  const opener=args.at(-1)!;assert.match(opener,/Start-Process .* -WindowStyle Normal -PassThru/);
+  const opener=args.at(-1)!;assert.match(opener,/Start-Process .* -WindowStyle Normal(?: -WorkingDirectory '[^']*')? -PassThru/,'在 Windows 上会带用户主目录');
   const wrapper=Buffer.from(opener.match(/-EncodedCommand ([A-Za-z0-9+/=]+)/)![1],'base64').toString('utf16le');
   assert.ok(wrapper.includes("$start.FileName='"+exe+"'"));assert.ok(wrapper.includes(command));
   assert.match(wrapper,/\$operation\.WaitForExit\(\)[\s\S]*\$operationCode=\$operation.ExitCode[\s\S]*Set-Content -LiteralPath[^\r\n]*exit-code\.tmp[\s\S]*Move-Item[^\r\n]*-Destination [^\r\n]*exit-code'/);
